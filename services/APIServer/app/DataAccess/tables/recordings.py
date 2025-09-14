@@ -14,21 +14,6 @@ from .__Enumeration import UploadStatus, UploadStatusEnum
 __all__ = ["Schema", "Table"]
 
 
-class Schema(BaseModel):
-    id: uuid.UUID
-    url: str 
-    user_id: int
-    camera_id: uuid.UUID | None = None
-    duration: float | None = Field(default=None, ge=0)
-    is_processed: bool = False
-    is_embedding: bool = False
-    start_time: datetime | None = None
-    video_metadata: dict | None = None
-
-    model_config = ConfigDict(from_attributes=True)
-    
-
-
 class RecordingsTable(ORMBase, TimestampMixin):
     __tablename__ = "recordings"
 

@@ -61,7 +61,7 @@ class FFmpegProcess:
             "-i", self.input_url,
             "-c", "copy",
             "-f", "segment",
-            "-segment_atclocktime", "1",
+            #"-segment_atclocktime", "1",
             "-segment_time", str(self.segment_seconds),
             "-reset_timestamps", "1",
             "-strftime", "1",

@@ -2,14 +2,17 @@ from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import datetime 
 
+# 目前數值從這裡生效
 class JobParams(BaseModel):
-    video_id: str | None = None  # 影片ID(如果有的話)
+    video_id: UUID | None = None  # 影片ID(如果有的話)
+    user_id: int | None = None  # 使用者ID(如果有的話)
+    camera_id: UUID | None = None  # 攝影機ID(如果有的話)
     video_start_time: datetime | None = None
-    target_fps: int | None = None  # 抽幀後的幀率，預設為3秒一幀。
-    blur_threshold: float | None = None # 模糊閾值，預設為20.0
-    difference_module: str | None = None
-    difference_threshold: float | None = None
-    compression_proportion: float | None = None
+    target_fps: int = 3  # 抽幀後的幀率，預設為3秒一幀。
+    blur_threshold: float  = 60 # 模糊閾值，預設為20.0
+    difference_module: str = "SSIM"
+    difference_threshold: float  = 0.7
+    compression_proportion: float  = 0.5
 
 class JobCreateDTO(BaseModel):
     type: str = Field(..., description="例如 video_description_extraction")
@@ -32,6 +35,7 @@ class JobCreateDTO(BaseModel):
 
 class JobCreatedRespDTO(BaseModel):
     job_id: UUID
+    trace_id: str | None = None
     status: str = "pending"
 
 class JobGetRespDTO(BaseModel):
@@ -62,4 +66,7 @@ class JobCompleteDTO(BaseModel):
     duration: float | None = None
     metrics: dict | None = None
     events: list | None = None
+class OKRespDTO(BaseModel):
+    msg: str = "OK"
+
 

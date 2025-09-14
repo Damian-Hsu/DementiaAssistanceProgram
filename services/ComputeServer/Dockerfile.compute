@@ -5,37 +5,58 @@ FROM python:3.12.11-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
-    PIP_NO_CACHE_DIR=on
+    PIP_NO_CACHE_DIR=on \
+    TZ=UTC \
+    TRANSFORMERS_CACHE=/srv/app/adapters/.cache/transformers \
+    HF_HOME=/srv/app/adapters/.cache/huggingface
 
+# 基本系統套件
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tzdata ca-certificates curl && \
-    rm -rf /var/lib/apt/lists/*
+    tzdata ca-certificates curl git ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
 
-# 工作目錄
 WORKDIR /srv
 
 # 先複製 requirements 以利快取
 COPY requirements.txt .
 
-# 安裝 Python 套件
-# RUN pip install --no-cache-dir -r requirements.txt
+# 安裝 Python 套件（用 BuildKit 的 pip cache）
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt
 
 # 複製其餘原始碼
 COPY . .
 
-# 建立錄影/日誌目錄（之後會被 volume 掛掉，但先確保存在）
-RUN mkdir -p /var/log/streaming
+# 建立執行用戶（先建使用者，再 chown）
+RUN useradd -r -u 10001 appuser
 
-# 預設時區用 UTC（ffmpeg 檔名已依 UTC）
-ENV TZ=UTC
+# 準備可寫目錄並賦權
+RUN mkdir -p /var/log/compute \
+             /srv/app/adapters/.cache/transformers \
+             /srv/app/adapters/.cache/huggingface \
+ && chown -R appuser:appuser /srv/app/adapters /var/log/compute
 
-# 非 root 執行（更安全）
-RUN useradd -r -u 10001 appuser && chown -R appuser:appuser /srv /var/log/streaming
+# 切換到非 root
 USER appuser
 
-# EXPOSE 9091
+# （強烈建議）在 build 階段預先把 BLIP 模型拉進快取，避免執行時卡權限/鎖與網路
+RUN python - <<'PY'
+from transformers import BlipProcessor, BlipForConditionalGeneration
+m = "Salesforce/blip-image-captioning-base"
+BlipProcessor.from_pretrained(m, cache_dir="/srv/app/adapters/.cache/transformers")
+BlipForConditionalGeneration.from_pretrained(m, cache_dir="/srv/app/adapters/.cache/transformers")
+PY
+
+# 啟動 Celery Worker
+# 注意：JSON array 內的行尾不要放反斜線 + 空白；每個參數獨立成一個字串元素即可
+CMD ["celery", "-A", "app.main:app", "worker", \
+     "-l", "info", \
+     "-Q", "default", \
+     "-P", "prefork", \
+     "-c", "4", \
+     "--max-tasks-per-child=100", \
+     "--prefetch-multiplier=1"]
+
 
 # 啟動 StreamingServer（FastAPI + Uvicorn）
 CMD ["celery", "-A", "app.main:app", "worker",\

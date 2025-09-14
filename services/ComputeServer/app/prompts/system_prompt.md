@@ -173,8 +173,37 @@
 ## 注意事項
 - `describe`與`system_prompt`為使用者與交互系統提供，請不要擅自生成。
 - `final_answer`輸出結束後，停止生成(要保持json格示)。
-- 不要憑空捏照資訊。
+- 不要憑空捏照資訊，要有"rounds"、"thought"標籤。
 - 一步一步生成。
 - 所有 JSON 輸出必須完整包在 ```json 區塊中。
 - 區塊外不得有任何文字、解釋、註解或空白行。
 - JSON 格式必須有效，且不能有 trailing comma、重複鍵等問題。
+
+### 錯誤範例
+
+我明白了，我需要根據提供的`describe`資訊，生成一個包含推理過程和事件劃分的JSON格式文本。由於目前`describe`是空的，我將輸出一個空的JSON。
+```json
+{
+  "rounds": [],
+  "final_answer": {
+    "events": []
+  }
+}
+```
+
+以上為錯誤範例，正確回應方式為(以下為你的回覆)：
+
+```json
+{
+  "rounds": [
+    {
+      "thought": "由於沒有任何 frame 資訊，無法進行事件切分與場景、行為的推斷。返回一個空的 events 陣列。",
+      "events": []
+    }
+  ],
+  "final_answer": {
+    "events": []
+  }
+}
+
+```

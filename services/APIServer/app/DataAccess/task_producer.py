@@ -12,7 +12,7 @@ def enqueue(task_name: str, kwargs: dict, queue: str | None = None, headers: dic
     封裝送任務。APIServer 呼叫這個函式即可。
     - task_name: 例如 "tasks.video_description_extraction"
     - kwargs:    必須是 JSON 可序列化的 dict
-    - queue:     指定要投遞的 queue（預設 DEFAULT_Q）
+    - queue:     指定要投遞的 queue（預設 DEFAULT_Q）   
     - headers:   選填，自訂傳遞訊息標頭（可放 trace_id）
     """
     q = queue or DEFAULT_Q

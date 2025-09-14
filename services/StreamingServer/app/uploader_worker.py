@@ -88,6 +88,66 @@ def _extract_ymd_from_path(p: Path) -> Optional[Tuple[int, int, int]]:
     except Exception:
         return None
 
+async def _wait_until_file_stable(
+    p: Path,
+    *,
+    min_age_sec: float = 2.0,        # 檔案至少要「生成超過」這個秒數
+    stable_for_sec: float = 5.0,     # 連續這麼久 size/mtime 都不變才算穩定
+    poll_interval: float = 0.5,      # 觀察輪詢間隔
+    max_wait_sec: float = 300.0      # 上限（避免卡死），到時還不穩就讓外層走重試
+) -> bool:
+    """
+    等待檔案「穩定」：存在、可讀、且 size/mtime 在 stable_for_sec 內沒有變動。
+    回傳 True=穩定；False=超時未穩定（交由外層重試策略處理）
+    """
+    start_ts = time.time()
+
+    last_size = -1
+    last_mtime = -1.0
+    stable_start = None
+
+    while True:
+        now = time.time()
+        if now - start_ts > max_wait_sec:
+            return False
+
+        if not p.exists():
+            await asyncio.sleep(poll_interval)
+            continue
+
+        try:
+            st = p.stat()
+            size = st.st_size
+            mtime = st.st_mtime
+        except FileNotFoundError:
+            await asyncio.sleep(poll_interval)
+            continue
+
+        # 至少要過 min_age_sec 才能判斷
+        if (now - mtime) < min_age_sec:
+            await asyncio.sleep(poll_interval)
+            continue
+
+        if size == last_size and mtime == last_mtime:
+            if stable_start is None:
+                stable_start = now
+            if (now - stable_start) >= stable_for_sec:
+                # 嘗試開檔讀一點點，避免單純 metadata 沒變但仍被獨占等極端狀況
+                try:
+                    with p.open("rb") as f:
+                        f.read(1024)
+                    return True
+                except Exception:
+                    # 無法讀取，繼續等
+                    pass
+        else:
+            # 狀態變了，重置穩定計時
+            stable_start = None
+            last_size = size
+            last_mtime = mtime
+
+        await asyncio.sleep(poll_interval)
+
 # =========================
 # 檔案系統清理（安全作法）
 # =========================
@@ -357,6 +417,17 @@ def _start_watchdog(loop: asyncio.AbstractEventLoop, q: "asyncio.Queue[Path]", r
 # =========================
 async def _upload_and_create_job(p: Path, meta: Dict[str, Any], rclock: RemoteClock) -> None:
     assert _http is not None and _s3 is not None
+
+    # 0) 關鍵：確保檔案穩定（否則讓外層重試退避）
+    ok = await _wait_until_file_stable(
+        p,
+        min_age_sec=2.0,
+        stable_for_sec=5.0,
+        poll_interval=0.5,
+        max_wait_sec=300.0
+    )
+    if not ok:
+        raise RuntimeError(f"file not stable yet: {p}")
 
     # 1) S3 上傳
     await asyncio.to_thread(_s3.upload_file, str(p), settings.minio_bucket, meta["s3_key"])

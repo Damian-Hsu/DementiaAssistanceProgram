@@ -32,3 +32,13 @@ sequenceDiagram
 
 
 ```
+    
+Job complete received:
+job_id=UUID('01994930-460e-7c70-8f95-232901d63a57') 
+trace_id='01994930-460b-71f2-879d-909b6ee438a7' 
+status='failed' 
+video_start_time='2025-09-14T17:04:45+00:00' 
+video_end_time=None error_code='TypeError' 
+error_message=
+"int() argument must be a string, a bytes-like object or a real number, not 'NoneType'"
+duration=0.0012440681457519531 metrics=None events=[]

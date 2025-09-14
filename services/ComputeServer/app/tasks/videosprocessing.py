@@ -5,19 +5,94 @@ import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 from PIL import Image
 import torch
-from transformers import AutoProcessor, BlipForConditionalGeneration
+from transformers import BlipProcessor, BlipForConditionalGeneration
 import math
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
 import time
+import threading
+import requests
+import dotenv
+import os
+import re
+import boto3
+from botocore.config import Config
+from urllib.parse import quote
+dotenv.load_dotenv()
 
 # 以此檔案為錨點，而非 CWD
 HERE = Path(__file__).resolve().parent           # .../tasks
 ROOT = HERE.parent                               # 專案根（含 prompts、tasks 的那層）
 PROMPTS_DIR = ROOT / "prompts"
+_JSON_FENCE_RE = re.compile(r"```(?:json|JSON)?\s*([\s\S]*?)\s*```", re.MULTILINE)
 SYSTEM_PROMPT_PATH = PROMPTS_DIR / "system_prompt.md"
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
+MINIO_ROOT_USER = os.getenv("MINIO_ROOT_USER", "minioadmin")
+MINIO_ROOT_PASSWORD = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
+PRESIGN_EXPIRES = int(os.getenv("PRESIGN_EXPIRES", "3600"))  # 秒
+DEBUG = os.getenv("DEBUG", "0") in ["1", "true", "True"]
+_S3_CLIENT = None
+_S3_LOCK = threading.Lock()
+_S3_URL_RE = re.compile(r"^s3://(?P<bucket>[^/]+)/(?P<key>.+)$")
 
+def _dbg(msg: str):
+    if DEBUG:
+        print(f"[DEBUG] {msg}")
+
+def _frames_dicts_summary(frames_dicts: List[Dict[str, Any]]) -> str:
+    total = len(frames_dicts)
+    blurry = sum(1 for f in frames_dicts if not f.get("is_not_blurry", False))
+    significant = sum(1 for f in frames_dicts if f.get("is_significant", False))
+    return f"frames_dicts summary: total={total}, blurry={blurry}, significant={significant}"
+def _get_s3_client():
+    global _S3_CLIENT
+    if _S3_CLIENT is None:
+        with _S3_LOCK:
+            if _S3_CLIENT is None:
+                _S3_CLIENT = boto3.client(
+                    "s3",
+                    endpoint_url=MINIO_ENDPOINT,                # 例: http://minio:9000
+                    aws_access_key_id=MINIO_ROOT_USER,
+                    aws_secret_access_key=MINIO_ROOT_PASSWORD,
+                    config=Config(signature_version="s3v4"),   # MinIO 建議 s3v4
+                    region_name=os.getenv("AWS_REGION", "us-east-1"),
+                )
+    return _S3_CLIENT
+
+
+def _s3_to_presigned_http(url: str, *, expires: int = PRESIGN_EXPIRES) -> str:
+    """
+    s3://bucket/key -> https://... 的限時 GET 署名網址
+    """
+    m = _S3_URL_RE.match(url)
+    if not m:
+        return url  # 不是 s3:// 就原樣回傳
+
+    bucket = m.group("bucket")
+    key = m.group("key")
+
+    s3 = _get_s3_client()
+
+    try:
+        presigned = s3.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={"Bucket": bucket, "Key": key},
+            ExpiresIn=expires,
+        )
+        return presigned
+    except Exception as e:
+        # 讓上層看見清楚錯誤（例如帳密/endpoint 錯、bucket 不存在等）
+        raise RuntimeError(f"Presign failed for {url}: {e}") from e
+
+
+def ensure_http_video_url(url: str) -> str:
+    """
+    若是 s3:// 就轉 presigned http(s)；否則原樣回傳。
+    """
+    if isinstance(url, str) and url.startswith("s3://"):
+        return _s3_to_presigned_http(url)
+    return url
 
 # SSIM 需用 skimage；只有在 module="SSIM" 時才會用到
 try:
@@ -33,7 +108,7 @@ def timer(func):
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
-        print(f"Function {func.__name__} took {end_time - start_time:.2f} seconds")
+        _dbg(f"Function {func.__name__} took {end_time - start_time:.2f} seconds")
         return result
     return wrapper
 
@@ -48,10 +123,12 @@ def get_video_frames(video_url: str, target_fps: int = 3):
                 "possible_extracts": None,
                 "extracted_frames": None
             }
+    _dbg(f"get_video_frames() called with video_url={video_url}, target_fps={target_fps}")
+    video_url = ensure_http_video_url(video_url)
     if target_fps <= 0:
         raise ValueError("target_fps 必須是正數，且大於0")
     
-    cap = cv2.VideoCapture(video_url)
+    cap = cv2.VideoCapture(video_url, cv2.CAP_FFMPEG)
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration = total_frames / fps * 1000  # 毫秒
@@ -110,10 +187,12 @@ def get_video_frames_fast(video_url: str, target_fps: int = 3):
     """
     GPT改我程式的加速版
     """
+    _dbg(f"get_video_frames_fast() called with video_url={video_url}, target_fps={target_fps}")
+    video_url = ensure_http_video_url(video_url)
     if target_fps <= 0:
         raise ValueError("target_fps 必須是正數，且大於0")
 
-    cap = cv2.VideoCapture(video_url)
+    cap = cv2.VideoCapture(video_url, cv2.CAP_FFMPEG)
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if fps <= 0 or total_frames <= 0:
@@ -174,6 +253,7 @@ def analyze_blur(
             "is_not_blurry": <bool>           # 變異數 < 門檻 -> False
         }
     """
+    _dbg(f"analyze_blur() call: {_frames_dicts_summary(frames_dicts)}，threshold={threshold}")
     analyzed = []
 
     for item in frames_dicts:
@@ -220,6 +300,7 @@ def filter_by_frame_difference(
     step 1 : 將影像壓縮，並形成對應的 key -> stamp ; value -> frame
     step 2 : 掠過第一張，從第二張開始，與前一張做差異比對，並根據key 修改原始dict的參數 
     """
+    _dbg(f"filter_by_frame_difference() call: {_frames_dicts_summary(frames_dicts)}，threshold={threshold}, compression_proportion={compression_proportion}, module={module}")
     if module not in ["MSE_L2", "SSIM"]:
         raise ValueError("module 必須是 'MSE_L2' 或 'SSIM'")
     if module == "SSIM" and not _HAS_SKIMAGE:
@@ -267,7 +348,6 @@ def filter_by_frame_difference(
         filtered_item["mse_value"] = diff_value if module == "MSE_L2" else None
         filtered_item["is_significant"] = bool(is_significant)
         filtered_frames.append(filtered_item)
-
     return filtered_frames  # 返回處理後的幀列表，包含是否顯著的標記
 
 
@@ -278,15 +358,21 @@ def filter_by_frame_difference(
 
 class BLIPImageCaptioner:
     
-    def __init__(self, model_name="Salesforce/blip-image-captioning-base", device=None):
-        # print(f"🔁 正在載入 BLIP 模型：{model_name}")
+    def __init__(self, model_name="Salesforce/blip-image-captioning-base",
+                 cache_dir="/srv/app/adapters/.cache/transformers",
+                 device=None):
+        _dbg(f"Initializing BLIPImageCaptioner with model {model_name} on device {device if device else ('cuda' if torch.cuda.is_available() else 'cpu')}")
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
-
-        self.processor = AutoProcessor.from_pretrained(model_name,
-                                                       cache_dir="./adapters/.cache/transformers",
-                                                       use_fast=True)
-        self.model = BlipForConditionalGeneration.from_pretrained(model_name,
-                                                                  cache_dir="./adapters/.cache/transformers")
+        self.cache_dir = cache_dir
+        self.processor = BlipProcessor.from_pretrained(
+            model_name,
+            cache_dir=self.cache_dir,
+            use_fast=True 
+        )
+        self.model = BlipForConditionalGeneration.from_pretrained(
+            model_name,
+            cache_dir=self.cache_dir
+        )
         self.model.to(self.device)
         self.model.eval()
 
@@ -303,6 +389,7 @@ class BLIPImageCaptioner:
         Returns:
             caption: 圖像描述文字（str）
         """
+        _dbg(f"BLIPImageCaptioner.describe() called with image_input type {type(image_input)}")
         if isinstance(image_input, str):
             image = Image.open(image_input).convert("RGB")
         elif isinstance(image_input, Image.Image):
@@ -315,13 +402,33 @@ class BLIPImageCaptioner:
         caption = self.processor.decode(generated_ids[0], skip_special_tokens=True)
 
         return caption
-    
+
+_CAPTIONER = None
+_CAPTIONER_LOCK = threading.Lock()
+
+def get_captioner() -> BLIPImageCaptioner:
+    global _CAPTIONER
+    _dbg("get_captioner() called")
+    if _CAPTIONER is None:
+        with _CAPTIONER_LOCK:
+            if _CAPTIONER is None:
+                # 確保有資料夾
+                os.makedirs("/srv/app/adapters/.cache/transformers", exist_ok=True)                
+                _CAPTIONER = BLIPImageCaptioner(
+                    model_name="Salesforce/blip-image-captioning-base",
+                    device=None,
+                    # 用「絕對路徑」而非相對路徑
+                    cache_dir="/srv/app/adapters/.cache/transformers",
+                )
+    return _CAPTIONER
+
 # 初始化 BLIP Captioner 
-CAPTIONER = BLIPImageCaptioner()
+# CAPTIONER = BLIPImageCaptioner()
 
 @timer
-def img_captioning(frames_dicts: List[Dict[str, Any]],
-                   ):
+def img_captioning(frames_dicts: List[Dict[str, Any]]):
+    _dbg(f"img_captioning() called with {_frames_dicts_summary(frames_dicts)}")
+    captioner = get_captioner()
     for item in frames_dicts:
         if item["is_not_blurry"] and item["is_significant"]:
             frame = item["frame"]
@@ -331,7 +438,7 @@ def img_captioning(frames_dicts: List[Dict[str, Any]],
             pil_image = Image.fromarray(image_rgb)
 
             # 丟進 BLIP 產生描述
-            caption = CAPTIONER.describe(pil_image)
+            caption = captioner.describe(pil_image)
 
             # 存回 dict
             item["caption"] = caption
@@ -340,27 +447,104 @@ def img_captioning(frames_dicts: List[Dict[str, Any]],
     return frames_dicts
 
 from ..libs.ModelLoad import llm_core
-import re
 LLM_CORE = llm_core(supplier="google",
                     model_name="gemini-2.0-flash",
-                    api_key="AIzaSyBvBotMRaGYMi4YYehNTT80d5-oknnp-68")
+                    api_key=os.getenv("GOOGLE_API_KEY") )
 
-def clean_model_output(model_output: str):
+def _extract_first_json_substring(s: str) -> Optional[str]:
     """
-    將 Google 模型回傳的字串（含 ```json ... ``` 標記）轉成 Python dict
+    在任意字串中找出第一個「平衡的」JSON 物件或陣列子字串。
+    支援跳過字串中的大括號（會處理跳脫字元）。
+    回傳子字串（含最外層 { } 或 [ ]），找不到回 None。
     """
-    # 移除 ```json 與 ```
-    cleaned = re.sub(r"^```json|```$", "", model_output.strip(), flags=re.MULTILINE).strip()
-    
-    # 嘗試轉換成 JSON
-    try:
-        data = json.loads(cleaned)
-        return data
-    except json.JSONDecodeError:
+    in_str = False
+    esc = False
+    quote = ""
+    start = None
+    depth = 0
+
+    for i, ch in enumerate(s):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == quote:
+                in_str = False
+            continue
+
+        # 不在字串內
+        if ch == '"' or ch == "'":
+            in_str = True
+            quote = ch
+            continue
+
+        if ch == "{" or ch == "[":
+            if start is None:
+                start = i
+            depth += 1
+            continue
+
+        if ch == "}" or ch == "]":
+            if start is not None:
+                depth -= 1
+                if depth == 0:
+                    return s[start:i+1]
+
+    return None
+
+def clean_model_output(model_output: Any) -> Optional[Any]:
+    """
+    將 LLM 回傳文本清成可用的 JSON 物件。
+    支援：
+      - ```json fenced blocks```
+      - 夾雜敘述文字的回應（自動擷取第一個平衡的 JSON）
+      - 輸入已是 dict/list 時直接回傳
+    """
+    # 先處理已是 JSON 的情形
+    if isinstance(model_output, (dict, list)):
+        return model_output
+    if model_output is None:
         return None
+
+    s = str(model_output).strip()
+    # 清掉常見不可見字元，避免 loads 受影響
+    s = s.replace("\u00A0", " ").replace("\u200B", "")
+
+    candidates: list[str] = []
+
+    # 1) 先試 fenced blocks（可能有多段，逐一嘗試）
+    fences = _JSON_FENCE_RE.findall(s)
+    for block in fences:
+        block = block.strip()
+        if block:
+            candidates.append(block)
+
+    # 2) 整段原文也加入候選
+    candidates.append(s)
+
+    # 逐一嘗試解析
+    for cand in candidates:
+        # 2.1 直接 parse
+        try:
+            return json.loads(cand)
+        except Exception:
+            pass
+
+        # 2.2 從候選中抽第一個平衡 JSON 子字串
+        sub = _extract_first_json_substring(cand)
+        if sub:
+            try:
+                return json.loads(sub)
+            except Exception:
+                pass
+
+    # 都失敗就回 None
+    return None
 @timer
 def llm_processing(frames_dicts: List[Dict[str, Any]],
                    number_of_trys: int = 3):
+    _dbg(f"llm_processing() called with {_frames_dicts_summary(frames_dicts)}，number_of_trys={number_of_trys}")
     #錯誤檢查
     if not frames_dicts or not isinstance(frames_dicts, list):
         raise ValueError("frames_dicts 必須是非空的列表")
@@ -396,6 +580,7 @@ def llm_processing(frames_dicts: List[Dict[str, Any]],
         }
         for i, fr in enumerate(cleaned_frames)
         ]
+    _dbg(f"Frames prepared for LLM: {len(frames_summary)} frames.")
     # 準備 prompt
     prompt = {
         "system_prompt": str(system_prompt),
@@ -406,8 +591,10 @@ def llm_processing(frames_dicts: List[Dict[str, Any]],
     output_num = number_of_trys
     while number_of_trys != 0:
         result = LLM_CORE.invoke(text = str(prompt))
+        _dbg(f"{output_num-number_of_trys+1} of try. LLM raw output: {result}")
         # 清理模型輸出
         result = clean_model_output(result)
+        _dbg(f"{output_num-number_of_trys+1} of try. LLM cleaned output: {result}")
         if result:
             break
         number_of_trys -= 1
@@ -640,10 +827,11 @@ def video_description_extraction_main(job: dict):
 
     """
     try:
+        _dbg(f"job received: {json.dumps(job) if isinstance(job, dict) else str(job)}")
         # === Step 1~3: 取幀 ===
         reply = get_video_frames_fast(
             video_url=job.get("input_url", ""),
-            target_fps=job.get("params", {}).get("target_fps", 3)
+            target_fps=int(job.get("params", {}).get("target_fps", 3))
         )
         video_info = reply["video_info"]
         frames = reply["frames"]
@@ -651,14 +839,14 @@ def video_description_extraction_main(job: dict):
         # === Step 4: 模糊度過濾 ===
         reply = analyze_blur(
             frames_dicts=frames,
-            threshold=job.get("params", {}).get("blur_threshold", 20.0)
+            threshold=float(job.get("params", {}).get("blur_threshold", 20.0))
         )
 
         # === Step 5: 幀差過濾 ===
         reply = filter_by_frame_difference(
             frames_dicts=reply,
-            threshold=job.get("params", {}).get("difference_threshold", 0.8),
-            compression_proportion=job.get("params", {}).get("compression_proportion", 0.5),
+            threshold=float(job.get("params", {}).get("difference_threshold", 0.8)),
+            compression_proportion=float(job.get("params", {}).get("compression_proportion", 0.5)),
             module=job.get("params", {}).get("difference_module", "SSIM")
         )
 
@@ -708,10 +896,10 @@ def video_description_extraction_main(job: dict):
             message=str(e)
         )
     
-import requests
-API_SERVER_URL = "http://localhost:8000"
+
+API_SERVER_URL = os.getenv("JOB_API_BASE", "http://api:8000")
 headers = {
-    "X-API-Key": "aQV0OW43EmgRbQkOeDEJCT4QX8ZaZShQdHCQKYTyJsy8Z0n_9HIeiARXTAUkjw7Q",
+    "X-API-Key": os.getenv("JOB_API_KEY", ""),
     "Content-Type": "application/json"
 }
 
@@ -725,6 +913,8 @@ def video_description_extraction(self, job: dict):
     # 呼叫 API Server，將結果存入資料庫
     # print("URL："+job.get('input_url', ''))
     # print(reply)
+    _dbg(f"Posting result to {API_SERVER_URL}/jobs/{job.get('job_id', '?')}/complete")
+    _dbg(f"Result: {json.dumps(reply) if isinstance(reply, dict) else str(reply)}")
     try:
         response = requests.post(
             f"{API_SERVER_URL}/jobs/{job.get('job_id', '?')}/complete",
