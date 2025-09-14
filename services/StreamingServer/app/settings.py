@@ -6,6 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 class _Settings:
     # Streaming（原本就有）
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     mediamtx_rtsp_base: str = os.getenv("MEDIAMTX_RTSP_BASE", "rtsp://mediamtx:8554")
     segment_seconds: int = int(os.getenv("SEGMENT_SECONDS", "30"))
     align_first_cut: bool = os.getenv("ALIGN_FIRST_CUT", "true").lower() == "true"

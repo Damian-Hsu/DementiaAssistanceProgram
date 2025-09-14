@@ -110,8 +110,8 @@ class BLIPImageCaptioner:
         print(f"🔁 正在載入 BLIP 模型：{model_name}")
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.processor = BlipProcessor.from_pretrained(model_name)
-        self.model = BlipForConditionalGeneration.from_pretrained(model_name)
+        self.processor = BlipProcessor.from_pretrained(model_name, cache_dir="./adapters/.cache/transformers")
+        self.model = BlipForConditionalGeneration.from_pretrained(model_name, cache_dir="./adapters/.cache/transformers")
         self.model.to(self.device)
 
         print(f"✅ BLIP 模型已載入至 {self.device}。")

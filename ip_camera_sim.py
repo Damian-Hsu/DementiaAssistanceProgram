@@ -4,7 +4,7 @@ import sys
 import time
 
 # 推到 mediamtx
-rtsp_url = "rtsp://192.168.4.128:8554/P3SJo3Ywj8QKBUIFoCJaru?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjaWQiOiIwMTk5MTZiMi02NTRlLTcwYzEtYWM2ZS01NTMzZTE2YjE0NTQiLCJhY3Rpb24iOiJwdWJsaXNoIiwidmVyIjowLCJ0dGwiOjYwLCJpYXQiOjE3NTczMjY2MzUsImV4cCI6MTc1NzMyNjY5NSwiYXVkIjoicnRzcCJ9.GCjx4fZFiI1heLYj_1NOqqhmIIvOAiKKX3BtNURSOUE"
+rtsp_url = input("請輸入 RTSP 推流 URL:")
 
 cap = cv2.VideoCapture(0)  # 可改成 "sample.mp4"
 if not cap.isOpened():

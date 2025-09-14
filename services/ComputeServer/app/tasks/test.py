@@ -1,8 +1,8 @@
 # services/ComputeServer/tasks/test.py
 from time import sleep
 from celery.exceptions import SoftTimeLimitExceeded
-from services.ComputeServer.CeleryApp import app
-from services.ComputeServer.DTO import JobCreate
+from ..main import app
+from ..DTO import JobCreate
 
 @app.task(name="tasks.echo_and_check", bind=True, acks_late=True)
 def echo_and_check(self, job: dict):

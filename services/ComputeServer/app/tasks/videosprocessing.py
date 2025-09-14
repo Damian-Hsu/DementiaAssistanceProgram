@@ -1,11 +1,11 @@
-from ..CeleryApp import app
+from ..main import app
 from ..DTO import *
 import cv2
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 from PIL import Image
 import torch
-from transformers import BlipProcessor, BlipForConditionalGeneration
+from transformers import AutoProcessor, BlipForConditionalGeneration
 import math
 import json
 from datetime import datetime, timedelta
@@ -212,10 +212,10 @@ def filter_by_frame_difference(
     """
     module:
     "MSE_L2" : 灰階均方差，"({n}-({n-1}))^2 if n < 1"
-    "SSIM" : 結構相似度，{\displaystyle {\text{SSIM}}(\mathbf {x} ,\mathbf {y} )=
-    [l(\mathbf {x} ,\mathbf {y} )]^{\alpha }
-    [c(\mathbf {x} ,\mathbf {y} )]^{\beta }
-    [s(\mathbf {x} ,\mathbf {y} )]^{\gamma }}(維基抄下來的，還有一堆沒有抄，好奇的自己去查)
+    "SSIM" : 結構相似度，{\\displaystyle {\\text{SSIM}}(\\mathbf {x} ,\\mathbf {y} )=
+    [l(\\mathbf {x} ,\\mathbf {y} )]^{\\alpha }
+    [c(\\mathbf {x} ,\\mathbf {y} )]^{\\beta }
+    [s(\\mathbf {x} ,\\mathbf {y} )]^{\\gamma }}(維基抄下來的，還有一堆沒有抄，好奇的自己去查)
 
     step 1 : 將影像壓縮，並形成對應的 key -> stamp ; value -> frame
     step 2 : 掠過第一張，從第二張開始，與前一張做差異比對，並根據key 修改原始dict的參數 
@@ -282,9 +282,13 @@ class BLIPImageCaptioner:
         # print(f"🔁 正在載入 BLIP 模型：{model_name}")
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.processor = BlipProcessor.from_pretrained(model_name)
-        self.model = BlipForConditionalGeneration.from_pretrained(model_name)
+        self.processor = AutoProcessor.from_pretrained(model_name,
+                                                       cache_dir="./adapters/.cache/transformers",
+                                                       use_fast=True)
+        self.model = BlipForConditionalGeneration.from_pretrained(model_name,
+                                                                  cache_dir="./adapters/.cache/transformers")
         self.model.to(self.device)
+        self.model.eval()
 
         # print(f"✅ BLIP 模型已載入至 {self.device}。")
 

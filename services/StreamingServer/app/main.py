@@ -1,29 +1,27 @@
 # -*- coding: utf-8 -*-
 from fastapi import FastAPI, Header, HTTPException, Depends
 from typing import Optional, List
-from urllib.parse import urlencode
-import jwt, time
 from contextlib import asynccontextmanager
+import asyncio
 from .models import StartStreamReq, UpdateStreamReq, StopStreamReq, StreamInfo
 from .settings import settings
 from .manager import manager
-from .uploader_worker import bootstrap_uploader
+from .uploader_worker import start_uploader_async, shutdown_uploader_async
 from .ffmpeg_runner import FFmpegProcess
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if not getattr(app.state, "uploader_started", False):
-        app.state.uploader_started = True
-        bootstrap_uploader()
+    # 啟動 uploader 背景任務
+    stop_event = asyncio.Event()
+    app.state.uploader_tasks = await start_uploader_async(stop_event)
+    app.state.uploader_stop = stop_event
     try:
         yield
     finally:
-        # 這裡可以做關閉清理，例如發一個 stop event 給 worker
-        # stop_uploader_event.set()
-        pass
-# @app.on_event("startup")
-# def _start_background_workers():
-#     # 啟動 Uploader（watchdog + worker），以及預先掃描既有檔案
-#     bootstrap_uploader()
+        # 收斂 uploader 背景任務
+        stop_event.set()
+        await shutdown_uploader_async(app.state.uploader_tasks)
+
 
 app = FastAPI(title="StreamingServer", version="0.3.0", lifespan=lifespan)
 

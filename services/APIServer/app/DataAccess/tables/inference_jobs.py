@@ -31,6 +31,7 @@ class InferenceJobsTable(ORMBase, TimestampMixin):
     error_code: Mapped[str|None] = mapped_column(String(64),nullable=True)
     error_message: Mapped[str|None] = mapped_column(Text, nullable=True)
     params: Mapped[dict|None] = mapped_column(JSONB,nullable=True)
+    # params = Column(MutableDict.as_mutable(JSONB), nullable=False, server_default="{}")
     metrics: Mapped[dict|None] = mapped_column(JSONB,nullable=True)
 
 Table = InferenceJobsTable

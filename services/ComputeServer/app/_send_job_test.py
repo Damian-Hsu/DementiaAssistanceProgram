@@ -1,7 +1,7 @@
 # services/ComputeServer/send_job.py
-from services.ComputeServer.CeleryApp import app
+from .main import app
 import uuid
-from services.ComputeServer.DTO import JobCreate
+from .DTO import JobCreate
 
 def main():
 

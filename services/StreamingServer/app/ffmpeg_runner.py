@@ -3,6 +3,7 @@ import os, shlex, subprocess, threading, time, random
 from pathlib import Path
 from typing import Optional
 from .settings import settings
+from datetime import datetime, timezone
 from .utils import ensure_dir, env_for_utc, seconds_to_next_boundary
 
 class FFmpegProcess:
@@ -37,13 +38,22 @@ class FFmpegProcess:
         self.proc: Optional[subprocess.Popen] = None
         self._thread: Optional[threading.Thread] = None
         self._stop = False
+        if settings.DEBUG:
+            print(f"[DEBUG] FFmpegProcess initialized: stream_id={self.stream_id}, user_id={self.user_id}, camera_id={self.camera_id}, input_url={self.input_url}, out_dir={self.out_dir}, segment_seconds={self.segment_seconds}, startup_deadline_ts={self.startup_deadline_ts}, align_first_cut={self.align_first_cut}")
 
     # ---------- command 構建 ----------
 
     def build_cmd(self) -> list[str]:
         # 輸出範本：/root/user_id/camera_id/YYYY/MM/DD/YYYYMMDDTHHMMSSZ.mp4（UTC）
         tpl = os.path.join(self.out_dir, "%Y/%m/%d/%Y%m%dT%H%M%SZ.mp4")
+        if settings.DEBUG:
+            print(f"[DEBUG] FFmpeg output template: {tpl}")
+            print(f"[DEBUG] Ensuring output directory exists: {self.out_dir}")
         ensure_dir(self.out_dir)
+        now_utc = datetime.now(timezone.utc)
+        date_path = os.path.join(self.out_dir, now_utc.strftime("%Y/%m/%d"))
+        ensure_dir(date_path)
+    
         args = [
             "ffmpeg",
             "-hide_banner", "-loglevel", "warning",
@@ -57,14 +67,24 @@ class FFmpegProcess:
             "-strftime", "1",
             "-segment_format", "mp4",
             "-segment_format_options", "movflags=+faststart",
+            # 確保 FFmpeg 使用 UTC 時間
+            "-use_wallclock_as_timestamps", "1",
             tpl,
         ]
+        # 設定環境變數確保 FFmpeg 使用 UTC
+        os.environ['TZ'] = 'UTC'
+        if settings.DEBUG:
+            args.insert(1, "-loglevel")
+            args.insert(2, "debug")
+            print(f"[DEBUG] FFmpeg command: {' '.join(shlex.quote(a) for a in args)}")
         return args
 
     def _open_log(self):
         log_file = os.path.join(settings.log_dir, f"{self.stream_id}.log")
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
         # 以附加模式開啟，每次啟動各自擁有 file handle；子行程結束後關閉
+        if settings.DEBUG:
+            print(f"[DEBUG] FFmpeg log file: {log_file}")
         return open(log_file, "ab", buffering=0)
 
     # ---------- 啟動一次（不重試） ----------
@@ -74,6 +94,9 @@ class FFmpegProcess:
         回傳子行程退出碼（rc）。
         - align_before_start=True 時，會在第一段前對齊一次。
         """
+        if settings.DEBUG:
+            print(f"[DEBUG] FFmpegProcess._start_once(align_before_start={align_before_start}) called")
+
         if align_before_start and self.align_first_cut:
             time.sleep(seconds_to_next_boundary(self.segment_seconds))
 
@@ -89,15 +112,21 @@ class FFmpegProcess:
             while not self._stop:
                 rc = self.proc.poll()
                 if rc is not None:
+                    if settings.DEBUG:
+                        print(f"[DEBUG] FFmpegProcess: process exited with rc={rc}")
                     break
                 time.sleep(0.5)
 
             if self._stop and rc is None:
                 # 被要求停止，主動終止
                 try:
+                    if settings.DEBUG:
+                        print(f"[DEBUG] FFmpegProcess: stopping process")
                     self.proc.terminate()
                     rc = self.proc.wait(timeout=10)
                 except subprocess.TimeoutExpired:
+                    if settings.DEBUG:
+                        print(f"[DEBUG] FFmpegProcess: process did not terminate in time, killing")
                     self.proc.kill()
                     try:
                         rc = self.proc.wait(timeout=5)
@@ -108,6 +137,8 @@ class FFmpegProcess:
         finally:
             try:
                 logf.close()
+                if settings.DEBUG:
+                    print(f"[DEBUG] FFmpegProcess: log file closed")
             except Exception:
                 pass
 
@@ -125,6 +156,8 @@ class FFmpegProcess:
         - stop() 被呼叫（會終止子行程），或
         - 子行程異常退出，再次進入重試（若仍在視窗內）
         """
+        if settings.DEBUG:
+            print(f"[DEBUG] FFmpegProcess._run_loop() started")
         self._stop = False
         backoff = 1.0
         first_attempt = True
@@ -167,6 +200,8 @@ class FFmpegProcess:
                     pass
 
     def spawn_background(self):
+        if settings.DEBUG:
+            print(f"[DEBUG] FFmpegProcess.spawn_background() called")
         # 背景跑重試迴圈
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
@@ -174,6 +209,8 @@ class FFmpegProcess:
     # ---------- 停止 ----------
 
     def stop(self):
+        if settings.DEBUG:
+            print(f"[DEBUG] FFmpegProcess.stop() called")
         self._stop = True
         if self.proc and self.proc.poll() is None:
             try:
@@ -190,4 +227,6 @@ class FFmpegProcess:
             self._thread.join(timeout=5)
 
     def is_running(self) -> bool:
+        if settings.DEBUG:
+            print(f"[DEBUG] FFmpegProcess.is_running() called, proc={self.proc}, poll={self.proc.poll() if self.proc else 'N/A'}")
         return bool(self.proc and self.proc.poll() is None)

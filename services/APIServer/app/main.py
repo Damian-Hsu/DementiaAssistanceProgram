@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime, timezone
+from .DTO import DateTimeResponse
 from .security.deps import get_current_user, get_current_api_client
 from .config.path import (API_ROOT)
 from .router.Authentication.service import auth_router, m2m_router
@@ -62,7 +64,7 @@ app.include_router(admin_router, dependencies=[Depends(get_current_user)])
 app.include_router(camera_router, dependencies=[Depends(get_current_user)])
 # ======================== User Signup API =======================
 
-@app.get("/")
+@app.get("/",tags=["system"])
 async def read_root():
     """
     測試 API 是否連線
@@ -75,3 +77,25 @@ async def health_check():
     健康檢查 API
     """
     return {"status": "ok"}
+
+@app.get("/datatime", response_model=DateTimeResponse, tags=["system"])
+async def get_server_datetime():
+    """
+    取得伺服器當前 UTC 時間
+    用於客戶端時間同步和查詢參數標準化
+    """
+    now_utc = datetime.now(timezone.utc)
+    
+    return DateTimeResponse(
+        utc_datetime=now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        utc_timestamp=now_utc.timestamp(),
+        utc_Y = now_utc.year,
+        utc_m = now_utc.month,
+        utc_d = now_utc.day,
+        utc_H = now_utc.hour,
+        utc_M = now_utc.minute,
+        utc_S = now_utc.second,
+        utc_microsecond = now_utc.microsecond,
+        timezone="UTC",
+        iso_format=now_utc.isoformat().replace("+00:00", "Z")
+    )

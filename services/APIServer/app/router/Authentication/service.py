@@ -109,8 +109,8 @@ def _make_path_from_id(cam_id: uuid.UUID, length: int = 22) -> str:
 @m2m_router.post("/check-stream-pwd")
 async def check_stream_pwd(req: Request):
     data = await req.json()
-    proto  = data.get("protocol")     # "rtsp" | "hls" | "webrtc"（MediaMTX 會送）
-    action = data.get("action")    # "publish" | "read"
+    proto  = data.get("protocol") # "rtsp" | "hls" | "webrtc"（MediaMTX 會送）
+    action = data.get("action") # "publish" | "read"
     path   = data.get("path")
     query  = data.get("query") or ""
     token  = (parse_qs(query).get("token") or [None])[0]

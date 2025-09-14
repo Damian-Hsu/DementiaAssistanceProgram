@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import uuid
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Any
 from datetime import datetime
 import ipaddress
 from pydantic import BaseModel, Field, ConfigDict, field_validator
@@ -87,11 +87,9 @@ class GenerateTokenReq(BaseModel):
     ttl: Optional[int] = Field(default=None, ge=30, le=3600)  # 秒
     # bind_ip: bool = True  # 是否把 request 來源 IP 綁進 token
 
-class StreamTokenResp(BaseModel):
-    rtsp_url: str
-    hls_url: str
-    webrtc_url: str
+class StreamConnectResp(BaseModel):
     ttl: int
+    info: Optional[dict[str, Any]] = None  # streaming 回傳的 JSON（僅成功時）
 
 class RefreshTokenResp(BaseModel):
     audience: Literal["rtsp", "hls", "webrtc"]
@@ -99,8 +97,15 @@ class RefreshTokenResp(BaseModel):
     token: str
     ttl: int
     expires_at: int
-
+class PublishRTSPURLResp(BaseModel):
+    publish_rtsp_url: str
+    ttl: int
+    expires_at: int
 class PlayHLSURLResp(BaseModel):
     play_hls_url: str
+    ttl: int
+    expires_at: int
+class PlayWebRTCURLResp(BaseModel):
+    play_webrtc_url: str
     ttl: int
     expires_at: int

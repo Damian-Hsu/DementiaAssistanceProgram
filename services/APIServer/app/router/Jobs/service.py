@@ -5,6 +5,7 @@ import uuid_utils as uuidu
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update, select
 
@@ -35,6 +36,7 @@ async def create_job(body: JobCreateDTO, db: AsyncSession = Depends(get_session)
     """
     # --- 1) 確定 trace_id ---
     trace_id = body.trace_id or create_uuid7()
+    params_json = jsonable_encoder(body.params)
 
     # --- 2) DB 新增 job ---
     job = inference_jobs.Table(
@@ -43,7 +45,7 @@ async def create_job(body: JobCreateDTO, db: AsyncSession = Depends(get_session)
         input_url=body.input_url,
         status=JobStatus.pending,
         trace_id=str(trace_id),
-        params=body.params,
+        params=params_json,
     )
     try:
         db.add(job)
@@ -79,7 +81,7 @@ async def create_job(body: JobCreateDTO, db: AsyncSession = Depends(get_session)
         "type": job.type,
         "input_type": job.input_type,
         "input_url": job.input_url,
-        "params": job.params,
+        "params": params_json,
         "trace_id": str(job.trace_id),
     }
 
@@ -185,5 +187,6 @@ async def complete_job(body:JobCompleteDTO ,db: AsyncSession = Depends(get_sessi
     Job 完成後的回傳
     收到結構為 JobCompleteDTO 的資料，此程式要更新video
     """
-    
+    print("Job complete received:", body)
+    return {"msg": "Job completion received. test ok."}
     

@@ -14,16 +14,16 @@ services:
       - ./postgres/init-scripts:/docker-entrypoint-initdb.d
     networks:
       - demo-network
-  fluent-bit:
-    image: fluent/fluent-bit:2.2
-    container_name: demo_fluent-bit
-    ports: ["24224:24224"]
-    volumes:
-      - ../datas/logs:/logs
-      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
-    command: ["-c", "/fluent-bit/etc/fluent-bit.conf"]
-    networks:
-      - demo-network
+  # fluent-bit:
+  #   image: fluent/fluent-bit:2.2
+  #   container_name: demo_fluent-bit
+  #   ports: ["24224:24224"]
+  #   volumes:
+  #     - ../datas/logs:/logs
+  #     - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+  #   command: ["-c", "/fluent-bit/etc/fluent-bit.conf"]
+  #   networks:
+  #     - demo-network
 
   redis:
     image: redis:7
@@ -118,6 +118,25 @@ services:
       - postgres
       - redis
       - minio
+
+  compute:
+    build:
+      context: ../services/ComputeServer
+      dockerfile: Dockerfile.compute
+    container_name: compute_server
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - LOG_DIR=/var/log/compute
+    volumes:
+      - ../datas/logs/compute:/var/log/compute
+      - ../datas/compute/adapters:/srv/app/adapters:rw
+    networks: [demo-network]
+    depends_on:
+      - mediamtx
+      - minio
+      - minio-init
+      - api
   streaming:
     build:
       context: ../services/StreamingServer
@@ -143,7 +162,9 @@ services:
     depends_on:
       - mediamtx
       - minio
+      - minio-init
       - api
+      - compute
 
 networks:
   demo-network:

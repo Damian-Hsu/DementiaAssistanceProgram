@@ -23,14 +23,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 複製其餘原始碼
 COPY . .
 
-# 建立錄影/日誌目錄（之後會被 volume 掛掉，但先確保存在）
-RUN mkdir -p /recordings /var/log/streaming
+# 建立錄影/日誌/資料庫目錄（之後會被 volume 掛掉，但先確保存在）
+RUN mkdir -p /recordings /var/log/streaming /srv/app/database
 
 # 預設時區用 UTC（ffmpeg 檔名已依 UTC）
 ENV TZ=UTC
 
-# 非 root 執行（更安全）
-RUN useradd -r -u 10001 appuser && chown -R appuser:appuser /srv /recordings /var/log/streaming
+# 建立 appuser 並設定目錄權限
+RUN useradd -r -u 10001 appuser && \
+    chown -R appuser:appuser /srv /recordings /var/log/streaming /srv/app/database && \
+    chmod -R u+rwX /srv /recordings /var/log/streaming /srv/app/database
+
 USER appuser
 
 EXPOSE 9090

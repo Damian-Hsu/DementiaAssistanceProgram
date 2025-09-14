@@ -19,8 +19,8 @@ from ...DataAccess.tables.__Enumeration import CameraStatus, Role
 
 from .DTO import (
     CameraCreate, CameraUpdate, CameraRead, CameraListResp, CameraStatusReq,
-    OkResp, TokenVersionResp, GenerateTokenReq, StreamTokenResp, PlayHLSURLResp,
-    RefreshTokenResp
+    OkResp, TokenVersionResp, GenerateTokenReq, PlayHLSURLResp,
+    RefreshTokenResp,PublishRTSPURLResp,StreamConnectResp,PlayWebRTCURLResp
 )
 from ...security.jwt_manager import CameraJWTManager
 from ...config.path import (CAMERA_PREFIX)
@@ -238,7 +238,7 @@ async def set_status(request: Request,
     return OkResp()
 
 
-@camera_router.post("/{id}/token-version:rotate", response_model=TokenVersionResp)
+@camera_router.post("/{id}/token/version-rotate", response_model=TokenVersionResp)
 async def rotate_token_version(request: Request,
                                id: uuid.UUID,
                                db: AsyncSession = Depends(get_session)):
@@ -268,47 +268,7 @@ async def rotate_token_version(request: Request,
     return TokenVersionResp(token_version=cam.token_version)
 
 
-@camera_router.post("/{id}/token:generate", response_model=StreamTokenResp)
-async def generate_token(
-    id: uuid.UUID,
-    req: GenerateTokenReq,
-    request: Request,
-    db: AsyncSession = Depends(get_session),
-):
-    """
-    簽發短效串流 token（publish / read），可選擇綁 request 來源 IP。
-    回傳直接可用的 RTSP URL。
-    """
-    cam = await _get_camera_or_404(db, id)
-    current_user = request.state.current_user
-
-    if current_user.role != Role.admin and current_user.id != cam.user_id:
-        raise HTTPException(status_code=403, detail="沒有權限操作此相機")
-
-    if cam.status != CameraStatus.active:
-        raise HTTPException(status_code=403, detail=f"camera status={cam.status} not allowed")
-
-    # 簽發 JWT
-    token = stream_jwt.issue(
-        camera_id=str(cam.id),
-        action=req.action,
-        token_version=int(cam.token_version),
-        ttl=req.ttl,
-        aud="rtsp"  # 指定用途（RTSP 推流或讀取）
-    )
-    url = _build_public_rtsp(cam, token)
-
-    ttl = req.ttl or (
-        stream_jwt.default_publish_ttl if req.action == "publish" else stream_jwt.default_play_ttl
-    )
-    return StreamTokenResp(
-        publ_rtsp_url=url if req.action == "publish" else None,
-        play_hls_url=None,
-        ttl=ttl
-    )
-
-
-@camera_router.post("/{id}/connect-stream", response_model=StreamTokenResp)
+@camera_router.post("/{id}/stream/connect", response_model=StreamConnectResp)
 async def connect_stream(
     id: uuid.UUID,
     req: GenerateTokenReq,
@@ -327,23 +287,13 @@ async def connect_stream(
         raise HTTPException(status_code=403, detail="沒有權限操作此相機")
     if cam.status != CameraStatus.active:
         raise HTTPException(status_code=403, detail=f"camera status={cam.status} not allowed")
-
-    # Publisher token（客戶端推流用）
-    publish_rtsp_token = stream_jwt.issue(
-        camera_id=str(cam.id),
-        action="publish",
-        token_version=int(cam.token_version),
-        ttl=req.ttl,
-        aud="rtsp"
-    )
-    public_publish_url = _build_public_rtsp(cam, publish_rtsp_token)
-
+    _ttl = max(req.ttl or 60, 60)
     # internal token (StreamingServer 拉流用)
     internal_rtsp_token = stream_jwt.issue(
         camera_id=str(cam.id),
         action="read",
         token_version=int(cam.token_version),
-        ttl=max(req.ttl or 60, 60),
+        ttl=_ttl,  # 最少 60 秒
         aud="rtsp"
     )
     internal_play_url = _build_internal_rtsp_for_streaming(cam, internal_rtsp_token)
@@ -355,7 +305,7 @@ async def connect_stream(
         "rtsp_url": internal_play_url,
         "segment_seconds": req.segment_seconds or 30,
         "align_first_cut": bool(getattr(req, "align_first_cut", True)),
-        "startup_deadline_ts": req.ttl or 60
+        "startup_deadline_ts": _ttl
     }
     headers = {"X-Internal-Token": STREAMING_INTERNAL_TOKEN} if STREAMING_INTERNAL_TOKEN else {}
     start_url = f"{STREAMING_BASE.rstrip('/')}/streams/start"
@@ -366,37 +316,77 @@ async def connect_stream(
                 status_code=502,
                 detail=f"streaming/start failed: {resp.status_code} {resp.text}",
             )
+    
+    return StreamConnectResp(
+        ttl=_ttl,
+        info=resp.json() if resp.status_code == 200 else None
+    )
 
-    # Public HLS 播放 token
-    public_hls_token = stream_jwt.issue(
+@camera_router.post("/{id}/stream/stop", response_model=OkResp)
+async def stop_stream(
+    id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    停止錄影（StreamingServer 停拉流與切片）。
+    """
+    cam = await _get_camera_or_404(db, id)
+    current_user = request.state.current_user
+    if current_user.role != Role.admin and current_user.id != cam.user_id:
+        raise HTTPException(status_code=403, detail="沒有權限操作此相機")
+    if cam.status != CameraStatus.active:
+        raise HTTPException(status_code=403, detail=f"camera status={cam.status} not allowed")
+
+    headers = {"X-Internal-Token": STREAMING_INTERNAL_TOKEN} if STREAMING_INTERNAL_TOKEN else {}
+    stop_url = f"{STREAMING_BASE.rstrip('/')}/streams/stop"
+    payload = {
+        "user_id": str(cam.user_id),
+        "camera_id": str(cam.id)
+    }
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(stop_url, json=payload, headers=headers)
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=502,
+                detail=f"streaming/stop failed: {resp.status_code} {resp.text}",
+            )
+    return OkResp()
+
+@camera_router.get("/{id}/publish_rtsp_url")
+async def get_publish_rtsp_url(
+    id: uuid.UUID,
+    request: Request,
+    ttl: Optional[int] = Query(60, ge=30, le=3600),
+    db: AsyncSession = Depends(get_session)
+):
+    """
+    發 RTSP 推流用的 JWT，回傳帶 token 的 URL。
+    """
+    cam = await _get_camera_or_404(db, id)
+    current_user = request.state.current_user
+    if current_user.role != Role.admin and current_user.id != cam.user_id:
+        raise HTTPException(status_code=403, detail="沒有權限操作此相機")
+    if cam.status != CameraStatus.active:
+        raise HTTPException(status_code=403, detail=f"camera status={cam.status} not allowed")
+
+    publish_rtsp_token = stream_jwt.issue(
         camera_id=str(cam.id),
-        action="read",
+        action="publish",
         token_version=int(cam.token_version),
-        ttl=max(req.ttl or 60, 60),
-        aud="hls"
+        ttl=ttl,
+        aud="rtsp"
     )
-    public_hls_url = _build_public_hls(cam, public_hls_token)
+    public_publish_url = _build_public_rtsp(cam, publish_rtsp_token)
 
-    # Public webrtc 串流 token
-    public_webrtc_token = stream_jwt.issue(
-        camera_id=str(cam.id),
-        action="read",
-        token_version=int(cam.token_version),
-        ttl=max(req.ttl or 60, 60),
-        aud="webrtc"
-    )
-    public_webrtc_url = _build_public_webrtc(cam, public_webrtc_token)
-     
-    ttl = req.ttl or stream_jwt.default_publish_ttl
-    return StreamTokenResp(
-        rtsp_url=public_publish_url,
-        hls_url=public_hls_url,
-        webrtc_url=public_webrtc_url,
-        ttl=ttl
+    now = int(datetime.now(timezone.utc).timestamp())
+    return PublishRTSPURLResp(
+        publish_rtsp_url=public_publish_url,
+        ttl=ttl,
+        expires_at=now + ttl,
     )
 
-
-@camera_router.get("/{id}/play-hls-url")
+@camera_router.get("/{id}/play-hls-url", response_model=PlayHLSURLResp)
 async def get_play_hls_url(
     id: uuid.UUID,
     request: Request,
@@ -428,8 +418,41 @@ async def get_play_hls_url(
         ttl=ttl,
         expires_at=now + ttl,
     )
-    
-@camera_router.get("/{id}/refresh-token/{audience}")
+
+@camera_router.get("/{id}/play-webrtc-url", response_model=PlayWebRTCURLResp)
+async def get_play_webrtc_url(
+    id: uuid.UUID,
+    request: Request,
+    ttl: Optional[int] = Query(60, ge=30, le=3600),
+    db: AsyncSession = Depends(get_session)
+):
+    """
+    發 WebRTC 播放用的 JWT，回傳帶 token 的 URL。
+    """
+    cam = await _get_camera_or_404(db, id)
+    current_user = request.state.current_user
+    if current_user.role != Role.admin and current_user.id != cam.user_id:
+        raise HTTPException(status_code=403, detail="沒有權限操作此相機")
+    if cam.status != CameraStatus.active:
+        raise HTTPException(status_code=403, detail=f"camera status={cam.status} not allowed")
+
+    webrtc_token_public = stream_jwt.issue(
+        camera_id=str(cam.id),
+        action="read",
+        token_version=int(cam.token_version),
+        ttl=ttl,
+        aud="webrtc"
+    )
+    public_play_webrtc_url = _build_public_webrtc(cam, webrtc_token_public)
+
+    now = int(datetime.now(timezone.utc).timestamp())
+    return PlayWebRTCURLResp(
+        play_webrtc_url=public_play_webrtc_url,
+        ttl=ttl,
+        expires_at=now + ttl
+    )
+
+@camera_router.get("/camera/{id}/token/refresh/{audience}")
 async def refresh_token(
     id: uuid.UUID,
     request: Request, # 這裡面有 current_user
@@ -482,17 +505,3 @@ async def refresh_token(
         ttl=ttl,
         expires_at=now + ttl,
     )
-
-from ..Authentication.service import m2m_router
-
-@m2m_router.get("/get-id-from-path")
-async def get_id_from_path(path: str = Query(), db: AsyncSession = Depends(get_session)):
-    """給 MediaMTX 查 path 對應的 camera.id 用"""
-    res = await db.execute(
-        select(camera_table.Table).where(camera_table.Table.path == path)
-    )
-    cam = res.scalar_one_or_none()
-    if not cam or cam.status != CameraStatus.active:
-        raise HTTPException(status_code=404, detail="camera not found")
-    return {"cid": str(cam.id),
-            "user_id": str(cam.user_id)}
