@@ -10,6 +10,7 @@ from .router.User.service import user_router
 from .router.Admin.service import admin_router
 from .router.Jobs.service import jobs_router
 from .router.Camera.service import camera_router
+from .router.Events.service import events_router
 """
 這個檔案負責"呼叫"各個Business Logic Functions，並提供API介面。
 規劃：
@@ -62,6 +63,7 @@ app.include_router(jobs_router,dependencies=[Depends(get_current_api_client)])
 app.include_router(user_router, dependencies=[Depends(get_current_user)])
 app.include_router(admin_router, dependencies=[Depends(get_current_user)])
 app.include_router(camera_router, dependencies=[Depends(get_current_user)])
+app.include_router(events_router, dependencies=[Depends(get_current_user)])
 # ======================== User Signup API =======================
 
 @app.get("/",tags=["system"])

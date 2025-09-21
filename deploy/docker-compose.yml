@@ -140,6 +140,13 @@ services:
       - minio-init
       - api
       - redis
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all            # 想用幾張卡；用 all 代表全部
+              capabilities: [gpu] # 必填：要求的是 GPU 能力
   streaming:
     build:
       context: ../services/StreamingServer

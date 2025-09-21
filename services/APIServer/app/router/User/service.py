@@ -29,6 +29,7 @@ class UserService:
 
     # 註冊：成功直接回 access token
     async def signup_user(self, db: AsyncSession, body: SignupRequestDTO) -> LoginResponseDTO:
+        
         # 檢查 account
         stmt = select(users.Table).where(users.Table.account == body.account)
         exists = await db.execute(stmt)
@@ -40,7 +41,13 @@ class UserService:
         exists = await db.execute(stmt)
         if exists.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Email 已被使用")
-
+        
+        # 檢查 phone
+        stmt = select(users.Table).where(users.Table.phone == body.phone)
+        exists = await db.execute(stmt)
+        if exists.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="phone 已被使用")
+        
         hashed = self.jwt.hash_password(body.password)
         user = users.Table(
             account=body.account,
@@ -73,7 +80,12 @@ class UserService:
         exists = await db.execute(stmt)
         if exists.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Email 已被使用")
-
+        # 檢查 phone
+        stmt = select(users.Table).where(users.Table.phone == body.phone)
+        exists = await db.execute(stmt)
+        if exists.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="phone 已被使用")
+        
         hashed = self.jwt.hash_password(body.password)
         user = users.Table(
             account=body.account,
@@ -216,3 +228,10 @@ async def change_password(
 ):
     current_user = request.state.current_user
     return await service.change_password(db, current_user, body)
+
+@user_router.get("/token/refresh", response_model=LoginResponseDTO)
+async def refresh_token(request: Request):
+    """重新申請個人JWT Token"""
+    current_user = request.state.current_user
+    token = service._issue_token(current_user)
+    return LoginResponseDTO(access_token=token)

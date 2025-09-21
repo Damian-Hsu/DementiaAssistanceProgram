@@ -34,6 +34,8 @@ class EventsTable(ORMBase, TimestampMixin):
         primary_key=True,
         default=create_uuid7
     )
+    # 下次要更新的時候新增
+    # user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     recording_id: Mapped[uuid.UUID|None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("recordings.id"),
