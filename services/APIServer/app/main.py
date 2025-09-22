@@ -57,7 +57,7 @@ app.add_middleware(
     max_age=600,  # 預檢快取
 )
 #建立資料表
-asyncio.run(create_db_and_tables())
+asyncio.get_event_loop().create_task(create_db_and_tables())
 
 # 基本權限控制路由，公開
 app.include_router(auth_router)
