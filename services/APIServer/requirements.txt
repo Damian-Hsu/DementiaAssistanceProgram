@@ -11,3 +11,4 @@ python-multipart
 celery==5.5.3
 redis==6.4.0
 httpx
+boto3
