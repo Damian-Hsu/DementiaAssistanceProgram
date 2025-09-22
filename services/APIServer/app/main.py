@@ -2,6 +2,8 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
+import asyncio
+from .DataAccess.Connect import create_db_and_tables
 from .DTO import DateTimeResponse
 from .security.deps import get_current_user, get_current_api_client
 from .config.path import (API_ROOT)
@@ -54,7 +56,8 @@ app.add_middleware(
     allow_headers=["*"],
     max_age=600,  # 預檢快取
 )
-
+#建立資料表
+asyncio.run(create_db_and_tables())
 
 # 基本權限控制路由，公開
 app.include_router(auth_router)
