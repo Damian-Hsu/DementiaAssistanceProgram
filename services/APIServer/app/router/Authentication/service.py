@@ -93,8 +93,8 @@ async def login(
 
 @m2m_router.get(M2M_GET_PING)
 async def ping(request: Request):
-    current_key: api_keys.Table = request.state.api_key
-    return {"msg": "success", "owner_id": str(current_key.owner_id)}
+    current_key: dict = request.state.api_key
+    return {"msg": "success", "owner_id": str(current_key["owner_id"])}
 
 def _make_path_from_id(cam_id: uuid.UUID, length: int = 22) -> str:
     """

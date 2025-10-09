@@ -78,7 +78,7 @@ def _build_public_webrtc(cam, webrtc_token: str) -> str:
     path = _camera_path(cam)
     return f"{WEBRTC_SCHEME}://{WEBRTC_PUBLIC_HOST}:{WEBRTC_PORT}/{path}/whep?token={webrtc_token}"
 async def _get_camera_or_404(db: AsyncSession, id_: uuid.UUID) -> camera_table.Table:
-    from sqlalchemy import select
+    
     stmt = select(camera_table.Table).where(camera_table.Table.id == id_)
     res = await db.execute(stmt)
     cam = res.scalar_one_or_none()

@@ -43,6 +43,7 @@ class JWTManager:
         payload: Dict[str, Any] = {
             "sub": str(subject),  # 統一為字串，避免型別落差
             "iat": int(now.timestamp()),
+            "ttl": self.expire_minutes * 60,  # 以秒為單位
             "exp": int((now + timedelta(minutes=self.expire_minutes)).timestamp()),
         }
         if self.issuer:
