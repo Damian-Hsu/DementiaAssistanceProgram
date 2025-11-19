@@ -1,0 +1,61 @@
+<!-- 手機模式底部導覽列 -->
+<nav class="mobile-nav" aria-label="手機導覽">
+  <ul class="mobile-nav-list">
+    <!-- 1. 家 -->
+    <li class="mobile-nav-item {{ 'active' if active_page == 'home' else '' }}">
+      <a class="mobile-nav-link" href="{{ url_for('home') }}" aria-label="首頁">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/home.svg') }}" alt="首頁" />
+        <span class="mobile-nav-label">首頁</span>
+      </a>
+    </li>
+    
+    <!-- 2. AI助手 -->
+    <li class="mobile-nav-item {{ 'active' if active_page == 'chat' else '' }}">
+      <a class="mobile-nav-link" href="{{ url_for('chat') }}" aria-label="AI助手">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/chat.svg') }}" alt="AI助手" />
+        <span class="mobile-nav-label">AI助手</span>
+      </a>
+    </li>
+    
+    <!-- 3. 鏡頭 -->
+    <li class="mobile-nav-item {{ 'active' if active_page == 'camera' else '' }}">
+      <a class="mobile-nav-link" href="{{ url_for('camera') }}" aria-label="鏡頭">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/recordings.svg') }}" alt="鏡頭" />
+        <span class="mobile-nav-label">鏡頭</span>
+      </a>
+    </li>
+    
+    <!-- 4. 影片 -->
+    <li class="mobile-nav-item {{ 'active' if active_page == 'recordings' else '' }}">
+      <a class="mobile-nav-link" href="{{ url_for('recordings') }}" aria-label="影片">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/camera.svg') }}" alt="影片" />
+        <span class="mobile-nav-label">影片</span>
+      </a>
+    </li>
+    
+    <!-- 5. 事件 -->
+    <li class="mobile-nav-item {{ 'active' if active_page == 'events' else '' }}">
+      <a class="mobile-nav-link" href="{{ url_for('events') }}" aria-label="事件">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/events.svg') }}" alt="事件" />
+        <span class="mobile-nav-label">事件</span>
+      </a>
+    </li>
+    
+    <!-- 6. 設定 -->
+    <li class="mobile-nav-item {{ 'active' if active_page == 'settings' or active_page == 'user_profile' else '' }}">
+      <a class="mobile-nav-link" href="{{ url_for('settings') }}" aria-label="設定">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/settings.svg') }}" alt="設定" />
+        <span class="mobile-nav-label">設定</span>
+      </a>
+    </li>
+    
+    <!-- 7. 登出 -->
+    <li class="mobile-nav-item mobile-nav-logout">
+      <button id="mobileLogoutBtn" class="mobile-nav-link" type="button" aria-label="登出">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/logout.svg') }}" alt="登出" />
+        <span class="mobile-nav-label">登出</span>
+      </button>
+    </li>
+  </ul>
+</nav>
+

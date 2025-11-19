@@ -1,0 +1,32 @@
+# ---- Base: Python 3.12.11 ----
+FROM python:3.12.11-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_NO_CACHE_DIR=on
+
+# 工作目錄
+WORKDIR /srv
+
+# 先複製 requirements 以利快取
+COPY requirements.txt .
+
+# 安裝 Python 套件
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 複製其餘原始碼
+COPY . .
+
+# 預設時區用 UTC（ffmpeg 檔名已依 UTC）
+ENV TZ=UTC
+
+# 非 root 執行（更安全）
+RUN useradd -r -u 10001 appuser && chown -R appuser:appuser /srv
+USER appuser
+
+EXPOSE 30100
+
+# 啟動 WebUIServer（Flask + Waitress）
+CMD ["waitress-serve", "--host=0.0.0.0", "--port=30100", "app.app:app"]
+  

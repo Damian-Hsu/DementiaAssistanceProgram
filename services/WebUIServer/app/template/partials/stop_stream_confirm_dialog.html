@@ -1,0 +1,27 @@
+<!-- 停止串流確認對話框 -->
+<dialog id="stopStreamConfirmDialog" class="logout-dialog" role="dialog" aria-labelledby="stopStreamDialogTitle" aria-modal="true">
+  <div class="logout-dialog-content">
+    <div class="logout-dialog-header">
+      <div class="logout-dialog-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <h3 id="stopStreamDialogTitle" class="logout-dialog-title">確認停止串流</h3>
+      <p class="logout-dialog-message">您確定要停止此鏡頭的串流嗎？停止後將無法繼續接收串流畫面。</p>
+    </div>
+    
+    <div class="logout-dialog-footer">
+      <button type="button" class="btn outline" id="stopStreamCancelBtn" aria-label="取消">
+        取消
+      </button>
+      <button type="button" class="btn danger primary" id="stopStreamConfirmBtn" aria-label="確認停止">
+        確認停止
+      </button>
+    </div>
+  </div>
+</dialog>
+
+

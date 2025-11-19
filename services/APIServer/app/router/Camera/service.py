@@ -20,23 +20,29 @@ from ...DataAccess.tables.__Enumeration import CameraStatus, Role
 from .DTO import (
     CameraCreate, CameraUpdate, CameraRead, CameraListResp, CameraStatusReq,
     OkResp, TokenVersionResp, GenerateTokenReq, PlayHLSURLResp,
-    RefreshTokenResp,PublishRTSPURLResp,StreamConnectResp,PlayWebRTCURLResp
+    RefreshTokenResp,PublishRTSPURLResp,StreamConnectResp,PlayWebRTCURLResp,
+    StreamStatusResp
 )
 from ...security.jwt_manager import CameraJWTManager
 from ...config.path import (CAMERA_PREFIX)
 
 # ====== 設定 ======
+# 外部端口（用於外部推流端和前端播放）
+# Docker 映射：外部 30201 → 容器內部 8554
 RTSP_PUBLIC_HOST = os.getenv("RTSP_PUBLIC_HOST", "127.0.0.1")
-RTSP_PORT = int(os.getenv("RTSP_PORT", "8554"))
+RTSP_PORT = int(os.getenv("RTSP_PORT", "30201"))  # 外部端口，給外部推流端使用
 
 # StreamingServer 與 MediaMTX 在 docker network 內可互通的位址
-STREAMING_BASE = os.getenv("STREAMING_BASE", "http://streaming:9090")
+# 注意：使用容器內部端口 8554，不是外部端口 30201（內網對內網）
+STREAMING_BASE = os.getenv("STREAMING_BASE", "http://streaming:30500")
 STREAMING_INTERNAL_TOKEN = os.getenv("INTERNAL_TOKEN", "")         # 給 StreamingServer 的 X-Internal-Token
-MEDIAMTX_INTERNAL_RTSP = os.getenv("MEDIAMTX_RTSP_BASE", "rtsp://mediamtx:8554")
+MEDIAMTX_INTERNAL_RTSP = os.getenv("MEDIAMTX_RTSP_BASE", "rtsp://mediamtx:8554")  # 內部端口 8554（內網對內網）
+
+# 其他外部端口（用於前端播放）
 HLS_PUBLIC_HOST = os.getenv("HLS_PUBLIC_HOST", RTSP_PUBLIC_HOST)
-HLS_PORT = int(os.getenv("HLS_PORT", "8888"))
+HLS_PORT = int(os.getenv("HLS_PORT", "30202"))  # 外部端口，映射到容器內部 8888
 WEBRTC_PUBLIC_HOST = os.getenv("WEBRTC_PUBLIC_HOST", RTSP_PUBLIC_HOST)
-WEBRTC_PORT = int(os.getenv("WEBRTC_PORT", "8889"))
+WEBRTC_PORT = int(os.getenv("WEBRTC_PORT", "30204"))  # 外部端口，映射到容器內部 8889
 WEBRTC_SCHEME = os.getenv("WEBRTC_SCHEME", "http")  # https 若你有 TLS
 
 
@@ -62,12 +68,19 @@ def _camera_path(cam: camera_table.Table) -> str:
 
 
 def _build_public_rtsp(cam: camera_table.Table, token: str) -> str:
+    """
+    構建外部 RTSP URL（給外部推流端使用，如 video2ip_camera_sim.py）
+    使用外部端口 30201（映射到容器內部 8554）
+    """
     return f"rtsp://{RTSP_PUBLIC_HOST}:{RTSP_PORT}/{_camera_path(cam)}?token={token}"
 
 
 def _build_internal_rtsp_for_streaming(cam: camera_table.Table, token: str) -> str:
-    # 給 StreamingServer 在 docker network 內拉流用
-    # 例如 "rtsp://mediamtx:8554/<path>?token=xxx"
+    """
+    構建內部 RTSP URL（給 StreamingServer 在 Docker 網絡內拉流用）
+    使用容器內部端口 8554（不是外部端口 30201）
+    例如 "rtsp://mediamtx:8554/<path>?token=xxx"
+    """
     return f"{MEDIAMTX_INTERNAL_RTSP.rstrip('/')}/{_camera_path(cam)}?token={token}"
 
 def _build_public_hls(cam, play_token: str) -> str:
@@ -125,10 +138,10 @@ async def update_camera(request: Request,
                         req: CameraUpdate,
                         db: AsyncSession = Depends(get_session)):
     current_user = request.state.current_user
-    # 只有管理員或擁有者可以修改所有相機，但一般使用者只能改自己的
-    if current_user.role != Role.admin and current_user.id != req.user_id:
-        raise HTTPException(status_code=403, detail="沒有權限修改此相機")
     cam = await _get_camera_or_404(db, id)
+    # 只有管理員或擁有者可以修改所有相機，但一般使用者只能改自己的
+    if current_user.role != Role.admin and current_user.id != cam.user_id:
+        raise HTTPException(status_code=403, detail="沒有權限修改此相機")
     patch = req.model_dump(exclude_unset=True)
     for k, v in patch.items():
         setattr(cam, k, v)
@@ -229,9 +242,9 @@ async def set_status(request: Request,
     只有管理員或擁有者可以修改所有相機，但一般使用者只能改自己的。
     """
     current_user = request.state.current_user
-    if current_user.role != Role.admin and current_user.id != req.user_id:
-        raise HTTPException(status_code=403, detail="沒有權限修改此相機")
     cam = await _get_camera_or_404(db, id)
+    if current_user.role != Role.admin and current_user.id != cam.user_id:
+        raise HTTPException(status_code=403, detail="沒有權限修改此相機")
     cam.status = CameraStatus(req.status)
     db.add(cam)
     await db.commit()
@@ -419,6 +432,51 @@ async def get_play_hls_url(
         expires_at=now + ttl,
     )
 
+@camera_router.get("/{id}/stream/status", response_model=StreamStatusResp)
+async def get_stream_status(
+    id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_session)
+):
+    """
+    查詢鏡頭的串流狀態。
+    """
+    cam = await _get_camera_or_404(db, id)
+    current_user = request.state.current_user
+    if current_user.role != Role.admin and current_user.id != cam.user_id:
+        raise HTTPException(status_code=403, detail="沒有權限操作此相機")
+    
+    # 查詢 StreamingServer 的串流狀態
+    headers = {"X-Internal-Token": STREAMING_INTERNAL_TOKEN} if STREAMING_INTERNAL_TOKEN else {}
+    streams_url = f"{STREAMING_BASE.rstrip('/')}/streams"
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(streams_url, headers=headers)
+            if resp.status_code == 200:
+                streams = resp.json()
+                # 查找匹配的串流
+                for stream in streams:
+                    if stream.get("camera_id") == str(cam.id) and stream.get("user_id") == str(cam.user_id):
+                        status = stream.get("status", "stopped")
+                        error_message = stream.get("error_message")
+                        return StreamStatusResp(
+                            is_streaming=(status in ["starting", "running"]),
+                            status=status,
+                            stream_info=stream,
+                            error_message=error_message
+                        )
+    except Exception as e:
+        # 如果查詢失敗，返回未串流狀態
+        print(f"[Stream Status] Failed to query streaming server: {e}")
+    
+    return StreamStatusResp(
+        is_streaming=False,
+        status="stopped",
+        stream_info=None,
+        error_message=None
+    )
+
 @camera_router.get("/{id}/play-webrtc-url", response_model=PlayWebRTCURLResp)
 async def get_play_webrtc_url(
     id: uuid.UUID,
@@ -452,7 +510,7 @@ async def get_play_webrtc_url(
         expires_at=now + ttl
     )
 
-@camera_router.get("/camera/{id}/token/refresh/{audience}")
+@camera_router.get("/{id}/token/refresh/{audience}")
 async def refresh_token(
     id: uuid.UUID,
     request: Request, # 這裡面有 current_user

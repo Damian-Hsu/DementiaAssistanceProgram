@@ -1,0 +1,367 @@
+/* ===== 鏡頭管理頁面樣式 ===== */
+
+/* 容器設定 */
+.container {
+  padding: var(--spacing-lg, 24px);
+  background: var(--bg-main, #F5EBDD);
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* YouTube 風格主布局 */
+.camera-main-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--spacing-md, 16px);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 預覽區域（左側） */
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.preview-container {
+  position: relative;
+  width: 100%;
+  background: #000;
+  border-radius: var(--radius-lg, 16px);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  box-shadow: var(--shadow-lg, 0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+#previewVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none; /* 預設隱藏，有畫面時顯示 */
+}
+
+.preview-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  text-align: center;
+  padding: var(--spacing-xl, 32px);
+}
+
+.preview-placeholder p {
+  margin: var(--spacing-sm, 8px) 0;
+  font-size: var(--font-size-base, 16px);
+}
+
+.preview-placeholder .hint {
+  font-size: var(--font-size-sm, 14px);
+  color: #666;
+}
+
+/* 控制區域（右側） */
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+  min-width: 0;
+}
+
+/* 卡片樣式 */
+.card {
+  background: #fff;
+  border-radius: var(--radius-lg, 16px);
+  padding: var(--spacing-lg, 24px);
+  box-shadow: var(--shadow-md, 0 2px 6px rgba(0, 0, 0, 0.1));
+  border: 2px solid var(--color-border, #D3C0A8);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.card h2 {
+  font-size: var(--font-size-xl, 20px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-accent, #6B4F4F);
+  margin: 0 0 var(--spacing-lg, 24px);
+}
+
+/* 鏡頭資訊表單 */
+.camera-info-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+}
+
+.info-row label {
+  font-size: var(--font-size-base, 16px);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-accent, #6B4F4F);
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.info-input {
+  flex: 1;
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  border: 2px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-md, 12px);
+  font-size: var(--font-size-base, 16px);
+  background-color: #fff;
+  color: var(--color-text, #2E2E2E);
+  transition: all var(--transition-normal, 0.2s ease);
+  box-sizing: border-box;
+  min-height: 44px;
+}
+
+.info-input:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+}
+
+.info-input[type="text"],
+.info-input select {
+  width: 100%;
+  cursor: pointer;
+}
+
+/* 串流狀態指示器 */
+.stream-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+  flex: 1;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: background-color var(--transition-normal, 0.2s ease);
+}
+
+.status-dot.streaming {
+  background-color: #4CAF50; /* 綠色 - 串流中 */
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+  animation: pulse 2s infinite;
+}
+
+.status-dot.stopped {
+  background-color: #999; /* 灰色 - 未串流 */
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+#streamStatusText {
+  font-size: var(--font-size-base, 16px);
+  color: var(--color-text, #2E2E2E);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+/* 成功複製提示框 */
+.copy-success-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: #4CAF50;
+  color: #fff;
+  padding: var(--spacing-md, 16px) var(--spacing-lg, 24px);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-lg, 0 4px 12px rgba(0, 0, 0, 0.15));
+  font-size: var(--font-size-base, 16px);
+  font-weight: var(--font-weight-medium, 500);
+  z-index: 10000;
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: all var(--transition-normal, 0.3s ease);
+  pointer-events: none;
+}
+
+.copy-success-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 響應式：手機模式調整提示框位置 */
+@media (max-width: 768px) {
+  .copy-success-toast {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+    font-size: var(--font-size-sm, 14px);
+  }
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--spacing-sm, 8px);
+}
+
+.form-actions .btn {
+  min-width: 120px;
+}
+
+/* 操作按鈕區 */
+.control-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+}
+
+.control-buttons .btn {
+  width: 100%;
+  padding: var(--spacing-md, 16px);
+  border-radius: var(--radius-md, 12px);
+  font-size: var(--font-size-base, 16px);
+  font-weight: var(--font-weight-medium, 500);
+  cursor: pointer;
+  transition: all var(--transition-normal, 0.2s ease);
+  border: none;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  min-height: 44px;
+}
+
+.control-buttons .btn.primary {
+  background-color: var(--color-accent, #6B4F4F);
+  color: #fff;
+}
+
+.control-buttons .btn.primary:hover {
+  background-color: #5a4040;
+}
+
+.control-buttons .btn.danger {
+  background-color: var(--color-danger, #C45B5B);
+  color: #fff;
+}
+
+.control-buttons .btn.danger:hover {
+  background-color: #b04a4a;
+}
+
+.control-buttons .btn:not(.primary):not(.danger) {
+  background-color: var(--bg-button, #F3F0EB);
+  color: var(--color-accent, #6B4F4F);
+  border: 1px solid var(--color-border, #D3C0A8);
+}
+
+.control-buttons .btn:not(.primary):not(.danger):hover {
+  background-color: var(--bg-button-hover, #E2D7C5);
+}
+
+.control-buttons .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 表單樣式 */
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 4px);
+}
+
+.form-row label {
+  font-size: var(--font-size-sm, 14px);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text, #2E2E2E);
+}
+
+.form-row input {
+  width: 100%;
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  border: 2px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-md, 12px);
+  font-size: var(--font-size-base, 16px);
+  background-color: #fff;
+  color: var(--color-text, #2E2E2E);
+  transition: all var(--transition-normal, 0.2s ease);
+  box-sizing: border-box;
+  min-height: 44px;
+}
+
+.form-row input:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+}
+
+/* 響應式設計 - 手機模式（上下排列） */
+@media (max-width: 768px) {
+  .container {
+    padding: var(--spacing-sm, 8px);
+  }
+
+  .camera-main-layout {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md, 16px);
+  }
+
+  .preview-section {
+    order: 1;
+  }
+
+  .control-section {
+    order: 2;
+  }
+
+  .preview-container {
+    aspect-ratio: 16 / 9;
+  }
+
+  .card {
+    padding: var(--spacing-md, 16px);
+  }
+
+  .card h2 {
+    font-size: var(--font-size-lg, 18px);
+    margin-bottom: var(--spacing-md, 16px);
+  }
+}
+
+/* 小手機 */
+@media (max-width: 480px) {
+  .card {
+    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  }
+
+  .control-buttons .btn {
+    font-size: var(--font-size-sm, 14px);
+    padding: var(--spacing-sm, 8px);
+  }
+}

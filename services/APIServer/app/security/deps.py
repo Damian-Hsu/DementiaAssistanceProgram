@@ -104,3 +104,5 @@ async def require_admin(user: users.Table = Depends(get_current_user)) -> users.
 
 _api_key_manager = APIKeyManager(APIKeyManagerConfig(header_name="X-API-Key"))
 get_current_api_client = _api_key_manager.require()   # 不做 scope 檢查
+get_uploader_api_client = _api_key_manager.require_scopes("uploader")  # 需要 uploader scope
+get_compute_api_client = _api_key_manager.require_scopes("compute")  # 需要 compute scope

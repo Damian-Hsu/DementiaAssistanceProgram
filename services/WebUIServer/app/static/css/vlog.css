@@ -1,0 +1,7 @@
+/* Vlog 頁面佔位樣式 */
+.vlog-placeholder {
+  text-align: center;
+  padding: var(--spacing-xl, 32px);
+  color: var(--text-muted-light, #999);
+}
+

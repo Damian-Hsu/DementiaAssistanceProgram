@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% include './partials/header.html'%}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/camera.css') }}">
+  
+  <div class="page-content">
+    <div class="container">
+      <!-- 主內容：YouTube 風格布局 -->
+      <main class="camera-main-layout">
+        <!-- 左側：預覽畫面 -->
+        <section class="preview-section">
+          <div class="preview-container">
+            <video id="previewVideo" playsinline controls muted></video>
+            <div class="preview-placeholder" id="previewPlaceholder">
+              <p>目前沒有可預覽的畫面</p>
+
+            </div>
+          </div>
+        </section>
+
+        <!-- 右側：操作區 -->
+        <section class="control-section">
+          <!-- 鏡頭資訊卡片 -->
+          <div class="card" id="cameraInfoCard" style="display: none;">
+            <h2>鏡頭資訊</h2>
+            <form id="cameraInfoForm" class="camera-info-form">
+              <div class="info-row">
+                <label for="cameraNameInput">名稱：</label>
+                <input type="text" id="cameraNameInput" class="info-input" />
+              </div>
+              <div class="info-row">
+                <label for="cameraStatusSelect">狀態：</label>
+                <select id="cameraStatusSelect" class="info-input">
+            <option value="active">啟用</option>
+            <option value="inactive">停用</option>
+                  <option value="deleted">已刪除</option>
+          </select>
+              </div>
+              <div class="info-row">
+                <label>串流狀態：</label>
+                <div id="streamStatusIndicator" class="stream-status">
+                  <span class="status-dot" id="streamStatusDot"></span>
+                  <span id="streamStatusText">檢查中...</span>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn primary" id="saveCameraBtn">儲存變更</button>
+              </div>
+            </form>
+        </div>
+
+          <!-- 操作按鈕區 -->
+          <div class="card" id="cameraControlCard" style="display: none;">
+            <h2>操作</h2>
+            <div class="control-buttons">
+              <button class="btn primary" id="startStreamBtn">開始串流</button>
+              <button class="btn danger" id="stopStreamBtn">停止串流</button>
+              <button class="btn" id="publishUrlBtn">串流連結</button>
+  </div>
+      </div>
+
+          <!-- 新增鏡頭區 -->
+          <div class="card" id="addCameraCard">
+            <h2>新增鏡頭</h2>
+        <form id="cameraForm" class="form-grid" autocomplete="off">
+          <div class="form-row">
+                <label for="camera_name">鏡頭名稱</label>
+            <input id="camera_name" name="camera_name" type="text" placeholder="例如：實驗室入口"/>
+          </div>
+          <div class="form-row">
+                <label for="cameraTTL">TTL（秒）</label>
+                <input id="cameraTTL" type="number" min="30" max="3600" value="300" />
+              </div>
+              <div class="form-row">
+                <button type="submit" class="btn primary">建立鏡頭</button>
+              </div>
+            </form>
+          </div>
+      </section>
+    </main>
+    </div>
+  </div>
+
+  {% include './partials/stop_stream_confirm_dialog.html' %}
+  
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script type="module" src="/static/js/camera.js"></script>
+
+{% endblock %}

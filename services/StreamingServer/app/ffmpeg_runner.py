@@ -22,7 +22,7 @@ class FFmpegProcess:
         input_url: str,
         out_dir: str,
         segment_seconds: int,
-        startup_deadline_ts: Optional[int],  # 其實是「啟動重試視窗（秒）」，None 則預設 60 秒
+        startup_deadline_ts: Optional[int],  # 「啟動重試視窗（秒）」，None 則預設 60 秒
         align_first_cut: bool,
     ):
         self.stream_id = stream_id  # e.g. f"{user_id}-{camera_id}"
@@ -38,6 +38,7 @@ class FFmpegProcess:
         self.proc: Optional[subprocess.Popen] = None
         self._thread: Optional[threading.Thread] = None
         self._stop = False
+        self.last_error: Optional[str] = None
         if settings.DEBUG:
             print(f"[DEBUG] FFmpegProcess initialized: stream_id={self.stream_id}, user_id={self.user_id}, camera_id={self.camera_id}, input_url={self.input_url}, out_dir={self.out_dir}, segment_seconds={self.segment_seconds}, startup_deadline_ts={self.startup_deadline_ts}, align_first_cut={self.align_first_cut}")
 
@@ -58,6 +59,8 @@ class FFmpegProcess:
             "ffmpeg",
             "-hide_banner", "-loglevel", "warning",
             "-rtsp_transport", "tcp",
+            "-rtsp_flags", "prefer_tcp",  # 優先使用 TCP
+            "-timeout", "5000000",  # 5 秒超時（微秒）
             "-i", self.input_url,
             "-c", "copy",
             "-f", "segment",
@@ -69,6 +72,7 @@ class FFmpegProcess:
             "-segment_format_options", "movflags=+faststart",
             # 確保 FFmpeg 使用 UTC 時間
             "-use_wallclock_as_timestamps", "1",
+            "-avoid_negative_ts", "make_zero",  # 避免負時間戳
             tpl,
         ]
         # 設定環境變數確保 FFmpeg 使用 UTC
@@ -106,13 +110,54 @@ class FFmpegProcess:
         logf = self._open_log()
         try:
             self.proc = subprocess.Popen(cmd, env=env_for_utc(), stdout=logf, stderr=logf)
+            
+            if settings.DEBUG:
+                print(f"[DEBUG] FFmpegProcess: process started with PID={self.proc.pid}")
 
             # 等待結束，但可被 stop() 打斷
             rc = None
             while not self._stop:
                 rc = self.proc.poll()
                 if rc is not None:
-                    if settings.DEBUG:
+                    # 讀取日誌文件的最後幾行來診斷問題
+                    error_msg = None
+                    try:
+                        log_file = os.path.join(settings.log_dir, f"{self.stream_id}.log")
+                        if os.path.exists(log_file):
+                            with open(log_file, "rb") as f:
+                                # 讀取最後 2KB
+                                f.seek(max(0, os.path.getsize(log_file) - 2048))
+                                last_lines = f.read().decode("utf-8", errors="ignore").split("\n")[-10:]
+                                if settings.DEBUG:
+                                    print(f"[DEBUG] FFmpegProcess: process exited with rc={rc}")
+                                    print(f"[DEBUG] FFmpegProcess: Last log lines:")
+                                    for line in last_lines:
+                                        if line.strip():
+                                            print(f"[DEBUG]   {line}")
+                                # 提取錯誤訊息
+                                for line in reversed(last_lines):
+                                    if "Connection refused" in line or "Connection to" in line:
+                                        error_msg = line.strip()
+                                        break
+                                    if "Error opening input" in line:
+                                        error_msg = line.strip()
+                                        break
+                    except Exception as log_err:
+                        if settings.DEBUG:
+                            print(f"[DEBUG] Failed to read log file: {log_err}")
+                    
+                    # 如果是連接錯誤，記錄更詳細的資訊
+                    if error_msg and ("Connection refused" in error_msg or "Error opening input" in error_msg):
+                        self.last_error = error_msg
+                        print(f"[ERROR] FFmpegProcess: Failed to connect to MediaMTX for stream {self.stream_id}")
+                        print(f"[ERROR]   Input URL: {self.input_url}")
+                        print(f"[ERROR]   Error: {error_msg}")
+                        print(f"[ERROR]   Possible causes:")
+                        print(f"[ERROR]     1. MediaMTX service is not running")
+                        print(f"[ERROR]     2. MediaMTX is not accessible at {settings.mediamtx_rtsp_base}")
+                        print(f"[ERROR]     3. Stream path does not exist (publisher not started yet)")
+                        print(f"[ERROR]     4. Network connectivity issue between StreamingServer and MediaMTX")
+                    elif settings.DEBUG:
                         print(f"[DEBUG] FFmpegProcess: process exited with rc={rc}")
                     break
                 time.sleep(0.5)
@@ -170,21 +215,33 @@ class FFmpegProcess:
 
                 if rc == 0:
                     # 子行程「正常結束」—通常代表上游停止或錄製結束；就不再重試
+                    if settings.DEBUG:
+                        print(f"[DEBUG] FFmpegProcess._run_loop: process exited normally (rc=0), stopping retry loop")
                     break
 
                 if self._stop:
+                    if settings.DEBUG:
+                        print(f"[DEBUG] FFmpegProcess._run_loop: stop requested, exiting loop")
                     break
 
                 # 非 0：視為暫時性錯誤 → 退避重試（含輕微抖動）
+                if settings.DEBUG:
+                    print(f"[DEBUG] FFmpegProcess._run_loop: process exited with rc={rc}, will retry after {backoff:.1f}s")
                 sleep_s = random.uniform(backoff * 0.7, backoff * 1.3)
                 time.sleep(sleep_s)
                 backoff = min(backoff * 2, 5.0)
 
-            except Exception:
+            except Exception as e:
                 # 啟動流程本身丟例外，也用退避重試
+                if settings.DEBUG:
+                    print(f"[DEBUG] FFmpegProcess._run_loop: exception during start: {e}, will retry after {backoff:.1f}s")
                 sleep_s = random.uniform(backoff * 0.7, backoff * 1.3)
                 time.sleep(sleep_s)
                 backoff = min(backoff * 2, 5.0)
+        
+        if settings.DEBUG:
+            if time.time() >= deadline:
+                print(f"[DEBUG] FFmpegProcess._run_loop: deadline reached, stopping retry loop")
 
         # 跳出 while：可能是 stop、超過 deadline、或 rc==0 正常退出
         # 若還有子行程活著，確保結束
@@ -227,6 +284,10 @@ class FFmpegProcess:
             self._thread.join(timeout=5)
 
     def is_running(self) -> bool:
+        if not self.proc:
+            return False
+        poll_result = self.proc.poll()
+        is_alive = poll_result is None
         if settings.DEBUG:
-            print(f"[DEBUG] FFmpegProcess.is_running() called, proc={self.proc}, poll={self.proc.poll() if self.proc else 'N/A'}")
-        return bool(self.proc and self.proc.poll() is None)
+            print(f"[DEBUG] FFmpegProcess.is_running() called, proc={self.proc}, pid={self.proc.pid if self.proc else None}, poll={poll_result}, is_alive={is_alive}")
+        return is_alive

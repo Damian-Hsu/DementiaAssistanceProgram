@@ -1,0 +1,151 @@
+/* Home 頁面樣式 */
+
+/* Chrome 分頁式標籤容器 */
+.home-tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg, 24px);
+  margin-bottom: var(--spacing-lg, 24px);
+  padding: 0;
+  background: transparent;
+}
+
+.chrome-tabs-container {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  background: transparent;
+  border-bottom: 1px solid var(--color-border, #D3C0A8);
+  padding: 0;
+  position: relative;
+}
+
+/* Chrome 分頁樣式 */
+.chrome-tab {
+  position: relative;
+  padding: var(--spacing-sm, 8px) var(--spacing-lg, 24px);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--color-border, #D3C0A8);
+  border-bottom: none;
+  border-radius: var(--radius-md, 12px) var(--radius-md, 12px) 0 0;
+  cursor: pointer;
+  transition: all var(--transition-normal, 0.2s ease);
+  user-select: none;
+  min-width: 80px;
+  text-align: center;
+  z-index: 1;
+  margin-right: -1px; /* 讓分頁重疊 */
+}
+
+.chrome-tab:first-child {
+  margin-left: 0;
+}
+
+.chrome-tab:not(.active) {
+  background: rgba(255, 255, 255, 0.4);
+  border-color: rgba(211, 192, 168, 0.6);
+}
+
+.chrome-tab:not(.active):hover {
+  background: rgba(255, 255, 255, 0.7);
+  z-index: 2;
+}
+
+.chrome-tab.active {
+  background: #fff;
+  border-color: var(--color-border, #D3C0A8);
+  z-index: 3;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.chrome-tab-label {
+  font-size: var(--font-size-base, 16px);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text, #2E2E2E);
+  white-space: nowrap;
+}
+
+.chrome-tab.active .chrome-tab-label {
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-accent, #6B4F4F);
+}
+
+/* 日期選擇器（同一行右側） */
+.date-selector-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+  flex-shrink: 0;
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  background: #fff;
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.date-selector-inline label {
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text, #2E2E2E);
+  white-space: nowrap;
+  font-size: var(--font-size-sm, 14px);
+}
+
+.date-selector-inline input[type="date"] {
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  border: 1px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-sm, 8px);
+  background-color: #fff;
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text, #2E2E2E);
+  cursor: pointer;
+  transition: all var(--transition-normal, 0.2s ease);
+}
+
+.date-selector-inline input[type="date"]:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 2px rgba(107, 79, 79, 0.1);
+}
+
+/* 內容區切換 */
+.home-content-section {
+  display: none;
+}
+
+.home-content-section.active {
+  display: block;
+}
+
+/* Vlog 佔位樣式 */
+.vlog-placeholder {
+  text-align: center;
+  padding: var(--spacing-xl, 32px);
+  color: var(--text-muted-light, #999);
+  background: #fff;
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-md, 0 2px 6px rgba(0, 0, 0, 0.1));
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .home-tab-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md, 16px);
+  }
+
+  .chrome-tabs-container {
+    width: 100%;
+  }
+
+  .chrome-tab {
+    flex: 1;
+    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+    font-size: var(--font-size-sm, 14px);
+  }
+
+  .date-selector-inline {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

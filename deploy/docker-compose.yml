@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${DB_SUPERPASS}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - "${DB_PORT}:5432"
+      - "${DB_PORT_PUBLIC}:${DB_PORT}"
     volumes:
       - ../datas/postgres_data:/var/lib/postgresql/data
       - ./postgres/init-scripts:/docker-entrypoint-initdb.d
@@ -29,7 +29,7 @@ services:
     image: redis:7
     container_name: demo_redis
     restart: always
-    ports: ["6379:6379"]
+    ports: ["30600:6379"]
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     networks:
       - demo-network
@@ -50,8 +50,8 @@ services:
     #volumes:
     #  - ../datas/minio/data:/data
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "30300:9000"  # MinIO API
+      - "30301:9001"  # MinIO Console
     healthcheck:
       test: ["CMD-SHELL", "curl --fail http://127.0.0.1:9000/minio/health/live || exit 1"]
       interval: 10s
@@ -88,11 +88,10 @@ services:
     environment:
       - MTX_PATH=/mediamtx.yml
     ports:
-      - "8554:8554/tcp" # RTSP
-      - "8888:8888/tcp" # HLS
-      - "8189:8189/udp" # WebRTC (UDP)
-      - "8189:8189/tcp" # WebRTC (TCP，必要時)  
-      - "8889:8889"
+      - "30201:8554/tcp" # RTSP（外部端口:內部端口）
+      - "30202:8888/tcp" # HLS（外部端口:內部端口）
+      - "30204:8889/tcp" # WebRTC (HTTP/WHEP)（外部端口:內部端口）
+      - "30205:8189/udp" # WebRTC (ICE/UDP)（外部端口:內部端口）
     networks:
       - demo-network
   api:
@@ -107,9 +106,9 @@ services:
     volumes:
       - ../datas/logs/api:/var/log/api
     ports:
-      - "8000:8000"
+      - "30000:30000"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/v1/healthz || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:30000/api/v1/healthz || exit 1"]
       interval: 60s
       timeout: 5s
       retries: 5
@@ -128,7 +127,6 @@ services:
     env_file: [.env]
     environment:
       - LOG_DIR=/var/log/compute
-      - TRANSFORMERS_CACHE=/srv/app/adapters/.cache/transformers
       - HF_HOME=/srv/app/adapters/.cache/huggingface
     volumes:
       - ../datas/logs/compute:/var/log/compute
@@ -157,14 +155,14 @@ services:
     environment:
       - RECORD_ROOT=/recordings
       - LOG_DIR=/var/log/streaming
+      - UPLOADER_DB=/recordings/uploader.db
     volumes:
       - ../datas/streaming/recordings:/recordings
-      - ../datas/streaming/database:/srv/app/database
       - ../datas/logs/streaming:/var/log/streaming
     ports:
-      - "9090:9090"
+      - "30500:30500"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9090/healthz || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:30500/healthz || exit 1"]
       interval: 60s
       timeout: 5s
       retries: 5
@@ -175,6 +173,21 @@ services:
       - minio-init
       - api
       - compute
+  webui:
+    build:
+      context: ../services/WebUIServer
+      dockerfile: Dockerfile.webui
+    container_name: webui_server
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - API_HOST=api  # Docker 服務名稱，用於內部通信
+      - API_PORT=30000
+    ports:
+      - "30100:30100"
+    networks: [demo-network]
+    depends_on:
+      - api
 
 networks:
   demo-network:

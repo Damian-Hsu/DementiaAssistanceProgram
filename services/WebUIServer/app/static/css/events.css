@@ -1,0 +1,546 @@
+/* 事件頁面容器 - 允許滾動 */
+.container{
+  padding: var(--spacing-lg, 24px);
+  background: var(--bg-main, #F5EBDD);
+  overflow-y: auto; /* 允許垂直滾動 */
+  overflow-x: hidden; /* 防止水平滾動 */
+  flex: 1; /* 佔滿可用空間 */
+  min-height: 0; /* 允許 flex 子元素收縮 */
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch; /* iOS 平滑滾動 */
+}
+/* --- 區塊：讓事件區在容器中更聚焦，但不和外層 container 衝突 --- */
+.events-section {
+  background: var(--bg-main, #F5EBDD);                          /* 內層白底，和外層米色背景對比 */
+  border-radius: calc(var(--radius-lg, 16px) + 4px);
+  padding: var(--spacing-lg, 24px);
+  margin-bottom: var(--spacing-lg, 24px);
+  overflow-y: visible; /* 允許內容滾動 */
+  overflow-x: hidden; /* 防止水平滾動 */
+  max-height: none; /* 不限制高度，讓內容自然展開 */
+}
+
+/* --- 搜尋列：沿用 components.css 的 .search-bar，再加些空氣感 --- */
+.search-bar {
+  margin-left: 24px;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 2fr 2fr auto; /* 關鍵字、日期、按鈕各區塊 */
+  gap: 12px 16px;                      /* 行內與列間距 */
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+/* 關鍵字與日期群組設定 */
+.search-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-group:first-child {
+  grid-column: 1;
+}
+
+.search-group:last-of-type {
+  grid-column: 2;
+}
+
+/* 搜尋動作按鈕組 */
+.search-actions {
+  grid-column: 3;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0; /* 防止按鈕被壓縮 */
+  white-space: nowrap; /* 防止按鈕文字換行 */
+  justify-content: flex-end; /* 右對齊 */
+}
+
+/* 搜尋按鈕樣式統一 */
+.search-actions .btn-primary,
+.search-actions .btn-secondary {
+  min-width: 80px;
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  font-size: var(--font-size-base, 16px);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 中等螢幕寬度優化：當寬度 < 1400px 時調整布局 */
+@media (max-width: 1400px) {
+  .search-bar {
+    grid-template-columns: 1fr 1fr; /* 改為兩列布局 */
+    gap: 12px;
+  }
+  
+  .search-group:first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  
+  .search-group:last-of-type {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  
+  .search-actions {
+    grid-column: 1 / -1; /* 跨越兩列 */
+    grid-row: 2;
+    justify-content: flex-start; /* 左對齊 */
+    align-items: center; /* 垂直居中 */
+    margin-top: 4px;
+    gap: 8px; /* 確保按鈕間距一致 */
+  }
+}
+
+/* 標籤樣式 */
+.search-group label {
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+/* 日期輸入框 */
+.search-group input[type="date"] {
+  width: 100%;
+  max-width: 160px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: #fff;
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+/* 小螢幕響應式：改為縱向排列 */
+@media (max-width: 768px) {
+  .search-bar {
+    grid-template-columns: 1fr; /* 全部垂直堆疊 */
+    gap: 8px; /* 減少間距 */
+    margin-left: 0;
+    padding: var(--spacing-sm, 8px);
+  }
+  .search-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px; /* 減少間距 */
+  }
+  .search-group:first-child,
+  .search-group:last-of-type {
+    grid-column: 1;
+  }
+  .search-actions {
+    grid-column: 1;
+    display: flex;
+    gap: 6px; /* 減少間距 */
+    justify-content: flex-start;
+    flex-wrap: wrap; /* 允許按鈕換行 */
+  }
+  
+  /* 手機版按鈕優化 */
+  .search-actions .btn-primary,
+  .search-actions .btn-secondary {
+    flex: 1;
+    min-width: 80px;
+    padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+    font-size: var(--font-size-sm, 14px);
+  }
+}
+/* --- 表格細節：在 components.css 的 .table 基礎上微調 --- */
+.table {
+  /* 原本已有白底/圓角/陰影:contentReference[oaicite:6]{index=6} */
+  overflow: hidden;                          /* 確保圓角裁切 */
+  border-collapse: collapse;                 /* 修復表格線段斷層問題 */
+  width: 100%;
+  border: 1px solid var(--color-border, #D3C0A8);
+}
+
+.table th,
+.table td {
+  vertical-align: top; /* 改為 top，讓所有欄位從頂部對齊，高度由內容決定 */
+  line-height: 1.45;
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  /* 只保留上邊框，底線由 tr::after 統一繪製 */
+  border-top: 1px solid var(--color-border, #D3C0A8);
+  border-bottom: none; /* 由 tr::after 統一繪製，避免重疊 */
+  border-left: none;
+  border-right: none;
+  text-align: left;
+}
+
+.table th {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.table th {
+  background-color: #f3eee8;                 /* 比 var(--bg-header) 更柔和一點的米色 */
+  letter-spacing: 0.3px;
+  border-bottom: 2px solid var(--color-border, #D3C0A8);
+  user-select: none;
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+/* 第一欄加左邊框，最後一欄加右邊框 */
+.table th:first-child,
+.table td:first-child {
+  border-left: 1px solid var(--color-border, #D3C0A8);
+}
+
+.table th:last-child,
+.table td:last-child {
+  border-right: 1px solid var(--color-border, #D3C0A8);
+}
+
+/* 由 tr::after 統一繪製底線，不再需要這裡的設定 */
+/* .table tbody tr:last-child td {
+  border-bottom: 1px solid var(--color-border, #D3C0A8);
+} */
+
+/* 列 hover 顏色更輕，避免過度對比 */
+.table tbody tr:hover td {
+  background-color: #faf6f3;
+}
+
+/* --- 可排序表頭：配合 th[data-sort] 的點擊行為 --- */
+.table th[data-sort] {
+  cursor: pointer;
+  position: relative;
+  transition: background-color .15s ease-in-out;
+}
+.table th[data-sort]:hover {
+  background-color: #efe6df;
+}
+/* 預留箭頭空間（JS 會寫入 ▲▼ 文字；這裡只處理排版） */
+.table th[data-sort]::after {
+  content: "";
+  display: inline-block;
+  width: .75em;
+  margin-left: .25em;
+}
+
+/* --- 內容欄位：時間欄位更好讀 --- */
+td[colspan] { text-align: center; color: #777; }
+
+td.time,
+td.date {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;        /* 對齊數字 */
+}
+/*控制事件摘要欄位換行*/
+.table td:nth-child(5) {
+  max-width: 400px;          /* 可以依畫面調整 */
+  white-space: normal;       /* 允許換行 */
+  word-break: break-all;     /* 強制斷詞換行 */
+  line-height: 1.5;          /* 增加閱讀性 */
+}
+/* --- 操作按鈕：維持一致配色（不覆蓋全域 .button） --- */
+.btn-detail,
+.btn-edit,
+.btn-delete {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  border: none;
+  transition: filter .15s ease-in-out, transform .02s;
+  margin: 0;
+  box-shadow: none;
+}
+
+.btn-detail { background: var(--color-accent); color: #fff; }
+.btn-edit   { background: #c8a785; color: #fff; }
+.btn-delete { background: #e07a5f; color: #fff; }
+
+.btn-detail:hover,
+.btn-edit:hover,
+.btn-delete:hover { filter: brightness(1.06); }
+.btn-detail:active,
+.btn-edit:active,
+.btn-delete:active { transform: translateY(1px); }
+
+/* 操作欄樣式 - 按鈕水平置中 */
+.table td:last-child {
+  white-space: nowrap;
+  text-align: center; /* 按鈕水平置中 */
+  /* 不再改動上/下邊框（由整列共用），避免重疊雙線 */
+  border-left: none; /* 避免與左側欄位重疊 */
+  border-right: 1px solid var(--color-border, #D3C0A8); /* 保留右邊框 */
+}
+
+/* 操作欄位按鈕樣式 - 確保按鈕本身沒有邊框和陰影 */
+.table td:last-child .btn-detail,
+.table td:last-child .btn-edit,
+.table td:last-child .btn-delete {
+  border: none;
+  margin: 0 3px; /* 按鈕之間的小間距 */
+  box-shadow: none;
+  outline: none;
+  display: inline-block; /* 讓按鈕可以水平排列 */
+  vertical-align: middle; /* 按鈕垂直置中 */
+}
+
+/* --- 分頁與結果摘要 --- */
+.pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pagination .page-btn {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--color-border, #D3C0A8);
+  background: var(--bg-button, #F3F0EB);
+  color: var(--color-text, #2E2E2E);
+  font-size: var(--font-size-base, 16px);
+  cursor: pointer;
+  transition: all var(--transition-normal, 0.2s ease);
+  min-height: 36px;
+  min-width: 36px;
+}
+
+.pagination .page-btn:hover:not(:disabled) {
+  background: var(--color-accent, #6B4F4F);
+  color: #fff;
+  border-color: var(--color-accent, #6B4F4F);
+}
+
+.pagination .page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-size {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  margin-left: var(--spacing-md, 16px);
+}
+
+.pagination-size label {
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text, #2E2E2E);
+  white-space: nowrap;
+}
+
+.pagination-size input {
+  width: 60px;
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  border: 2px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-sm, 8px);
+  font-size: var(--font-size-base, 16px);
+  text-align: center;
+  background: #fff;
+  color: var(--color-text, #2E2E2E);
+  transition: all var(--transition-normal, 0.2s ease);
+}
+
+.pagination-size input:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+}
+
+#pageInfo,
+#resultInfo {
+  color: var(--text-muted-light, #666);
+  font-size: var(--font-size-sm, 14px);
+}
+
+#resultInfo {
+  text-align: center;
+  margin-top: 8px;
+}
+
+/* --- 手機版卡片布局 --- */
+@media (max-width: 768px) {
+  .events-section {
+    padding: var(--spacing-md, 16px);
+  }
+
+  /* 隱藏桌面版表格 */
+  .table {
+    display: none;
+  }
+
+  /* 顯示卡片布局 */
+  .events-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md, 16px);
+  }
+
+  .event-card {
+    background: #fff;
+    border: 2px solid var(--color-border, #D3C0A8);
+    border-radius: var(--radius-lg, 16px);
+    padding: var(--spacing-md, 16px);
+    box-shadow: var(--shadow-md, 0 2px 6px rgba(0, 0, 0, 0.1));
+    transition: all var(--transition-normal, 0.2s ease);
+  }
+
+  .event-card:hover {
+    box-shadow: var(--shadow-lg, 0 4px 12px rgba(0, 0, 0, 0.15));
+    border-color: var(--color-accent, #6B4F4F);
+    transform: translateY(-2px);
+  }
+
+  .event-card-header {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    margin-bottom: var(--spacing-sm, 8px);
+    padding-bottom: var(--spacing-sm, 8px);
+    border-bottom: 1px solid var(--color-border, #D3C0A8);
+  }
+
+  .event-card-datetime {
+    font-size: var(--font-size-lg, 18px);
+    font-weight: var(--font-weight-bold, 700);
+    color: var(--color-accent, #6B4F4F);
+    white-space: nowrap;
+  }
+
+  .event-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm, 8px);
+  }
+
+  .event-card-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs, 4px);
+  }
+
+  .event-card-label {
+    font-size: var(--font-size-xs, 12px);
+    font-weight: var(--font-weight-semibold, 600);
+    color: var(--text-muted-light, #666);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .event-card-value {
+    font-size: var(--font-size-base, 16px);
+    color: var(--color-text, #2E2E2E);
+    line-height: var(--line-height-relaxed, 1.8);
+  }
+
+  .event-card-summary {
+    margin-top: var(--spacing-sm, 8px);
+    padding-top: var(--spacing-sm, 8px);
+    border-top: 1px solid var(--color-border, #D3C0A8);
+  }
+
+  .event-card-actions {
+    display: flex;
+    gap: var(--spacing-sm, 8px);
+    margin-top: var(--spacing-md, 16px);
+    padding-top: var(--spacing-md, 16px);
+    border-top: 1px solid var(--color-border, #D3C0A8);
+    flex-wrap: wrap;
+  }
+
+  .event-card-actions .btn-detail,
+  .event-card-actions .btn-edit,
+  .event-card-actions .btn-delete {
+    flex: 1;
+    min-width: 80px;
+    text-align: center;
+    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  }
+
+  /* 手機版分頁改為水平排列 */
+  .pagination {
+    flex-direction: row; /* 改為水平排列 */
+    flex-wrap: wrap;
+    gap: var(--spacing-xs, 4px);
+    justify-content: center;
+    align-items: center;
+  }
+
+  .pagination-size {
+    margin-left: var(--spacing-sm, 8px);
+    width: auto; /* 改為自動寬度 */
+    justify-content: center;
+  }
+  
+  /* 優化手機版間距 */
+  .events-section {
+    padding: var(--spacing-sm, 8px);
+    margin-bottom: var(--spacing-sm, 8px);
+  }
+  
+  .search-bar {
+    margin-left: 0;
+    padding: var(--spacing-sm, 8px);
+    gap: 8px;
+  }
+  
+  .container {
+    padding: var(--spacing-sm, 8px);
+  }
+}
+
+/* --- 小尺寸螢幕優化：讓表格可水平捲動、避免擠壓 --- */
+@media (min-width: 769px) and (max-width: 920px) {
+  .events-section { padding: 16px 12px; }
+  .events-section .table { display: block; overflow-x: auto; }
+  .events-section .table table { min-width: 720px; }
+}
+
+/* 桌面版隱藏卡片列表 */
+@media (min-width: 769px) {
+  .events-card-list {
+    display: none;
+  }
+}
+
+/* ===== 表格水平線穩定方案：由 tr 統一繪製，避免雙線重疊 ===== */
+/* 1) 取消每格自己的底線，避免重疊與斷裂 */
+.table tbody td {
+  border-bottom: none !important;
+}
+
+/* 2) 由每一列 tr 自己畫一條底線（單一訊號源） */
+.table tbody tr {
+  position: relative; /* 讓偽元素定位 */
+}
+
+.table tbody tr::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0; /* 用邊框當線 */
+  border-bottom: 1px solid var(--color-border, #D3C0A8);
+  pointer-events: none;
+}
+
+/* 3) 最後一列如果需要外框，保留由 table/td:first/last 控制的左右線即可 */
+.table tbody tr:last-child::after {
+  border-bottom: 1px solid var(--color-border, #D3C0A8); /* 要外框就留著；若不要底線改成 none */
+}
+
+/* 4) 垂直分隔線維持：第一欄左線、最後一欄右線 */
+.table th:first-child,
+.table td:first-child {
+  border-left: 1px solid var(--color-border, #D3C0A8) !important;
+}
+
+.table th:last-child,
+.table td:last-child {
+  border-right: 1px solid var(--color-border, #D3C0A8) !important;
+}
+
+/* 5) 表頭下緣畫粗一點（和原本效果一致） */
+.table thead th {
+  border-bottom: 2px solid var(--color-border, #D3C0A8) !important;
+}

@@ -1,0 +1,53 @@
+<nav class="sidebar" aria-label="主要導覽">
+<ul class="nav-list">
+<!-- 1. 家 -->
+<li class="nav-item {{ 'active' if active_page == 'home' else '' }}">
+<a class="nav-link" href="{{ url_for('home') }}" aria-label="首頁">
+<img class="nav-icon" src="{{ url_for('static', filename='icons/home.svg') }}" alt="首頁" />
+</a>
+</li>
+
+<!-- 2. AI助手 -->
+<li class="nav-item {{ 'active' if active_page == 'chat' else '' }}">
+<a class="nav-link" href="{{ url_for('chat') }}" aria-label="AI助手">
+<img class="nav-icon" src="{{ url_for('static', filename='icons/chat.svg') }}" alt="AI助手" />
+</a>
+</li>
+
+<!-- 3. 鏡頭 -->
+<li class="nav-item {{ 'active' if active_page == 'camera' else '' }}">
+<a class="nav-link" href="{{ url_for('camera') }}" aria-label="鏡頭">
+<img class="nav-icon" src="{{ url_for('static', filename='icons/recordings.svg') }}" alt="鏡頭" />
+</a>
+</li>
+
+<!-- 4. 影片 -->
+<li class="nav-item {{ 'active' if active_page == 'recordings' else '' }}">
+<a class="nav-link" href="{{ url_for('recordings') }}" aria-label="影片">
+<img class="nav-icon" src="{{ url_for('static', filename='icons/camera.svg') }}" alt="影片" />
+</a>
+</li>
+
+<!-- 5. 事件 -->
+<li class="nav-item {{ 'active' if active_page == 'events' else '' }}">
+<a class="nav-link" href="{{ url_for('events') }}" aria-label="事件">
+<img class="nav-icon" src="{{ url_for('static', filename='icons/events.svg') }}" alt="事件" />
+</a>
+</li>
+
+<!-- 6. 設定 -->
+<li class="nav-item {{ 'active' if active_page == 'settings' or active_page == 'user_profile' else '' }}">
+<a class="nav-link" href="{{ url_for('settings') }}" aria-label="設定">
+<img class="nav-icon" src="{{ url_for('static', filename='icons/settings.svg') }}" alt="設定" />
+</a>
+</li>
+
+<!-- 7. 登出 -->
+<li class="nav-item nav-logout">
+<button id="logoutbtn" class="nav-link" type="button" aria-label="登出">
+  <img class="nav-icon" src="{{ url_for('static', filename='icons/logout.svg') }}" alt="登出">
+</button>
+</li>
+</ul>
+</nav>
+</nav>

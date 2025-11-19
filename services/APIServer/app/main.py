@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import asyncio
 from .DataAccess.Connect import create_db_and_tables
 from .DTO import DateTimeResponse
-from .security.deps import get_current_user, get_current_api_client
+from .security.deps import get_current_user, get_current_api_client, get_uploader_api_client
 from .config.path import (API_ROOT)
 from .router.Authentication.service import auth_router, m2m_router
 from .router.User.service import user_router
@@ -14,6 +15,7 @@ from .router.Jobs.service import jobs_router
 from .router.Camera.service import camera_router
 from .router.Events.service import events_router
 from .router.Recordings.service import recordings_router
+from .router.Chat.service import chat_router
 """
 這個檔案負責"呼叫"各個Business Logic Functions，並提供API介面。
 規劃：
@@ -40,13 +42,60 @@ API 功能規劃：
     
 """
 
-app = FastAPI(root_path=API_ROOT, title="Dementia Assistance Program API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """管理應用程式的生命週期"""
+    # 啟動時執行
+    print("[App] 應用程式啟動中...")
+    # 建立資料表
+    await create_db_and_tables()
+    print("[App] 資料庫連接準備完成")
+    
+    # 啟動日記自動刷新定時任務
+    from .router.Chat.diary_scheduler import diary_refresh_scheduler
+    stop_event = asyncio.Event()
+    scheduler_task = asyncio.create_task(diary_refresh_scheduler(stop_event))
+    print("[App] 日記自動刷新任務已啟動")
+    
+    yield  # 應用程式運行中
+    
+    # 關閉時執行
+    print("[App] 應用程式正在關閉...")
+    try:
+        # 停止日記自動刷新任務
+        stop_event.set()
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
+        print("[App] 日記自動刷新任務已停止")
+    except Exception as e:
+        print(f"[App] 停止日記自動刷新任務時發生錯誤: {str(e)}")
+    
+    try:
+        # 清理 LLM Manager
+        from .router.Chat.llm_tools import user_llm_manager
+        user_llm_manager.shutdown()
+        print("[App] LLM Manager 已關閉")
+    except Exception as e:
+        print(f"[App] 關閉時發生錯誤: {str(e)}")
+    print("[App] 應用程式已關閉")
+
+
+app = FastAPI(
+    root_path=API_ROOT,
+    title="Dementia Assistance Program API",
+    version="1.0.0",
+    lifespan=lifespan  # 添加 lifespan
+)
 
 
 # ALLOWED_ORIGINS = [
 #     "http://localhost:8080",
 #     "http://127.0.0.1:8080",
-#     # "http://localhost:9090",
+#     # "http://localhost:30500",
 # ]
 
 app.add_middleware(
@@ -56,19 +105,19 @@ app.add_middleware(
     allow_headers=["*"],
     max_age=600,  # 預檢快取
 )
-#建立資料表
-asyncio.get_event_loop().create_task(create_db_and_tables())
 
 # 基本權限控制路由，公開
 app.include_router(auth_router)
 # 機器對機器的測試路由，要使用 API Key(header: X-API-Key)
 app.include_router(m2m_router, dependencies=[Depends(get_current_api_client)])
-app.include_router(jobs_router,dependencies=[Depends(get_current_api_client)])
+# Jobs 路由：不同端點使用不同的 API Key 依賴（在端點層級定義）
+app.include_router(jobs_router)
 app.include_router(user_router, dependencies=[Depends(get_current_user)])
 app.include_router(admin_router, dependencies=[Depends(get_current_user)])
 app.include_router(camera_router, dependencies=[Depends(get_current_user)])
 app.include_router(events_router, dependencies=[Depends(get_current_user)])
 app.include_router(recordings_router, dependencies=[Depends(get_current_user)])
+app.include_router(chat_router, dependencies=[Depends(get_current_user)])
 # ======================== User Signup API =======================
 
 @app.get("/",tags=["system"])

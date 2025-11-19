@@ -1,0 +1,197 @@
+/* ==== 全域設定 ==== */
+body {
+  margin: 0; /* 移除預設邊距，避免瀏覽器留白 */
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", sans-serif; /* 全站字體 */
+  background: #E2D4C1; /* 頁面背景色，設計稿底色 */
+  display: flex; /* 使用 Flex 讓容器置中 */
+  justify-content: center; /* 水平置中 */
+  align-items: center; /* 垂直置中 */
+  min-height: 100vh; /* 保證全頁至少填滿視窗高度 */
+}
+
+/* ==== 容器設定 - 響應式優化 ==== */
+.container {
+  width: 100%; /* 讓容器寬度自適應 */
+  max-width: 600px; /* 限制最大寬度，避免過寬 */
+  background: #fff; /* 白底，與背景色形成對比 */
+  border-radius: var(--radius-xl, 16px); /* 圓角效果 */
+  padding: var(--spacing-xl, 32px); /* 內邊距，讓內容不要緊貼邊框 */
+  box-shadow: var(--shadow-xl, 0 12px 28px rgba(0, 0, 0, .1)); /* 陰影，增加立體感 */
+  margin: 0 auto;
+  transition: all var(--transition-normal, 0.2s ease);
+  box-sizing: border-box; /* 確保寬度計算包含 padding */
+  overflow: hidden; /* 防止內容溢出 */
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .container {
+    padding: var(--spacing-lg, 24px);
+    border-radius: var(--radius-lg, 12px);
+    max-width: 100%;
+    margin: var(--spacing-md, 16px);
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: var(--spacing-md, 16px);
+    margin: var(--spacing-sm, 8px);
+  }
+}
+
+/* ==== 標題設定 - 增強視覺層次 ==== */
+h1 {
+  font-size: var(--font-size-3xl, 28px); /* 標題大小 */
+  font-weight: var(--font-weight-bold, 700); /* 加粗 */
+  margin: 0 0 var(--spacing-sm, 8px); /* 下方留空間 */
+  text-align: center; /* 標題置中 */
+  color: var(--color-accent, #6B4F4F); /* 主色 */
+  line-height: var(--line-height-tight, 1.4); /* 緊密行高 */
+  letter-spacing: -0.02em; /* 字距微調 */
+}
+
+/* ==== 副標題（小字說明）- 優化可讀性 ==== */
+p.subtitle {
+  text-align: center; /* 文字置中 */
+  font-size: var(--font-size-sm, 14px); /* 小字大小 */
+  color: var(--text-muted-light, #666); /* 深灰色，比黑色柔和 */
+  margin: 0 0 var(--spacing-xl, 24px); /* 與下方表單留空 */
+  line-height: var(--line-height-normal, 1.6); /* 正常行高 */
+}
+
+/* ==== 表單區塊設定 ==== */
+form {
+  display: grid; /* 使用 grid 排版 */
+  gap: var(--spacing-md, 16px); /* 每個輸入欄位之間間距 */
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 表單欄位容器 - 確保不超出範圍 */
+form > div {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  position: relative; /* 為圖標定位做準備 */
+}
+
+/* ==== 標籤設定（label）- 增強可讀性 ==== */
+label {
+  display: block; /* label 獨佔一行 */
+  margin-bottom: var(--spacing-xs, 4px); /* 與輸入框留距離 */
+  font-size: var(--font-size-sm, 14px); /* 字體大小 */
+  font-weight: var(--font-weight-medium, 500); /* 中等字重 */
+  color: var(--color-text, #333); /* 深灰，對比度高 */
+  line-height: var(--line-height-normal, 1.6); /* 正常行高 */
+}
+
+/* ==== 輸入框設定 - 增強互動反饋 ==== */
+input, select {
+  width: 100%; /* 填滿容器寬度 */
+  min-height: 48px; /* 無障礙最小點擊區域 */
+  border: 2px solid var(--color-border, #D3C0A8); /* 灰色邊框 */
+  border-radius: var(--radius-md, 12px); /* 輕微圓角 */
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px); /* 左右內距，讓文字不要緊貼 */
+  padding-right: 48px; /* 為右側圖標留出空間 */
+  font-size: var(--font-size-base, 16px); /* 輸入字體大小 */
+  background-color: #fff;
+  color: var(--color-text, #2E2E2E);
+  transition: all var(--transition-normal, 0.2s ease);
+  line-height: var(--line-height-normal, 1.6);
+  box-sizing: border-box; /* 確保寬度計算包含 padding 和 border */
+  max-width: 100%; /* 防止超出容器 */
+  overflow: hidden; /* 防止內容溢出 */
+  text-overflow: ellipsis; /* 文字過長時顯示省略號 */
+}
+
+input:hover,
+select:hover {
+  border-color: var(--color-hover, #CBB89B);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+  transform: translateY(-1px);
+}
+
+input:focus-visible,
+select:focus-visible {
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.25);
+}
+
+input.error,
+select.error {
+  border-color: var(--color-danger, #C45B5B);
+  background-color: rgba(196, 91, 91, 0.05);
+}
+
+input::placeholder {
+  color: var(--text-muted-light, #666);
+  opacity: 0.7;
+}
+
+/* ==== 按鈕設定 - 增強互動反饋 ==== */
+button {
+  min-height: 48px; /* 無障礙最小點擊區域 */
+  width: 100%;
+  border: none; /* 移除預設邊框 */
+  border-radius: var(--radius-md, 12px); /* 圓角 */
+  background: var(--color-accent, #6B4F4F); /* 主色背景 */
+  color: #fff; /* 白色文字 */
+  font-size: var(--font-size-base, 16px); /* 按鈕字體大小 */
+  font-weight: var(--font-weight-medium, 500); /* 中等字重 */
+  cursor: pointer; /* 滑鼠移上去顯示指標 */
+  transition: all var(--transition-normal, 0.2s ease);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm, 8px);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ==== 按鈕 hover 效果 ==== */
+button:hover {
+  background: var(--color-secondary, #A47148); /* 滑過時顏色變深 */
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md, 0 2px 6px rgba(0,0,0,0.1));
+}
+
+button:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+}
+
+button:focus-visible {
+  outline: 3px solid var(--color-accent, #6B4F4F);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ==== 輔助文字（切換登入/註冊連結）==== */
+.helper {
+  text-align: center; /* 置中 */
+  font-size: 13px; /* 小字體 */
+  margin-top: 8px; /* 與上方保持距離 */
+  color: #444; /* 中灰色 */
+}
+
+/* ==== 區塊顯示控制 ==== */
+section {
+  display: none; /* 預設隱藏所有區塊 */
+}
+section.active {
+  display: block; /* 需要顯示的區塊加 active 類別 */
+}

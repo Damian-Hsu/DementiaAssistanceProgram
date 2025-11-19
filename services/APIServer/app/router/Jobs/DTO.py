@@ -66,6 +66,13 @@ class JobCompleteDTO(BaseModel):
     duration: float | None = None
     metrics: dict | None = None
     events: list | None = None
+class JobListRespDTO(BaseModel):
+    items: list[JobGetRespDTO]
+    total: int
+    page: int
+    size: int
+    page_total: int
+
 class OKRespDTO(BaseModel):
     msg: str = "OK"
 

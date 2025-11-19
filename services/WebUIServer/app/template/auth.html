@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>登入 / 註冊</title>
+  <link rel="stylesheet" href="../static/css/auth.css" />
+</head>
+<body>
+  <div class="container">
+
+    <!-- 登入區塊 -->
+    <section id="loginSection" class="active">
+      <form id="loginform" autocomplete="on" novalidate>
+        <h1>Welcome Back</h1>
+        <p class="subtitle">Sign in to monitor your home</p>
+
+        <div>
+          <label for="login_account">帳號 Account</label>
+          <input type="text" id="login_account" name="username" autocomplete="username" required />
+        </div>
+
+        <div>
+          <label for="login_password">密碼 Password</label>
+          <input type="password" id="login_password" name="password" autocomplete="current-password" required />
+        </div>
+
+        <button type="submit">Log in</button>
+        <p class="helper">Don’t have an account? <a href="#" onclick="showSection('signup')">Sign up 註冊</a></p>
+      </form>
+    </section>
+
+    <!-- 註冊區塊 -->
+    <section id="signupSection">
+      <form id="signupform" autocomplete="on" novalidate>
+        <h1>Create your account</h1>
+        <p class="subtitle">Join our community to care for your loved ones.</p>
+
+        <div>
+          <label for="sign_account">帳號 account</label>
+          <input type="text" id="sign_account" name="account" required />
+        </div>
+
+        <div>
+          <label for="sign_name">姓名 Name</label>
+          <input type="text" id="sign_name" name="name" required />
+        </div>
+
+        <div>
+          <label for="sign_gender">性別 Gender</label>
+          <select id="sign_gender" name="gender" required>
+            <option value="">請選擇性別</option>
+            <option value="male">男性</option>
+            <option value="female">女性</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="sign_birthday">生日 Birth</label>
+          <input type="date" id="sign_birthday" name="birthday" required />
+        </div>
+
+        <div>
+          <label for="sign_phone">手機號碼 Phone</label>
+          <input type="tel" id="sign_phone" name="phone" pattern="^[0-9]{10}$" maxlength="10" required />
+        </div>
+
+        <div>
+          <label for="sign_email">電子郵件 Email</label>
+          <input type="email" id="sign_email" name="email" required />
+        </div>
+
+        <div>
+          <label for="sign_password">密碼 Password</label>
+          <input type="password" id="sign_password" name="password" required minlength="6" />
+        </div>
+
+        <div>
+          <label for="sign_password_confirm">再次輸入密碼 Confirm Password</label>
+           <input type="password" id="sign_password_confirm" name="password_confirm" required minlength="6" />
+        </div>
+
+
+        <button type="submit">下一步 Next</button>
+        <p class="helper">Already have an account? <a href="#" onclick="showSection('login')">Log in 登入</a></p>
+      </form>
+    </section>
+
+    <!-- 登出區塊 -->
+    <section id="logoutSection">
+      <h1>已登入</h1>
+      <p class="subtitle">點擊下方按鈕登出</p>
+      <button id="logoutbtn">Log out</button>
+    </section>
+
+  </div>
+
+  <script>
+    
+
+
+  </script>
+
+  <!-- 引入你的 JS -->
+  <script type="module" src="../static/js/APIClient.js"></script>
+  <script type="module" src="../static/js/AuthService.js"></script>
+  <script type="module" src="../static/js/sign_login.js"></script>
+</body>
+</html>

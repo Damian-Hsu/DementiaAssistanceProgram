@@ -8,13 +8,14 @@ from datetime import date, datetime, time, timedelta, timezone
 import boto3
 from botocore.config import Config
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, delete, exists
 
 from ...DataAccess.Connect import get_session
 from ...DataAccess.tables import recordings as recordings_table  # recordings_table.Table
 from ...DataAccess.tables import events as events_table          # events_table.Table
+from ...router.User.service import UserService
 
 from .DTO import (
     RecordingRead, RecordingListResp, RecordingUrlResp, OkResp, EventRead
@@ -26,18 +27,28 @@ from .DTO import (
 recordings_router = APIRouter(prefix="/recordings", tags=["recordings"])
 
 # ------------------------------------------------------------
+# User Service 實例
+# ------------------------------------------------------------
+user_service = UserService()
+
+# ------------------------------------------------------------
 # S3/MinIO：你可把下列兩函式改成你「已驗證成功」的封裝
 # ------------------------------------------------------------
-# 對外可達的 endpoint（可改成主機 IP 或網域）：例如 http://localhost:9000
-PUBLIC_MINIO_ENDPOINT = os.getenv("PUBLIC_MINIO_ENDPOINT", "http://localhost:9000")
+# 內部使用的 endpoint（Docker 網絡內）
+INTERNAL_MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
 
-S3_ENDPOINT   = PUBLIC_MINIO_ENDPOINT          # ← 關鍵：外部可連到
+# 外部可達的 endpoint（瀏覽器訪問）
+# 注意：docker-compose.yml 中 MinIO 的端口映射是 30300:9000
+PUBLIC_MINIO_ENDPOINT = os.getenv("PUBLIC_MINIO_ENDPOINT", "http://localhost:30300")
+
+# S3 客戶端使用內部 endpoint（服務器端訪問）
+S3_ENDPOINT   = INTERNAL_MINIO_ENDPOINT
 S3_ACCESS_KEY = os.getenv("MINIO_ROOT_USER",  os.getenv("S3_ACCESS_KEY", "minioadmin"))
 S3_SECRET_KEY = os.getenv("MINIO_ROOT_PASSWORD", os.getenv("S3_SECRET_KEY", "minioadmin"))
 S3_REGION     = os.getenv("AWS_REGION", "us-east-1")
 S3_BUCKET     = os.getenv("MINIO_BUCKET", "media-bucket")
 
-# 一律用 path-style，避免變成 videos.minio:9000 這種外部解析不到的子網域
+# 一律用 path-style，避免變成 videos.minio:30300 這種外部解析不到的子網域
 _s3 = boto3.client(
     "s3",
     endpoint_url=S3_ENDPOINT,
@@ -51,6 +62,18 @@ _s3 = boto3.client(
 )
 
 def _normalize_key(key: str) -> str:
+    """
+    正規化 S3 key，確保格式正確且不包含不支援的字符。
+    
+    處理的情況：
+    1. s3://bucket/key 格式
+    2. bucket/key 格式
+    3. 直接 key 格式
+    4. 清理多餘的斜線和空格
+    """
+    if not key:
+        raise ValueError("S3 key cannot be empty")
+    
     # 1) 去掉 s3://bucket/... 前綴
     if key.startswith("s3://"):
         without_scheme = key.split("://", 1)[1]
@@ -65,6 +88,19 @@ def _normalize_key(key: str) -> str:
             key = key[len(b) + 1 :]
             break
 
+    # 3) 清理多餘的斜線和空格，確保格式正確
+    # 移除開頭和結尾的斜線
+    key = key.strip("/")
+    # 將多個連續斜線替換為單個斜線
+    while "//" in key:
+        key = key.replace("//", "/")
+    # 移除開頭和結尾的空格
+    key = key.strip()
+    
+    # 4) 驗證 key 不為空（這裡 key 已經被處理過，如果為空說明原始 key 有問題）
+    if not key:
+        raise ValueError("Normalized S3 key is empty after processing")
+    
     return key
 
 def _presign_get(key: str, ttl: int, *, disposition: Optional[str], filename: Optional[str]) -> str:
@@ -79,32 +115,72 @@ def _presign_get(key: str, ttl: int, *, disposition: Optional[str], filename: Op
     safe_name = filename or key.rsplit("/", 1)[-1]
     params["ResponseContentDisposition"] = f'{disp}; filename="{safe_name}"'
 
-    return _s3.generate_presigned_url("get_object", Params=params, ExpiresIn=int(ttl))
+    # 如果內部和外部的 endpoint 不同，需要創建外部客戶端來生成預簽名 URL
+    # 因為預簽名 URL 的簽名是基於 host 的，不能直接替換 host
+    if INTERNAL_MINIO_ENDPOINT != PUBLIC_MINIO_ENDPOINT:
+        # 創建外部 S3 客戶端（用於生成瀏覽器可訪問的預簽名 URL）
+        _s3_public = boto3.client(
+            "s3",
+            endpoint_url=PUBLIC_MINIO_ENDPOINT,
+            aws_access_key_id=S3_ACCESS_KEY,
+            aws_secret_access_key=S3_SECRET_KEY,
+            region_name=S3_REGION,
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"}
+            ),
+        )
+        presigned_url = _s3_public.generate_presigned_url("get_object", Params=params, ExpiresIn=int(ttl))
+    else:
+        # 如果內部外部相同，直接使用內部客戶端
+        presigned_url = _s3.generate_presigned_url("get_object", Params=params, ExpiresIn=int(ttl))
+    
+    return presigned_url
 
 def _delete_object(key: str) -> None:
     """刪除物件；不存在也視為成功（S3 的語意即是冪等）。"""
-    _s3.delete_object(Bucket=S3_BUCKET, Key=key)
+    # 正規化 key，確保格式正確
+    normalized_key = _normalize_key(key)
+    try:
+        _s3.delete_object(Bucket=S3_BUCKET, Key=normalized_key)
+    except Exception as e:
+        # 記錄錯誤詳情以便調試
+        print(f"[Delete Object Error] Original key: {key}")
+        print(f"[Delete Object Error] Normalized key: {normalized_key}")
+        print(f"[Delete Object Error] Error: {e}")
+        raise
 
 # ------------------------------------------------------------
 # Utils
 # ------------------------------------------------------------
-def _date_to_utc_range(d: date) -> Tuple[datetime, datetime]:
-    """把 local ISO date 轉為該日 UTC [00:00, 次日00:00)。"""
-    start = datetime.combine(d, time.min).replace(tzinfo=timezone.utc)
-    end = start + timedelta(days=1)
-    return start, end
+def _date_to_utc_range(d: date, user_timezone: str = "Asia/Taipei") -> Tuple[datetime, datetime]:
+    """把 local ISO date 轉為該日 UTC [00:00, 次日00:00)。使用使用者時區進行轉換。"""
+    import pytz
+    
+    # 獲取使用者時區
+    user_tz = pytz.timezone(user_timezone)
+    
+    # 在使用者時區中創建日期時間
+    local_start = user_tz.localize(datetime.combine(d, time.min))
+    local_end = user_tz.localize(datetime.combine(d, time.max))
+    
+    # 轉換為 UTC
+    utc_start = local_start.astimezone(timezone.utc)
+    utc_end = local_end.astimezone(timezone.utc)
+    
+    return utc_start, utc_end
 
-def _build_time_preds(start_d: Optional[date], end_d: Optional[date], col):
+def _build_time_preds(start_d: Optional[date], end_d: Optional[date], col, user_timezone: str = "Asia/Taipei"):
     preds = []
     if start_d and end_d:
-        s0, _ = _date_to_utc_range(start_d)
-        e0, _ = _date_to_utc_range(end_d)
+        s0, _ = _date_to_utc_range(start_d, user_timezone)
+        e0, _ = _date_to_utc_range(end_d, user_timezone)
         preds.extend([col >= s0, col < (e0 + timedelta(days=1))])
     elif start_d:
-        s0, e0 = _date_to_utc_range(start_d)
+        s0, e0 = _date_to_utc_range(start_d, user_timezone)
         preds.extend([col >= s0, col < e0])
     elif end_d:
-        s0, e0 = _date_to_utc_range(end_d)
+        s0, e0 = _date_to_utc_range(end_d, user_timezone)
         preds.extend([col >= s0, col < e0])
     return preds
 
@@ -162,6 +238,7 @@ def _events_keyword_exists_condition(keywords: Optional[str], sr: Optional[List[
 
 @recordings_router.get("/{recording_id}", response_model=RecordingUrlResp)
 async def get_recording_url(
+    request: Request,  # 🔧 修復：添加權限檢查
     recording_id: uuid.UUID = Path(..., description="錄影片段 ID"),
     ttl: int = Query(900, ge=30, le=7*24*3600, description="URL 有效秒數（預設 900，最大 7 天）"),
     disposition: Optional[str] = Query(None, regex="^(inline|attachment)$", description="瀏覽器呈現方式：inline 或 attachment"),
@@ -181,11 +258,21 @@ async def get_recording_url(
       `GET /recordings/{id}?ttl=300&disposition=inline`
     - 下載並指定檔名（30 分鐘）：  
       `GET /recordings/{id}?ttl=1800&disposition=attachment&filename=myvideo.mp4`
+    
+    **注意**：此端點僅回傳影片 URL，不包含 recording 詳細資訊。
     """
+    # 🔧 修復：添加權限檢查
+    current_user = request.state.current_user
+    from ...DataAccess.tables.__Enumeration import Role
+    
     stmt = select(recordings_table.Table).where(recordings_table.Table.id == recording_id)
     rec = (await db.execute(stmt)).scalar_one_or_none()
     if not rec:
         raise HTTPException(status_code=404, detail="recording not found")
+    
+    # 非管理員只能訪問自己的錄影
+    if current_user.role != Role.admin and rec.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="沒有權限訪問此錄影")
 
     url = _presign_get(rec.s3_key, ttl, disposition=disposition, filename=filename)
     now = int(datetime.now(timezone.utc).timestamp())
@@ -194,6 +281,7 @@ async def get_recording_url(
 
 @recordings_router.delete("/{recording_id}", response_model=OkResp, status_code=status.HTTP_200_OK)
 async def delete_recording(
+    request: Request,  # 🔧 修復：添加權限檢查
     recording_id: uuid.UUID = Path(..., description="錄影片段 ID"),
     db: AsyncSession = Depends(get_session),
 ):
@@ -210,15 +298,34 @@ async def delete_recording(
     **呼叫範例**
     - `DELETE /recordings/{id}`
     """
+    # 🔧 修復：添加權限檢查
+    current_user = request.state.current_user
+    from ...DataAccess.tables.__Enumeration import Role
+    
     stmt = select(recordings_table.Table).where(recordings_table.Table.id == recording_id)
     rec = (await db.execute(stmt)).scalar_one_or_none()
     if not rec:
         raise HTTPException(status_code=404, detail="recording not found")
+    
+    # 非管理員只能刪除自己的錄影
+    if current_user.role != Role.admin and rec.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="沒有權限刪除此錄影")
 
     try:
         _delete_object(rec.s3_key)
+    except ValueError as e:
+        # key 正規化錯誤
+        raise HTTPException(status_code=400, detail=f"Invalid S3 key format: {e}")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"s3 delete failed: {e}")
+        # 其他 S3 錯誤
+        error_msg = str(e)
+        # 提取更友好的錯誤訊息
+        if "XMinioInvalidObjectName" in error_msg or "unsupported characters" in error_msg.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid S3 object name: {rec.s3_key}. The object name contains unsupported characters."
+            )
+        raise HTTPException(status_code=502, detail=f"S3 delete failed: {error_msg}")
 
     # 若你的 DB 已設 CASCADE，可移除以下兩段 delete
     await db.execute(delete(events_table.Table).where(events_table.Table.recording_id == recording_id))
@@ -229,6 +336,8 @@ async def delete_recording(
 
 @recordings_router.get("/", response_model=RecordingListResp)
 async def list_recordings(
+    request: Request,  # 🔧 修復：添加 request 參數以獲取 current_user
+    user_id: Optional[int] = Query(default=None, description="指定使用者 ID（僅管理員可用）"),
     keywords: Optional[str] = Query(None, description="在 *事件* 欄位內搜尋的關鍵字（預設比對 `summary`）"),
     sr: Optional[List[str]] = Query(None, description="查詢範圍，多值：`?sr=action&sr=scene&sr=objects`；預設只查 `summary`"),
     start_time: Optional[date] = Query(None, description="ISO local date；會轉為整日 UTC 開始"),
@@ -254,8 +363,25 @@ async def list_recordings(
     - 指定查詢範圍為 `action` 與 `objects`：  
       `GET /recordings?keywords=drinking&sr=action&sr=objects`
     """
+    # 🔧 修復：添加用戶權限檢查（非管理員只能查看自己的錄影）
+    current_user = request.state.current_user
+    from ...DataAccess.tables.__Enumeration import Role
+    
+    # 獲取使用者時區
+    user_timezone = user_service.get_user_timezone(current_user)
+    
     conds = []
-    conds += _build_time_preds(start_time, end_time, recordings_table.Table.start_time)
+    
+    # 權限控制：使用者 ID 過濾
+    if current_user.role == Role.admin:
+        # 管理員：可以使用手動輸入的 user_id，如果沒有則使用自己的 ID
+        target_user_id = user_id if user_id is not None else current_user.id
+        conds.append(recordings_table.Table.user_id == target_user_id)
+    else:
+        # 一般使用者：只能查詢自己的影片，忽略手動輸入的 user_id
+        conds.append(recordings_table.Table.user_id == current_user.id)
+    
+    conds += _build_time_preds(start_time, end_time, recordings_table.Table.start_time, user_timezone)
 
     exists_pred = _events_keyword_exists_condition(keywords, sr)
     if exists_pred is not None:
@@ -279,11 +405,72 @@ async def list_recordings(
 
     rows = (await db.execute(stmt_items)).scalars().all()
     total = (await db.execute(stmt_total)).scalar_one()
-    return RecordingListResp(items=rows, total=total)
+    
+    # 🔧 修復：為每個 recording 填充 summary（從第一個 event）並轉換時間到使用者時區
+    import pytz
+    user_tz = pytz.timezone(user_timezone)
+    items_with_summary = []
+    for rec in rows:
+        # 查詢該 recording 的第一個 event 的 summary
+        stmt_event = (
+            select(events_table.Table.summary)
+            .where(events_table.Table.recording_id == rec.id)
+            .order_by(events_table.Table.start_time.asc())
+            .limit(1)
+        )
+        first_summary = (await db.execute(stmt_event)).scalar_one_or_none()
+        
+        # 轉換時間到使用者時區
+        start_time_user = rec.start_time
+        if start_time_user:
+            if start_time_user.tzinfo is None:
+                start_time_user = start_time_user.replace(tzinfo=timezone.utc)
+            start_time_user = start_time_user.astimezone(user_tz)
+        
+        end_time_user = rec.end_time
+        if end_time_user:
+            if end_time_user.tzinfo is None:
+                end_time_user = end_time_user.replace(tzinfo=timezone.utc)
+            end_time_user = end_time_user.astimezone(user_tz)
+        
+        created_at_user = getattr(rec, "created_at", None)
+        if created_at_user:
+            if created_at_user.tzinfo is None:
+                created_at_user = created_at_user.replace(tzinfo=timezone.utc)
+            created_at_user = created_at_user.astimezone(user_tz)
+        
+        updated_at_user = getattr(rec, "updated_at", None)
+        if updated_at_user:
+            if updated_at_user.tzinfo is None:
+                updated_at_user = updated_at_user.replace(tzinfo=timezone.utc)
+            updated_at_user = updated_at_user.astimezone(user_tz)
+        
+        # 將 ORM 對象轉為 dict，添加 summary 和轉換後的時間
+        rec_dict = {
+            "id": rec.id,
+            "user_id": rec.user_id,
+            "camera_id": rec.camera_id,
+            "s3_key": rec.s3_key,
+            "duration": rec.duration,
+            "is_processed": rec.is_processed,
+            "is_embedding": rec.is_embedding,
+            "size_bytes": rec.size_bytes,
+            "upload_status": rec.upload_status.value if hasattr(rec.upload_status, 'value') else str(rec.upload_status),
+            "start_time": start_time_user,
+            "end_time": end_time_user,
+            "video_metadata": rec.video_metadata,
+            "summary": first_summary,  # 添加 summary
+            "created_at": created_at_user,
+            "updated_at": updated_at_user,
+        }
+        items_with_summary.append(rec_dict)
+    
+    return RecordingListResp(items=items_with_summary, total=total)
 
 
 @recordings_router.get("/{recording_id}/events", response_model=List[EventRead])
 async def get_recording_events(
+    request: Request,  # 🔧 修復：添加權限檢查
     recording_id: uuid.UUID = Path(..., description="錄影片段 ID"),
     sort: Optional[str] = Query(None, description="排序：`start_time|created_at|duration|id`，可 `:asc|:desc` 或 `-field`"),
     db: AsyncSession = Depends(get_session),
@@ -298,6 +485,19 @@ async def get_recording_events(
     - 依事件開始時間新到舊：  
       `GET /recordings/{id}/events?sort=-start_time`
     """
+    # 🔧 修復：添加權限檢查（先驗證 recording 是否存在且有權限訪問）
+    current_user = request.state.current_user
+    from ...DataAccess.tables.__Enumeration import Role
+    
+    stmt_rec = select(recordings_table.Table).where(recordings_table.Table.id == recording_id)
+    rec = (await db.execute(stmt_rec)).scalar_one_or_none()
+    if not rec:
+        raise HTTPException(status_code=404, detail="recording not found")
+    
+    # 非管理員只能訪問自己的錄影事件
+    if current_user.role != Role.admin and rec.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="沒有權限訪問此錄影的事件")
+    
     allowed = {
         "start_time": events_table.Table.start_time,
         "created_at": getattr(events_table.Table, "created_at", events_table.Table.start_time),

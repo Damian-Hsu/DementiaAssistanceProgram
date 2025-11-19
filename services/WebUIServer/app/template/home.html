@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block content %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/diary.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+
+  <div class="page-content">
+    <div class="container">
+      <!-- Chrome 分頁式標籤切換 + 日期選擇器 -->
+      <section class="home-tab-header">
+        <div class="chrome-tabs-container">
+          <div class="chrome-tab active" id="diaryTab" data-tab="diary">
+            <span class="chrome-tab-label">日記</span>
+          </div>
+          <div class="chrome-tab" id="vlogTab" data-tab="vlog">
+            <span class="chrome-tab-label">Vlog</span>
+          </div>
+        </div>
+        <div class="date-selector-inline">
+          <label for="diaryDate">選擇日期</label>
+          <input type="date" id="diaryDate" />
+        </div>
+      </section>
+
+      <!-- 日記內容區 -->
+      <section class="home-content-section active" id="diarySection">
+        <!-- 雙頁日記容器 -->
+        <div class="diary-book-container">
+          <!-- 左側翻頁區域（書的兩旁） -->
+          <div class="book-edge-nav book-edge-left" id="prevPageArea"></div>
+          
+          <!-- 日記書本 -->
+          <div class="diary-book">
+            <!-- 左頁 -->
+            <div class="diary-page diary-page-left" id="leftPage">
+              <div class="diary-page-content">
+                <div class="diary-page-header">
+                  <h2 class="diary-date-title" id="leftPageDate">2025-10-27</h2>
+                  <img class="diary-refresh-icon" id="leftPageRefreshBtn" src="{{ url_for('static', filename='icons/refresh-line.svg') }}" alt="重新整理" />
+                </div>
+                <div class="diary-page-body" id="leftPageContent">
+                  <p class="diary-placeholder">載入中...</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 書脊分隔線 -->
+            <div class="diary-spine"></div>
+
+            <!-- 右頁 -->
+            <div class="diary-page diary-page-right" id="rightPage">
+              <div class="diary-page-content">
+                <div class="diary-page-header">
+                  <h2 class="diary-date-title" id="rightPageDate">2025-10-28</h2>
+                  <img class="diary-refresh-icon" id="rightPageRefreshBtn" src="{{ url_for('static', filename='icons/refresh-line.svg') }}" alt="重新整理" />
+                </div>
+                <div class="diary-page-body" id="rightPageContent">
+                  <p class="diary-placeholder">載入中...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 右側翻頁區域（書的兩旁） -->
+          <div class="book-edge-nav book-edge-right" id="nextPageArea"></div>
+        </div>
+      </section>
+
+      <!-- Vlog 內容區 -->
+      <section class="home-content-section" id="vlogSection">
+        <div class="vlog-placeholder">
+          <h2>Vlog 頁面</h2>
+          <p>此頁面正在開發中...</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module" src="{{ url_for('static', filename='js/diary.js') }}"></script>
+  <script type="module" src="{{ url_for('static', filename='js/home.js') }}"></script>
+
+{% endblock %}

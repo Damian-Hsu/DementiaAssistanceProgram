@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_NO_CACHE_DIR=on
 
-# 安裝 ffmpeg 與基礎工具（tzdata 用於 UTC）
+# 安裝 ffmpeg 與基礎工具（tzdata 用於 UTC、gosu 用於權限切換）
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg tzdata ca-certificates curl && \
+    ffmpeg tzdata ca-certificates curl gosu && \
     rm -rf /var/lib/apt/lists/*
 
 # 工作目錄
@@ -23,6 +23,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 複製其餘原始碼
 COPY . .
 
+# 複製 entrypoint 腳本並設定權限
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # 建立錄影/日誌/資料庫目錄（之後會被 volume 掛掉，但先確保存在）
 RUN mkdir -p /recordings /var/log/streaming /srv/app/database
 
@@ -34,9 +38,8 @@ RUN useradd -r -u 10001 appuser && \
     chown -R appuser:appuser /srv /recordings /var/log/streaming /srv/app/database && \
     chmod -R u+rwX /srv /recordings /var/log/streaming /srv/app/database
 
-USER appuser
+EXPOSE 30500
 
-EXPOSE 9090
-
-# 啟動 StreamingServer（FastAPI + Uvicorn）
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9090"]
+# 使用 entrypoint 腳本處理權限後再啟動服務
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "30500"]

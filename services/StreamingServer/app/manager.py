@@ -20,7 +20,30 @@ class _Manager:
         return (user_id, camera_id) 
     
     def to_info(self, p: FFmpegProcess) -> StreamInfo:
-        status = "running" if p.is_running() else "stopped"
+        # 檢查進程是否真的在運行
+        is_running = p.is_running()
+        # 如果進程存在但不在運行，可能是剛啟動或剛失敗
+        if p.proc and not is_running:
+            # 檢查進程退出碼
+            if p.proc.poll() is not None:
+                # 進程已退出
+                if p.proc.returncode == 0:
+                    # 正常退出（可能是推流端停止），標記為 stopped
+                    status = "stopped"
+                elif p.last_error and ("Connection refused" in p.last_error or "Error opening input" in p.last_error):
+                    # 連接錯誤
+                    status = "error"
+                else:
+                    # 其他錯誤
+                    status = "error"
+            else:
+                # 進程還在運行但 is_running() 返回 False（不太可能）
+                status = "starting"
+        elif is_running:
+            status = "running"
+        else:
+            # 沒有進程對象，標記為 stopped
+            status = "stopped"
         return StreamInfo(
             stream_id=p.stream_id,
             user_id=p.user_id,
@@ -31,7 +54,8 @@ class _Manager:
             align_first_cut=p.align_first_cut,
             pid=(p.proc.pid if p.proc else None),
             status=status,
-            cmdline=p.cmdline
+            cmdline=p.cmdline,
+            error_message=p.last_error
         )
 
     def list(self) -> List[StreamInfo]:
@@ -50,8 +74,17 @@ class _Manager:
         
         key = self._stream_id(user_id, camera_id)
         exist = self.active.get(key)
-        if exist and exist.is_running():
+        
+        # 如果進程存在且正在運行，且 URL 相同，則返回現有進程
+        if exist and exist.is_running() and exist.input_url == rtsp_url:
             return exist
+        
+        # 如果進程存在但不運行，或 URL 不同，先停止舊進程
+        if exist:
+            if settings.DEBUG:
+                print(f"[DEBUG] Manager.start: Stopping existing process for {key}, is_running={exist.is_running()}, url_changed={exist.input_url != rtsp_url}")
+            exist.stop()
+            self.active.pop(key, None)
 
         seg = segment_seconds or settings.segment_seconds
         align = settings.align_first_cut if align_first_cut is None else align_first_cut

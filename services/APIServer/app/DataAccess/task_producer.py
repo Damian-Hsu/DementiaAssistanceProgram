@@ -1,7 +1,7 @@
 import os
 from celery import Celery
 
-BROKER_URL  = os.getenv("BROKER_URL",  "redis://localhost:6379/0")
+BROKER_URL  = os.getenv("BROKER_URL",  "redis://redis:6379/0")
 DEFAULT_Q   = os.getenv("CELERY_DEFAULT_QUEUE", "default")
 
 # 僅作為 Producer，用同樣的 broker/backend 即可

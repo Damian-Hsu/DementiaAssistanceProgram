@@ -25,6 +25,7 @@ class RecordingRead(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     video_metadata: Optional[dict[str, Any]] = None
+    summary: Optional[str] = None  # 🔧 修復：添加 summary 欄位（從關聯的 events 聚合）
 
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

@@ -27,7 +27,7 @@ ROOT = HERE.parent                               # 專案根（含 prompts、tas
 PROMPTS_DIR = ROOT / "prompts"
 _JSON_FENCE_RE = re.compile(r"```(?:json|JSON)?\s*([\s\S]*?)\s*```", re.MULTILINE)
 SYSTEM_PROMPT_PATH = PROMPTS_DIR / "system_prompt.md"
-MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:30300")
 MINIO_ROOT_USER = os.getenv("MINIO_ROOT_USER", "minioadmin")
 MINIO_ROOT_PASSWORD = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
 PRESIGN_EXPIRES = int(os.getenv("PRESIGN_EXPIRES", "3600"))  # 秒
@@ -52,7 +52,7 @@ def _get_s3_client():
             if _S3_CLIENT is None:
                 _S3_CLIENT = boto3.client(
                     "s3",
-                    endpoint_url=MINIO_ENDPOINT,                # 例: http://minio:9000
+                    endpoint_url=MINIO_ENDPOINT,                # 例: http://minio:30300
                     aws_access_key_id=MINIO_ROOT_USER,
                     aws_secret_access_key=MINIO_ROOT_PASSWORD,
                     config=Config(signature_version="s3v4"),   # MinIO 建議 s3v4
@@ -897,7 +897,7 @@ def video_description_extraction_main(job: dict):
         )
     
 
-API_SERVER_URL = os.getenv("JOB_API_BASE", "http://api:8000")
+API_SERVER_URL = os.getenv("JOB_API_BASE", "http://api:30000")
 headers = {
     "X-API-Key": os.getenv("JOB_API_KEY", ""),
     "Content-Type": "application/json"

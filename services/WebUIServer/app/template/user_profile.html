@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  {% include './partials/header.html'%}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/user_profile.css') }}">
+  
+  <div class="page-content">
+    <div class="container">
+      <!-- 訊息提示 -->
+      <div id="successMessage" class="messagesuccess hidden"></div>
+      <div id="errorMessage" class="messageerror hidden"></div>
+
+      <div class="settings-container">
+        <!-- 使用者設定區塊 -->
+        <section class="settings-section">
+          <div class="settings-section-header">
+            <h2 class="settings-section-title">使用者設定</h2>
+            <p class="settings-section-desc">管理您的個人資料與基本偏好設定</p>
+          </div>
+
+          <div class="profile-container">
+            <!-- 左側：基本資料 -->
+            <div class="profile-left">
+              <div class="info-group">
+                <label for="user_account">帳號</label>
+                <input id="user_account" type="text" readonly>
+
+                <label for="user_birthday">生日</label>
+                <input id="user_birthday" type="date">
+
+                <label for="user_email">信箱</label>
+                <input id="user_email" type="email">
+
+                <label for="user_phone">電話</label>
+                <input id="user_phone" type="tel">
+              </div>
+
+              <div class="button-group">
+                <button id="btnSaveProfile" class="edit-btn">
+                  儲存個人資料
+                </button>
+                <button id="btnChangePassword" class="change-btn">
+                  變更密碼
+                </button>
+              </div>
+            </div>
+
+            <!-- 右側：系統資訊與 JWT -->
+            <div class="profile-right">
+              <div class="info-group">
+                <label for="user_name">姓名</label>
+                <input id="user_name" type="text">
+
+                <label for="user_gender">性別</label>
+                <select id="user_gender" name="gender">
+                  <option value="male">男性</option>
+                  <option value="female">女性</option>
+                </select>
+              </div>
+
+              <div class="token-card">
+                <h3>自動登出期限</h3>
+                <div id="current_jwt_display" class="jwt-display"></div>
+                <button id="btnRefreshJwt" class="refresh-btn">延長登入期限</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 應用程式設定區塊 -->
+        <section class="settings-section">
+          <div class="settings-section-header">
+            <h2 class="settings-section-title">應用程式設定</h2>
+            <p class="settings-section-desc">調整系統行為與介面偏好</p>
+          </div>
+
+          <div class="info-group">
+            <label for="setting_timezone">時區</label>
+            <select id="setting_timezone">
+              <option value="">載入中...</option>
+            </select>
+
+            <label for="setting_diary_auto_refresh_interval">日記刷新間隔（分鐘）</label>
+            <input id="setting_diary_auto_refresh_interval" type="number" min="5" max="1440" step="5" placeholder="30">
+            <div class="settings-note">
+              <p><strong>說明：</strong>設定系統自動刷新當天日記的間隔時間（範圍：5-1440 分鐘）。預設為 30 分鐘。系統預設啟用日記自動刷新功能。</p>
+            </div>
+
+            <div class="button-group">
+              <button id="btnSaveAppSettings" class="edit-btn">
+                儲存應用程式設定
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 模型設定區塊 -->
+        <section class="settings-section">
+          <div class="settings-section-header">
+            <h2 class="settings-section-title">AI 模型設定</h2>
+            <p class="settings-section-desc">配置 AI 助手使用的語言模型與供應商</p>
+          </div>
+
+          <div class="info-group">
+            <label for="setting_llm_provider">預設 LLM 供應商</label>
+            <select id="setting_llm_provider">
+              <option value="google">Google (Gemini)</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+            </select>
+
+            <label for="setting_llm_model">預設 LLM 模型</label>
+            <input id="setting_llm_model" type="text" placeholder="例如：gemini-2.0-flash-exp">
+
+            <div class="settings-note">
+              <p><strong>注意：</strong>模型設定需要 API 金鑰。請在下方配置各供應商的 API 金鑰。</p>
+            </div>
+
+            <!-- LLM 供應商配置 -->
+            <div class="llm-providers-config">
+              <h3 class="llm-providers-title">供應商 API 金鑰</h3>
+              
+              <div class="provider-config-group">
+                <label for="provider_google_api_key">Google API 金鑰</label>
+                <input id="provider_google_api_key" type="text" placeholder="輸入 Google API 金鑰">
+              </div>
+
+              <div class="provider-config-group">
+                <label for="provider_openai_api_key">OpenAI API 金鑰</label>
+                <input id="provider_openai_api_key" type="text" placeholder="輸入 OpenAI API 金鑰">
+              </div>
+
+              <div class="provider-config-group">
+                <label for="provider_anthropic_api_key">Anthropic API 金鑰</label>
+                <input id="provider_anthropic_api_key" type="text" placeholder="輸入 Anthropic API 金鑰">
+              </div>
+            </div>
+
+            <div class="button-group">
+              <button id="btnSaveModelSettings" class="edit-btn">
+                儲存模型設定
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- 修改密碼對話框 -->
+  <dialog id="changepassworddialog" aria-labelledby="cp-title">
+    <header class="dlg__header">
+      <h3 id="cp-title" class="dlg__title">修改密碼</h3>
+      <form method="dialog"><button class="dlg__close" aria-label="關閉">✕</button></form>
+    </header>
+
+    <div class="dlg__body">
+      <div class="dlg__panel">
+        <div id="successMessage" class="messagesuccess" style="display:none;"></div>
+        <div id="errorMessage" class="messageerror" style="display:none;"></div>
+        <div class="dlg__field">
+          <input id="current_password" type="password"
+                 inputmode="numeric"
+                 oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)"
+                 placeholder="請輸入舊密碼"
+                 pattern="\d{6}" minlength="6" maxlength="6"
+                 autocomplete="new-password" required>
+        </div>
+        <div class="dlg__field">
+          <input id="new_password" type="password"
+                 inputmode="numeric"
+                 oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)"
+                 placeholder="請輸入新密碼"
+                 pattern="\d{6}" minlength="6" maxlength="6"
+                 autocomplete="new-password" required>
+        </div>
+        <div class="dlg__footer">
+          <button type="button" class="btn-submit" id="btnSubmitChangePassword">
+            確認變更
+          </button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="{{ url_for('static', filename='js/user_profile.js') }}"></script>
+{% endblock %}

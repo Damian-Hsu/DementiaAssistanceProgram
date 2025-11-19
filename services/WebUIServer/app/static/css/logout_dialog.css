@@ -1,0 +1,230 @@
+/* ===== 登出確認對話框樣式 ===== */
+
+.logout-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-normal, 0.2s ease), visibility var(--transition-normal, 0.2s ease);
+}
+
+.logout-dialog[open] {
+  opacity: 1;
+  visibility: visible;
+}
+
+.logout-dialog::backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease;
+  margin: 0;
+  padding: 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.logout-dialog-content {
+  background: #fff;
+  border-radius: var(--radius-xl, 20px);
+  box-shadow: var(--shadow-xl, 0 8px 24px rgba(0, 0, 0, 0.2));
+  padding: var(--spacing-xl, 32px);
+  max-width: 420px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  border: 2px solid var(--color-border, #D3C0A8);
+  animation: slideUp 0.3s ease;
+  position: relative;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.logout-dialog-header {
+  text-align: center;
+  margin-bottom: var(--spacing-xl, 32px);
+}
+
+.logout-dialog-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--spacing-md, 16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-button, #F3F0EB);
+  border-radius: 50%;
+  color: var(--color-accent, #6B4F4F);
+  border: 2px solid var(--color-border, #D3C0A8);
+}
+
+.logout-dialog-title {
+  font-size: var(--font-size-2xl, 24px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-accent, #6B4F4F);
+  margin: 0 0 var(--spacing-sm, 8px);
+  line-height: var(--line-height-tight, 1.4);
+}
+
+.logout-dialog-message {
+  font-size: var(--font-size-base, 16px);
+  color: var(--text-muted-light, #666);
+  line-height: var(--line-height-relaxed, 1.8);
+  margin: 0;
+  padding: 0 var(--spacing-md, 16px);
+}
+
+.logout-dialog-footer {
+  display: flex;
+  gap: var(--spacing-md, 16px);
+  justify-content: space-between;
+  margin-top: var(--spacing-xl, 32px);
+}
+
+.logout-dialog-footer .btn {
+  min-width: 100px;
+  min-height: 44px;
+  font-size: var(--font-size-base, 16px);
+  font-weight: var(--font-weight-medium, 500);
+  padding: var(--spacing-sm, 8px) var(--spacing-lg, 24px);
+  border-radius: var(--radius-md, 12px);
+  transition: all var(--transition-normal, 0.2s ease);
+  cursor: pointer;
+  border: 2px solid;
+}
+
+.logout-dialog-footer .btn.outline {
+  background: #fff;
+  color: var(--color-text, #2E2E2E);
+  border-color: var(--color-border, #D3C0A8);
+}
+
+.logout-dialog-footer .btn.outline:hover {
+  background: var(--bg-button, #F3F0EB);
+  border-color: var(--color-accent, #6B4F4F);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm, 0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.logout-dialog-footer .btn.outline:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.logout-dialog-footer .btn.danger {
+  background: var(--color-danger, #EF4444);
+  color: #fff;
+  border-color: var(--color-danger, #EF4444);
+}
+
+.logout-dialog-footer .btn.danger:hover {
+  background: #DC2626;
+  border-color: #DC2626;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md, 0 4px 8px rgba(239, 68, 68, 0.3));
+}
+
+.logout-dialog-footer .btn.danger:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm, 0 2px 4px rgba(239, 68, 68, 0.2));
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .logout-dialog-content {
+    padding: var(--spacing-lg, 24px);
+    max-width: 90%;
+    width: calc(100% - var(--spacing-xl, 32px));
+  }
+
+  .logout-dialog-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .logout-dialog-title {
+    font-size: var(--font-size-xl, 20px);
+  }
+
+  .logout-dialog-message {
+    font-size: var(--font-size-sm, 14px);
+    padding: 0;
+  }
+
+  .logout-dialog-footer {
+    flex-direction: column-reverse;
+    gap: var(--spacing-sm, 8px);
+  }
+
+  .logout-dialog-footer .btn {
+    width: 100%;
+    min-width: unset;
+  }
+}
+
+@media (max-width: 480px) {
+  .logout-dialog-content {
+    padding: var(--spacing-md, 16px);
+    border-radius: var(--radius-lg, 16px);
+  }
+
+  .logout-dialog-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: var(--spacing-sm, 8px);
+  }
+
+  .logout-dialog-title {
+    font-size: var(--font-size-lg, 18px);
+  }
+
+  .logout-dialog-header {
+    margin-bottom: var(--spacing-lg, 24px);
+  }
+
+  .logout-dialog-footer {
+    margin-top: var(--spacing-lg, 24px);
+  }
+}
+

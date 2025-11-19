@@ -1,18 +1,23 @@
 # -*- coding: utf-8 -*-
+"""
+唯一不需要注入API Key 或 User ID 的 router ， 針對不同 Path 注入不同的依賴
+"""
 from __future__ import annotations
 from typing import Optional
 import uuid
 from datetime import datetime, timedelta
 import uuid_utils as uuidu
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import update, select
+from sqlalchemy import update, select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...DataAccess.Connect import get_session
+from ...security.deps import get_uploader_api_client, get_compute_api_client, get_current_user
+from ...DataAccess.tables.__Enumeration import Role
 from .DTO import (
     JobCreateDTO, JobCreatedRespDTO, JobGetRespDTO, JobStatusRespDTO,
-    JobCompleteDTO, OKRespDTO
+    JobCompleteDTO, JobListRespDTO, OKRespDTO
 )
 from ...DataAccess.task_producer import enqueue
 from ...DataAccess.tables import inference_jobs, recordings, events
@@ -40,7 +45,7 @@ def _parse_iso_dt(s: str | None):
 
 
 @jobs_router.post(JOBS_POST_CREATE_JOB, response_model=JobCreatedRespDTO, status_code=status.HTTP_201_CREATED)
-async def create_job(body: JobCreateDTO, db: AsyncSession = Depends(get_session)):
+async def create_job(body: JobCreateDTO, db: AsyncSession = Depends(get_session), api_key = Depends(get_uploader_api_client)):
     trace_id: str = body.trace_id or str(create_uuid7())
     params_json = jsonable_encoder(body.params)
 
@@ -132,7 +137,7 @@ async def create_job(body: JobCreateDTO, db: AsyncSession = Depends(get_session)
 
 
 @jobs_router.get(JOBS_GET_GET_JOB, response_model=JobGetRespDTO)
-async def get_job(job_id: str, db: AsyncSession = Depends(get_session)):
+async def get_job(job_id: str, db: AsyncSession = Depends(get_session), current_user = Depends(get_current_user)):
     """取得 Job 狀態與結果"""
     try:
         jid = uuid.UUID(job_id)
@@ -145,6 +150,15 @@ async def get_job(job_id: str, db: AsyncSession = Depends(get_session)):
 
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    # 權限檢查：非管理員只能查看自己相關的任務
+    if current_user.role != Role.admin:
+        # 檢查任務是否與當前使用者相關
+        job_params = job.params or {}
+        job_user_id = job_params.get("user_id")
+        
+        if job_user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="沒有權限查看此任務")
 
     return JobGetRespDTO(
         job_id=job.id,
@@ -163,21 +177,101 @@ async def get_job(job_id: str, db: AsyncSession = Depends(get_session)):
 
 
 @jobs_router.get(JOBS_GET_GET_JOB_STATUS, response_model=JobStatusRespDTO)
-async def get_job_status(job_id: str, db: AsyncSession = Depends(get_session)):
+async def get_job_status(job_id: str, db: AsyncSession = Depends(get_session), current_user = Depends(get_current_user)):
     """取得 Job 狀態"""
     try:
         jid = uuid.UUID(job_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid job_id")
 
-    stmt = select(inference_jobs.Table.status).where(inference_jobs.Table.id == jid)
+    # 先獲取完整的 job 資訊以進行權限檢查
+    stmt = select(inference_jobs.Table).where(inference_jobs.Table.id == jid)
     result = await db.execute(stmt)
-    status_result: Optional[JobStatus] = result.scalar_one_or_none()
+    job: Optional[inference_jobs.Table] = result.scalar_one_or_none()
 
-    if not status_result:
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    return JobStatusRespDTO(status=status_result.value)
+    # 權限檢查：非管理員只能查看自己相關的任務
+    if current_user.role != Role.admin:
+        job_params = job.params or {}
+        job_user_id = job_params.get("user_id")
+        
+        if job_user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="沒有權限查看此任務")
+
+    return JobStatusRespDTO(status=job.status.value)
+
+
+@jobs_router.get("/", response_model=JobListRespDTO)
+async def list_jobs(
+    status_filter: Optional[str] = Query(default=None, description="篩選任務狀態"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=200),
+    db: AsyncSession = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    """取得任務列表（支援分頁和狀態篩選）"""
+    
+    # 構建查詢條件
+    conditions = []
+    
+    # 權限控制：使用者 ID 過濾
+    if current_user.role == Role.admin:
+        # 管理員可以查看所有任務
+        pass
+    else:
+        # 一般使用者只能查看自己的任務
+        # 使用 JSON 查詢來篩選 params.user_id
+        conditions.append(
+            func.json_extract(inference_jobs.Table.params, "$.user_id") == current_user.id
+        )
+    
+    # 狀態篩選
+    if status_filter:
+        try:
+            job_status = JobStatus(status_filter)
+            conditions.append(inference_jobs.Table.status == job_status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status_filter}")
+    
+    # 查詢任務
+    base_query = select(inference_jobs.Table)
+    if conditions:
+        base_query = base_query.where(and_(*conditions))
+    
+    # 分頁查詢
+    stmt_items = base_query.order_by(inference_jobs.Table.created_at.desc()).offset((page - 1) * size).limit(size)
+    stmt_total = select(func.count()).select_from(base_query.subquery())
+    
+    rows = (await db.execute(stmt_items)).scalars().all()
+    total = (await db.execute(stmt_total)).scalar_one()
+    
+    # 轉換為 DTO
+    items = []
+    for job in rows:
+        items.append(JobGetRespDTO(
+            job_id=job.id,
+            type=job.type,
+            status=job.status.value if hasattr(job.status, "value") else str(job.status),
+            input_type=job.input_type,
+            input_url=job.input_url,
+            output_url=job.output_url,
+            trace_id=job.trace_id,
+            duration=job.duration,
+            error_code=job.error_code,
+            error_message=job.error_message,
+            params=job.params,
+            metrics=job.metrics,
+        ))
+    
+    return JobListRespDTO(
+        items=items,
+        total=total,
+        page=page,
+        size=size,
+        page_total=total // size + (1 if total % size > 0 else 0),
+    )
 
 
 @jobs_router.patch("/{job_id}/update_status", response_model=JobStatusRespDTO)
@@ -204,7 +298,7 @@ async def update_job_status(job_id: str, new_status: JobStatus, db: AsyncSession
 
 
 @jobs_router.post("/{job_id}/complete", response_model=OKRespDTO)
-async def complete_job(job_id: str, body: JobCompleteDTO, db: AsyncSession = Depends(get_session)):
+async def complete_job(job_id: str, body: JobCompleteDTO, db: AsyncSession = Depends(get_session), api_key = Depends(get_compute_api_client)):
     """
     Job 完成後的回傳：
     1) 更新 job（狀態/錯誤/度量）
@@ -319,8 +413,17 @@ async def complete_job(job_id: str, body: JobCompleteDTO, db: AsyncSession = Dep
             """
             # start_time 儲存UTC時間
             if body.events:
+                # 取得 user_id（從 recordings 表）
+                res_user = await db.execute(
+                    select(recordings.Table.user_id).where(recordings.Table.id == vid)
+                )
+                recording_user_id = res_user.scalar_one_or_none()
+                if not recording_user_id:
+                    raise HTTPException(status_code=400, detail="recording user_id not found")
+                
                 for event in body.events:
                     ev = events.Table(
+                        user_id=recording_user_id,  # 🔧 修復：添加 user_id
                         recording_id=vid,
                         action=event.get("action"),
                         scene=event.get("scene"),

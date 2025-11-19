@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% include './partials/header.html'%}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/recordings.css') }}">
+  
+  <div class="page-content">
+    <div class="container">
+      <!-- YouTube 風格主布局 -->
+      <main class="recordings-main-layout">
+        <!-- 左側：影片播放區 -->
+        <section class="player-section">
+          <div class="player-container">
+            <video id="videoPlayer" controls playsinline preload="metadata"></video>
+            <div class="player-placeholder" id="playerPlaceholder">
+              <p>請從右側選擇一個影片開始播放</p>
+            </div>
+          </div>
+          
+          <!-- 影片詳細資訊（在播放器下方） -->
+          <div class="video-details" id="videoDetails" style="display: none;">
+            <h2 class="video-title" id="videoTitle"></h2>
+            <div class="video-meta">
+              <span class="meta-item" id="videoDuration"></span>
+              <span class="meta-item" id="videoTime"></span>
+            </div>
+            
+            <!-- 影片內的事件列表 -->
+            <div class="events-section">
+              <h3>影片內的事件</h3>
+              <div class="events-list" id="eventsList"></div>
+            </div>
+            
+            <!-- 刪除按鈕 -->
+            <div class="video-actions">
+              <button class="btn btn-danger" id="deleteVideoBtn">刪除影片</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 右側：影片列表 -->
+        <section class="list-section">
+          <div class="list-header">
+            <h2>影片列表</h2>
+            <div class="search-box">
+              <input type="text" id="searchInput" placeholder="搜尋影片（關鍵字）" />
+            </div>
+          </div>
+          <div class="recordings-list" id="recordingsList">
+            <p class="loading">載入中...</p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="/static/js/recordings.js"></script>
+
+{% endblock %}

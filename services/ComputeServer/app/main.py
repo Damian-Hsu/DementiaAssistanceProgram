@@ -10,7 +10,7 @@ def _bool(env, default=False):
     v = os.getenv(env, str(default)).lower()
     return v in ("1", "true", "yes", "on")
 
-BROKER_URL = os.getenv("BROKER_URL", "redis://localhost:6379/0")
+BROKER_URL = os.getenv("BROKER_URL", "redis://redis:6379/0")
 app = Celery("compute", broker=BROKER_URL)
 
 # 基礎設定（從環境讀，保持與 Celery 命名一致或轉成小寫）

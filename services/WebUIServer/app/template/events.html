@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  {% include './partials/header.html'%}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/events.css') }}">
+
+  <div class="page-content">
+    <div class="container">
+    <section class="search-bar">
+      <div class="search-group">
+        <label for="keywords">搜尋</label>
+        <input id="keywords" type="text" placeholder="請輸入關鍵字" />
+      </div>
+      <div class="search-group">
+        <label for="start">起始日期</label>
+        <input id="start" type="date" />
+        <label for="end">結束日期</label>
+        <input id="end" type="date" />
+      </div>
+      <div class="search-actions">
+        <button id="searchBtn" class="btn-primary">篩選</button>
+        <button id="resetBtn" class="btn-secondary">重設</button>
+      </div>
+    </section>
+
+    <section class="events-section">
+      <!-- 桌面版表格 -->
+      <table class="table">
+        <thead>
+          <tr>
+            <th data-sort="start_time">發生日期</th>
+            <th data-sort="start_time">紀錄時間</th>
+            <th data-sort="action">進行行為</th>
+            <th data-sort="scene">發生地點</th>
+            <th data-sort="summary">事件摘要</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="eventsList">
+        </tbody>
+      </table>
+      
+      <!-- 手機版卡片列表 -->
+      <div class="events-card-list"></div>
+
+
+      <div class="pagination">
+          <button id="prevBtn" class="page-btn">&lt;</button>
+          <span id="pageInfo">第 1 頁</span>
+          <button id="nextBtn" class="page-btn">&gt;</button>
+          <div class="pagination-size">
+            <label for="pageSize">每頁</label>
+            <input id="pageSize" type="number" min="1" max="100" value="20" />
+            <label for="pageSize">筆</label>
+          </div>
+        </div>
+        <div id="resultSummary" class="result-info"></div>
+      </section>
+      <dialog id="eventDialog">
+  <div class="dlg__header">
+    <h3 id="dialogTitle"></h3>
+    <button id="closeDialogBtn" class="dlg__close">✕</button>
+  </div>
+  <div class="dlg__body">
+    <div id="dialogContent"></div>
+  </div>
+</dialog>
+    </div>
+  </div>
+
+<script type="module" src="{{ url_for('static', filename='js/events.js') }}"></script>
+
+{% endblock %}

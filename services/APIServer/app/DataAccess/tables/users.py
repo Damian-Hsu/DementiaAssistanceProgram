@@ -3,7 +3,7 @@ from datetime import date
 from pydantic import BaseModel, Field
 from sqlalchemy import String, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column
-
+from sqlalchemy.dialects.postgresql import JSONB
 from . import ORMBase, TimestampMixin, TimestampSchema
 from .__Enumeration import Role, Gender, DementiaLevel
 from .__Enumeration import RoleEnum, GenderEnum, DementiaLevelEnum
@@ -42,5 +42,6 @@ class UserTable(ORMBase, TimestampMixin):
     headshot_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
     active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    settings: Mapped[dict|None] = mapped_column(JSONB,nullable=True)
 
 Table = UserTable

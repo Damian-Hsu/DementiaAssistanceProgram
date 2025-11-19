@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<!-- 基本編碼與 RWD 視窗設定 -->
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+
+
+<!-- 頁面標題：優先使用後端傳入的中文標題，其次英文，最後給預設 -->
+<title>{{ title_zh or title_en or '未命名頁面' }}|AI助手</title>
+
+
+<!-- 全站佈局樣式（包含側邊欄、Header、RWD 等） -->
+ <link rel="stylesheet" href="{{url_for('static', filename='css/base.css')}}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}" >
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/mobile_nav.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/logout_dialog.css') }}">
+</head>
+<body>
+<div class="layout-container">
+<!-- 側邊欄（共用）：獨立模板，透過 active_page 控制高亮 -->
+<!-- 桌面模式顯示，手機模式隱藏 -->
+{% include 'partials/sidebar.html' %}
+
+<!-- 手機模式底部導覽列 -->
+<!-- 手機模式顯示，桌面模式隱藏 -->
+{% include 'partials/mobile_nav.html' %}
+
+<!-- 登出確認對話框 -->
+{% include 'partials/logout_confirm_dialog.html' %}
+
+<!-- 右側主要區域：頁面標題（可選） + 主要內容 -->
+<main class="main-content" role="main">
+
+<!-- 標題區（Header）是否出現由各頁面自行決定：
+- 需要：在子模板內 include 'components/header.html' 
+- 不需要：子模板就不要 include，main 會自動頂到上方，沒有多餘空白 -->
+
+
+
+<!-- 子頁面的主要內容會插入到這個區塊 -->
+{% block content %}{% endblock %}
+</main>
+</div>
+<script type="module" src="../static/js/logout.js"></script>
+<script type="module" src="{{ url_for('static', filename='js/mobile_nav.js') }}"></script>
+
+</body>
+
+</html>

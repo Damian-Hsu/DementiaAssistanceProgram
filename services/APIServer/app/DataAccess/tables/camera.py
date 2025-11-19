@@ -26,7 +26,6 @@ class CameraTable(ORMBase, TimestampMixin):
     status: Mapped[CameraStatus] = mapped_column(CameraStatusEnum, default=CameraStatus.inactive, nullable=False, index=True)
     path: Mapped[str] = mapped_column(String(64), unique=True, nullable=True, index=True)
     token_version: Mapped[int] = mapped_column(nullable=False, default=0)
-    #allow_ip: Mapped[list[str]|None] = mapped_column(ARRAY(CIDR), nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     max_publishers: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     

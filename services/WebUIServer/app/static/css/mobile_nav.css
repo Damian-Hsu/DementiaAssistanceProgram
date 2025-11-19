@@ -1,0 +1,246 @@
+/* ==============================
+   📱 手機模式底部導覽列
+   ============================== */
+
+/* 桌面模式：隱藏底部導覽 */
+.mobile-nav {
+  display: none;
+}
+
+/* 手機模式：顯示底部導覽 */
+@media (max-width: 768px) {
+  .mobile-nav {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: #fff;
+    border-top: 2px solid var(--color-border, #D3C0A8);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+    padding: var(--spacing-sm, 8px) 0;
+    /* 修復 iPad Pro 底部白邊 - 確保貼齊底部 */
+    padding-bottom: max(var(--spacing-sm, 8px), env(safe-area-inset-bottom, 0px));
+    margin-bottom: 0; /* 確保沒有間隙 */
+    box-sizing: border-box;
+    /* 確保貼齊最底端 */
+    height: calc(80px + env(safe-area-inset-bottom, 0px));
+    min-height: 80px;
+  }
+
+  .mobile-nav-list {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    gap: var(--spacing-xs, 4px);
+  }
+
+  .mobile-nav-item {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .mobile-nav-center {
+    flex: 1.2; /* 聊天按鈕稍大一些 */
+  }
+
+  .mobile-nav-expandable {
+    position: relative;
+  }
+
+  .mobile-nav-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs, 4px);
+    padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+    border-radius: var(--radius-md, 12px);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-normal, 0.2s ease);
+    width: 100%;
+    text-decoration: none;
+    color: var(--color-text, #2E2E2E);
+    font-size: var(--font-size-xs, 12px);
+    min-height: 56px;
+    box-sizing: border-box;
+  }
+
+  .mobile-nav-link:active {
+    background: var(--bg-button, #F3F0EB);
+    transform: scale(0.95);
+  }
+
+  .mobile-nav-item.active .mobile-nav-link {
+    background: var(--color-accent, #6B4F4F);
+    color: #fff;
+  }
+
+  .mobile-nav-item.active .mobile-nav-icon {
+    filter: brightness(0) invert(1);
+  }
+
+  .mobile-nav-icon {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    display: block;
+    object-fit: contain;
+    transition: all var(--transition-normal, 0.2s ease);
+  }
+
+  .mobile-nav-label {
+    font-size: var(--font-size-xs, 12px);
+    font-weight: var(--font-weight-medium, 500);
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .mobile-nav-expand-icon {
+    width: 12px;
+    height: 12px;
+    transition: transform var(--transition-normal, 0.2s ease);
+    margin-top: 2px;
+  }
+
+  .mobile-nav-expandable.expanded .mobile-nav-expand-icon {
+    transform: rotate(180deg);
+  }
+
+  /* 展開的子選單 */
+  .mobile-nav-submenu {
+    position: absolute;
+    bottom: calc(100% + var(--spacing-xs, 4px));
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    border: 2px solid var(--color-border, #D3C0A8);
+    border-radius: var(--radius-md, 12px);
+    box-shadow: var(--shadow-lg, 0 4px 12px rgba(0, 0, 0, 0.15));
+    padding: var(--spacing-xs, 4px);
+    min-width: 140px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-50%) translateY(10px);
+    transition: all var(--transition-normal, 0.2s ease);
+    z-index: 1001;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs, 4px);
+  }
+
+  .mobile-nav-expandable.expanded .mobile-nav-submenu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+  }
+
+  .mobile-nav-submenu-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-sm, 8px);
+    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+    border-radius: var(--radius-sm, 8px);
+    text-decoration: none;
+    color: var(--color-text, #2E2E2E);
+    transition: all var(--transition-normal, 0.2s ease);
+    white-space: nowrap;
+  }
+
+  .mobile-nav-submenu-item:hover,
+  .mobile-nav-submenu-item:active {
+    background: var(--bg-button, #F3F0EB);
+  }
+
+  .mobile-nav-submenu-item.active {
+    background: var(--color-accent, #6B4F4F);
+    color: #fff;
+  }
+
+  .mobile-nav-submenu-item.active .mobile-nav-icon {
+    filter: brightness(0) invert(1);
+  }
+
+  .mobile-nav-submenu-item .mobile-nav-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .mobile-nav-submenu-item .mobile-nav-label {
+    font-size: var(--font-size-sm, 14px);
+    font-weight: var(--font-weight-medium, 500);
+  }
+
+  /* 子選單的小箭頭 */
+  .mobile-nav-submenu::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid var(--color-border, #D3C0A8);
+  }
+
+  .mobile-nav-submenu::before {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 7px solid #fff;
+    z-index: 1;
+  }
+}
+
+/* 超小螢幕優化 */
+@media (max-width: 480px) {
+  .mobile-nav-label {
+    font-size: 10px;
+  }
+
+  .mobile-nav-icon {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+  }
+
+  .mobile-nav-link {
+    min-height: 52px;
+    padding: var(--spacing-xs, 4px);
+  }
+}
+
+/* 確保手機模式下側邊欄隱藏 - 已在 layout.css 中處理 */
+
+/* 點擊外部關閉展開選單 - 通過 JS 處理 */
+

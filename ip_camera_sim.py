@@ -30,6 +30,9 @@ ffmpeg_cmd = [
     "-c:v", "libx264",
     "-preset", "ultrafast",
     "-tune", "zerolatency",
+    "-bf", "0",                         # 禁用 B-frames，WebRTC 相容
+    "-g", "30",                         # GOP 大小
+    "-keyint_min", "30",                # 最小關鍵幀間隔
     "-pix_fmt", "yuv420p",              # ★ 重要：避免 4:4:4
     "-rtsp_transport", "tcp",           # 比較穩定
     "-f", "rtsp",

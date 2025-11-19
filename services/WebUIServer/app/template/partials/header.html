@@ -1,0 +1,22 @@
+{#
+頁面標題區（Header）
+- 四個欄位：
+1) 介面名稱（中文）：title_zh
+3) 中文說明：desc_zh
+- 缺省策略（優雅降級）：
+* 若中英標題都沒給，顯示「未命名頁面」避免空 heading
+* 只要 desc_zh / desc_en 任一存在就渲染說明容器；都沒給則整塊略過
+#}
+<header class="page-header" role="region" aria-labelledby="page-title">
+<h1 id="page-title" class="page-title">
+{{ (title_zh) | e }}
+
+</h1>
+
+
+{% if desc_zh%}
+<div class="page-desc">
+{% if desc_zh %}<p class="desc-zh">{{ desc_zh }}</p>{% endif %}
+</div>
+{% endif %}
+</header>

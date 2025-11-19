@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block content %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+  
+  <!-- 標題區域 -->
+  <header class="chat-header" role="region" aria-labelledby="page-title">
+    <div class="chat-header-content">
+      <h1 id="page-title" class="chat-title">{{ (title_zh) | e }}</h1>
+    </div>
+  </header>
+
+  <!-- 聊天容器 - 直接佔滿可用空間 -->
+  <div class="chat-container">
+    <!-- 聊天訊息區域 -->
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-message ai">
+        <div class="chat-avatar">AI</div>
+        <div class="message-content">
+          <div class="chat-bubble">
+            👋 您好！我是您的 AI 助手。<br><br>
+            您可以問我：<br>
+            • "我今天幾點吃早餐？"<br>
+            • "我今天去了哪裡？"<br>
+            • "我在客廳做了什麼？"<br>
+            • "我今天有散步嗎？"
+          </div>
+          <div class="chat-time">AI 助手</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 輸入區域 -->
+    <div class="chat-input-area">
+      <div class="chat-input-row">
+        <!-- 工具按鈕和展開面板 -->
+        <div class="chat-tools-container">
+          <button id="chatToolsBtn" class="chat-tools-btn" type="button" aria-label="工具" aria-expanded="false">
+            <img class="chat-tools-icon" src="{{ url_for('static', filename='icons/tools-fill.svg') }}" alt="工具" />
+            <span class="chat-tools-label">工具</span>
+          </button>
+          
+          <!-- 展開的工具面板 -->
+          <div class="chat-tools-panel" id="chatToolsPanel">
+            <div class="chat-filters">
+              <div class="filter-group">
+                <label for="chatDateFrom">開始日期</label>
+                <input id="chatDateFrom" type="date" />
+              </div>
+              <div class="filter-group">
+                <label for="chatDateTo">結束日期</label>
+                <input id="chatDateTo" type="date" />
+              </div>
+              <button id="clearChat" class="btn danger outline">清除對話</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 輸入框和發送按鈕 -->
+        <div class="chat-input-wrapper">
+          <textarea 
+            id="chatInput" 
+            placeholder="輸入您的問題..." 
+            rows="1"
+            autocomplete="off"
+          ></textarea>
+          <button id="chatSend" class="btn primary" type="button" aria-label="發送訊息">
+            <svg style="width:18px;height:18px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}

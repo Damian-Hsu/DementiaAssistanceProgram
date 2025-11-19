@@ -109,3 +109,9 @@ class PlayWebRTCURLResp(BaseModel):
     play_webrtc_url: str
     ttl: int
     expires_at: int
+
+class StreamStatusResp(BaseModel):
+    is_streaming: bool
+    status: Optional[Literal["starting", "running", "stopped", "error"]] = None
+    stream_info: Optional[dict[str, Any]] = None
+    error_message: Optional[str] = None
