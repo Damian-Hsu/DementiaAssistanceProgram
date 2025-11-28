@@ -22,7 +22,7 @@ button {
 /* 主要按鈕 */
 button.primary,
 button[type="submit"],
-button:not(.secondary):not(.outline):not(.ghost) {
+button:not(.secondary):not(.outline):not(.ghost):not(.nav-link) {
   background-color: var(--color-accent);
   color: #fff;
   box-shadow: var(--shadow-sm);
@@ -30,7 +30,7 @@ button:not(.secondary):not(.outline):not(.ghost) {
 
 button.primary:hover,
 button[type="submit"]:hover,
-button:not(.secondary):not(.outline):not(.ghost):hover {
+button:not(.secondary):not(.outline):not(.ghost):not(.nav-link):hover {
   background-color: var(--color-secondary);
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
@@ -38,7 +38,7 @@ button:not(.secondary):not(.outline):not(.ghost):hover {
 
 button.primary:active,
 button[type="submit"]:active,
-button:not(.secondary):not(.outline):not(.ghost):active {
+button:not(.secondary):not(.outline):not(.ghost):not(.nav-link):active {
   transform: translateY(0);
   box-shadow: var(--shadow-sm);
 }
@@ -211,7 +211,7 @@ textarea {
 .search-bar input[type="text"] {
   flex: 1;
   padding: var(--spacing-sm) var(--spacing-md);
-  padding-left: var(--spacing-xl); /* 為圖示留空間 */
+  /*padding-left: var(--spacing-xl);  為圖示留空間 */
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   background-color: #fff;

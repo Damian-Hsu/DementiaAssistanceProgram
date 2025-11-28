@@ -57,6 +57,7 @@ async def create_key(
         db,
         name=body.name,
         owner_id=body.owner_id,
+        scopes=body.scopes,
         rate_limit_per_min=body.rate_limit_per_min,
         quota_per_day=body.quota_per_day,
         active=True,
@@ -95,15 +96,23 @@ async def update_key(
     rec = await api_key_mgr.get(db, key_id=key_id)
 
     patch = body.model_dump(exclude_unset=True)
+    
+    # 如果只更新 active 狀態
     if "active" in patch and len(patch) == 1:
         rec = await api_key_mgr.set_active(db, key_id=key_id, active=bool(patch["active"]))
     else:
-        # 這裡更新其他欄位
-        for k, v in patch.items():
-            setattr(rec, k, v)
-        db.add(rec)
-        await db.commit()
-        await db.refresh(rec)
+        # 如果更新 scopes，使用專門的方法來確保驗證和正規化
+        if "scopes" in patch:
+            scopes = patch.pop("scopes")
+            rec = await api_key_mgr.set_scopes(db, key_id=key_id, scopes=scopes or [])
+        
+        # 更新其他欄位
+        if patch:
+            for k, v in patch.items():
+                setattr(rec, k, v)
+            db.add(rec)
+            await db.commit()
+            await db.refresh(rec)
 
     return ApiKeyOutDTO.model_validate(rec)
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import asyncio, os
+import asyncio, os, time
 from typing import Dict, Tuple, List
 from pathlib import Path
 import uuid, hashlib, base64
@@ -22,28 +22,61 @@ class _Manager:
     def to_info(self, p: FFmpegProcess) -> StreamInfo:
         # 檢查進程是否真的在運行
         is_running = p.is_running()
-        # 如果進程存在但不在運行，可能是剛啟動或剛失敗
-        if p.proc and not is_running:
-            # 檢查進程退出碼
-            if p.proc.poll() is not None:
-                # 進程已退出
-                if p.proc.returncode == 0:
-                    # 正常退出（可能是推流端停止），標記為 stopped
-                    status = "stopped"
+        
+        # 優先檢查：如果進程正在運行，直接返回 running
+        if is_running:
+            status = "running"
+        elif p.proc:
+            # 進程對象存在但不在運行，檢查退出碼
+            poll_result = p.proc.poll()
+            if poll_result is None:
+                # poll() 返回 None 表示進程還在運行（但 is_running() 返回 False，可能是競態條件）
+                # 這種情況下，應該標記為 running
+                status = "running"
+            elif poll_result == 0:
+                # 正常退出（可能是推流端停止），標記為 stopped
+                status = "stopped"
+            else:
+                # 異常退出（rc != 0）
+                if p.disconnect_start_time is not None:
+                    # 正在重連中（有斷線計時）
+                    disconnect_duration = time.time() - p.disconnect_start_time
+                    if disconnect_duration < 60:  # 1分鐘內
+                        status = "reconnecting"  # 重連中狀態
+                    else:
+                        # 超過1分鐘，標記為錯誤
+                        status = "error"
+                elif p.process_started_time is not None:
+                    # 曾經成功啟動過，給重連機會
+                    if p.disconnect_start_time is None:
+                        p.disconnect_start_time = time.time()
+                    disconnect_duration = time.time() - p.disconnect_start_time
+                    if disconnect_duration < 60:
+                        status = "reconnecting"
+                    else:
+                        status = "error"
                 elif p.last_error and ("Connection refused" in p.last_error or "Error opening input" in p.last_error):
-                    # 連接錯誤
+                    # 連接錯誤，還沒成功啟動過，標記為錯誤
                     status = "error"
                 else:
-                    # 其他錯誤
+                    # 其他錯誤，還沒成功啟動過
                     status = "error"
-            else:
-                # 進程還在運行但 is_running() 返回 False（不太可能）
-                status = "starting"
-        elif is_running:
-            status = "running"
         else:
-            # 沒有進程對象，標記為 stopped
-            status = "stopped"
+            # 沒有進程對象
+            if p.process_started_time is not None:
+                # 曾經啟動過，但現在沒有進程對象，可能是剛退出
+                # 檢查是否在重連容許時間內
+                if p.disconnect_start_time is not None:
+                    disconnect_duration = time.time() - p.disconnect_start_time
+                    if disconnect_duration < 60:
+                        status = "reconnecting"
+                    else:
+                        status = "stopped"
+                else:
+                    status = "stopped"
+            else:
+                # 從未啟動過，標記為 stopped
+                status = "stopped"
         return StreamInfo(
             stream_id=p.stream_id,
             user_id=p.user_id,

@@ -2,6 +2,7 @@ from ..main import app
 from ..DTO import *
 import cv2
 import numpy as np
+import gc
 from typing import List, Dict, Any, Optional, Tuple
 from PIL import Image
 import torch
@@ -94,6 +95,90 @@ def ensure_http_video_url(url: str) -> str:
         return _s3_to_presigned_http(url)
     return url
 
+
+def _generate_video_thumbnail(video_url: str, thumbnail_path: str) -> bool:
+    """
+    從視頻第一幀生成縮圖
+    
+    Args:
+        video_url: 視頻 URL (可以是 s3:// 或 http://)
+        thumbnail_path: 縮圖輸出路徑
+    
+    Returns:
+        是否成功生成
+    """
+    try:
+        import cv2
+        import tempfile
+        
+        # 如果是 s3:// URL，先轉換為 presigned URL
+        video_http_url = ensure_http_video_url(video_url)
+        
+        # 使用 OpenCV 讀取視頻第一幀
+        cap = cv2.VideoCapture(video_http_url)
+        if not cap.isOpened():
+            _dbg(f"無法打開視頻: {video_url}")
+            return False
+        
+        ret, frame = cap.read()
+        cap.release()
+        
+        if not ret or frame is None:
+            _dbg(f"無法讀取視頻第一幀: {video_url}")
+            return False
+        
+        # 縮放圖片（寬度 320，高度按比例）
+        height, width = frame.shape[:2]
+        new_width = 320
+        new_height = int(height * (new_width / width))
+        frame_resized = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
+        
+        # 保存為 JPEG
+        cv2.imwrite(thumbnail_path, frame_resized, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        _dbg(f"縮圖生成成功: {thumbnail_path}")
+        return True
+        
+    except Exception as e:
+        _dbg(f"生成縮圖失敗: {e}")
+        return False
+
+
+def _upload_thumbnail_to_s3(thumbnail_path: str, s3_key: str) -> bool:
+    """
+    上傳縮圖到 S3/MinIO
+    
+    Args:
+        thumbnail_path: 本地縮圖路徑
+        s3_key: S3 對象鍵
+    
+    Returns:
+        是否成功上傳
+    """
+    try:
+        s3 = _get_s3_client()
+        m = _S3_URL_RE.match(s3_key) if s3_key.startswith("s3://") else None
+        
+        if m:
+            bucket = m.group("bucket")
+            key = m.group("key")
+        else:
+            # 如果不是 s3:// 格式，假設是 key，使用默認 bucket
+            bucket = os.getenv("MINIO_BUCKET", "media-bucket")
+            key = s3_key
+        
+        s3.upload_file(
+            thumbnail_path,
+            bucket,
+            key,
+            ExtraArgs={'ContentType': 'image/jpeg'}
+        )
+        _dbg(f"縮圖已上傳到 S3: s3://{bucket}/{key}")
+        return True
+        
+    except Exception as e:
+        _dbg(f"上傳縮圖到 S3 失敗: {e}")
+        return False
+
 # SSIM 需用 skimage；只有在 module="SSIM" 時才會用到
 try:
     from skimage.metrics import structural_similarity as ssim
@@ -177,6 +262,11 @@ def get_video_frames(video_url: str, target_fps: int = 3):
         "extracted_frames": output_count,
         "duration": duration / 1000.0,  # 秒數
         })
+    
+    # 釋放 VideoCapture 相關資源
+    del cap
+    gc.collect()
+    
     return {
         "video_info": video_info,
         "frames": frames_dicts
@@ -224,6 +314,10 @@ def get_video_frames_fast(video_url: str, target_fps: int = 3):
 
     duration_sec = total_frames / fps
     cap.release()
+    
+    # 釋放 VideoCapture 相關資源
+    del cap
+    gc.collect()
 
     video_info = {
         "video_url": video_url,
@@ -280,7 +374,13 @@ def analyze_blur(
             "variance": variance,
             "is_not_blurry": not is_blurry # 這裡的 is_not_blurry 反轉了邏輯，True 表示清晰
         })
+        
+        # 每處理 10 個幀後進行一次垃圾回收（避免記憶體累積）
+        if len(analyzed) % 10 == 0:
+            gc.collect()
 
+    # 處理完成後進行垃圾回收
+    gc.collect()
     return analyzed
 
 @timer
@@ -348,6 +448,11 @@ def filter_by_frame_difference(
         filtered_item["mse_value"] = diff_value if module == "MSE_L2" else None
         filtered_item["is_significant"] = bool(is_significant)
         filtered_frames.append(filtered_item)
+    
+    # 清理壓縮後的幀列表（不再需要）
+    del compression_frames
+    gc.collect()
+    
     return filtered_frames  # 返回處理後的幀列表，包含是否顯著的標記
 
 
@@ -400,7 +505,13 @@ class BLIPImageCaptioner:
         inputs = self.processor(image, return_tensors="pt").to(self.device)
         generated_ids = self.model.generate(**inputs, max_new_tokens=50)
         caption = self.processor.decode(generated_ids[0], skip_special_tokens=True)
-
+        
+        # 清理模型推理產生的臨時變數
+        del inputs
+        del generated_ids
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()  # 清理 CUDA 快取
+        
         return caption
 
 _CAPTIONER = None
@@ -429,7 +540,8 @@ def get_captioner() -> BLIPImageCaptioner:
 def img_captioning(frames_dicts: List[Dict[str, Any]]):
     _dbg(f"img_captioning() called with {_frames_dicts_summary(frames_dicts)}")
     captioner = get_captioner()
-    for item in frames_dicts:
+    processed_count = 0
+    for idx, item in enumerate(frames_dicts):
         if item["is_not_blurry"] and item["is_significant"]:
             frame = item["frame"]
 
@@ -442,8 +554,23 @@ def img_captioning(frames_dicts: List[Dict[str, Any]]):
 
             # 存回 dict
             item["caption"] = caption
+            processed_count += 1
+            
+            # 每處理 5 個幀後進行一次垃圾回收（模型推理較耗記憶體）
+            if processed_count % 5 == 0:
+                del image_rgb
+                del pil_image
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
         else: 
             item["caption"] = "<skipped due to blur or insignificance>"
+    
+    # 處理完成後進行最終垃圾回收
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
     return frames_dicts
 
 from ..libs.ModelLoad import llm_core
@@ -570,7 +697,10 @@ def llm_processing(frames_dicts: List[Dict[str, Any]],
         {k: v for k, v in fr.items() if k not in del_list}
         for fr in new_frames_dicts
     ]
-   
+    
+    # 清理不再需要的原始幀數據
+    del new_frames_dicts
+    gc.collect()
     
     frames_summary = [
         {
@@ -811,6 +941,8 @@ def _make_failed_jobresult(job: dict,
         "events": [],
     }
 
+from ..libs.RAG import RAGModel
+
 def video_description_extraction_main(job: dict):
     """
     step 1 : 從 job 取得 video_url
@@ -870,6 +1002,17 @@ def video_description_extraction_main(job: dict):
         # === 強制用 index→秒數映射，完全忽略任何 start_time/end_time ===
         events, clamp_count = _build_events_from_llm_by_index(llm_result, frames_summary)
 
+        # === Calculate Embeddings (Added) ===
+        try:
+            rag = RAGModel.get_instance()
+            for event in events:
+                summary_text = event.get("summary", "")
+                if summary_text:
+                    emb = rag.encode([f"passage: {summary_text}"])[0]
+                    event["embedding"] = emb.tolist()
+        except Exception as e:
+            _dbg(f"Embedding calculation failed: {e}")
+
         if not events:
             return _make_failed_jobresult(
                 job, video_info,
@@ -890,11 +1033,20 @@ def video_description_extraction_main(job: dict):
 
     except Exception as e:
         # 報錯的程式返回格式
+        # 發生錯誤時也要清理記憶體
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return _make_failed_jobresult(
             job, video_info if "video_info" in locals() else None,
             code=getattr(e, "__class__", type(e)).__name__,
             message=str(e)
         )
+    finally:
+        # 任務完成後強制清理記憶體
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
     
 
 API_SERVER_URL = os.getenv("JOB_API_BASE", "http://api:30000")
@@ -906,31 +1058,37 @@ headers = {
 @app.task(name="tasks.video_description_extraction", bind=True, acks_late=True)
 def video_description_extraction(self, job: dict):
     start_time = time.time()
-    reply = video_description_extraction_main(job)
-    end_time = time.time()
-    duration = end_time - start_time
-    reply["duration"] = duration
-    # 呼叫 API Server，將結果存入資料庫
-    # print("URL："+job.get('input_url', ''))
-    # print(reply)
-    _dbg(f"Posting result to {API_SERVER_URL}/jobs/{job.get('job_id', '?')}/complete")
-    _dbg(f"Result: {json.dumps(reply) if isinstance(reply, dict) else str(reply)}")
     try:
-        response = requests.post(
-            f"{API_SERVER_URL}/jobs/{job.get('job_id', '?')}/complete",
-            headers=headers,
-            json=reply,
-            timeout=30
-        )
-        response.raise_for_status()
-        return response.json()
-    
-    except requests.RequestException as e:
-        # API 呼叫失敗，回傳錯誤訊息
-        return {
-            "job_id": job.get("job_id", "?"),
-            "trace_id": job.get("trace_id"),
-            "error_code": "API_CALL_FAILED",
-            "error_message": str(e)
-        }
+        reply = video_description_extraction_main(job)
+        end_time = time.time()
+        duration = end_time - start_time
+        reply["duration"] = duration
+        # 呼叫 API Server，將結果存入資料庫
+        # print("URL："+job.get('input_url', ''))
+        # print(reply)
+        _dbg(f"Posting result to {API_SERVER_URL}/jobs/{job.get('job_id', '?')}/complete")
+        _dbg(f"Result: {json.dumps(reply) if isinstance(reply, dict) else str(reply)}")
+        try:
+            response = requests.post(
+                f"{API_SERVER_URL}/jobs/{job.get('job_id', '?')}/complete",
+                headers=headers,
+                json=reply,
+                timeout=30
+            )
+            response.raise_for_status()
+            return response.json()
+        
+        except requests.RequestException as e:
+            # API 呼叫失敗，回傳錯誤訊息
+            return {
+                "job_id": job.get("job_id", "?"),
+                "trace_id": job.get("trace_id"),
+                "error_code": "API_CALL_FAILED",
+                "error_message": str(e)
+            }
+    finally:
+        # 任務完成後強制清理記憶體
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 

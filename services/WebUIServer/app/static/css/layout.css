@@ -6,9 +6,9 @@
   height: 100vh;
   height: calc(100vh - env(safe-area-inset-bottom)); /* 修復 iPad Pro 底部白邊 */
   background-color: var(--bg-main);
-  padding: var(--spacing-lg);
+  padding: var(--spacing-md);
   padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom)); /* 考慮安全區域 */
-  gap: var(--spacing-lg);
+  gap: var(--spacing-sm);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -17,7 +17,7 @@
 @media (max-width: 1024px) {
   .layout-container {
     padding: var(--spacing-md);
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
   }
 }
 
@@ -29,7 +29,6 @@
     height: 100vh;
     min-height: 100vh;
     max-height: 100vh;
-    padding-bottom: calc(80px + var(--spacing-sm)); /* 為底部導覽留出空間 */
     overflow: hidden;
   }
 }
@@ -37,6 +36,12 @@
 /* ==============================
    📚 側邊欄樣式 - 響應式優化
    ============================== */
+#sidebar-container {
+  display: flex;
+  align-self: stretch;
+  height: 100%;
+}
+
 .sidebar {
   width: var(--sidebar-w);
   min-width: var(--sidebar-w);
@@ -44,21 +49,26 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
   padding: var(--spacing-lg) 0;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
   position: sticky;
-  top: var(--spacing-lg);
-  height: fit-content;
-  max-height: calc(100vh - var(--spacing-lg) * 2);
+  top: 0;
+  align-self: stretch;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 /* 響應式設計 */
+/* 當底部導覽列顯示時（max-width: 768px），隱藏側邊欄容器 */
 @media (max-width: 768px) {
-  /* 手機模式下隱藏側邊欄，使用底部導覽 */
+  /* 手機模式下隱藏側邊欄容器和側邊欄，使用底部導覽 */
+  #sidebar-container {
+    display: none !important;
+  }
+  
   .sidebar {
     display: none !important;
   }
@@ -68,27 +78,35 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
-  flex:1;
+  gap:14px;
+  flex: 1;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
 }
 
 .nav-item {
-  width: 56px;
-  height: 56px;
+  width: 64px;
 }
 
 .nav-link {
-  width: 56px;
-  height: 56px;
-  min-width: 56px; /* 無障礙最小點擊區域 */
-  min-height: 56px;
+  width: 64px;
+  min-width: 64px; /* 無障礙最小點擊區域 */
+  aspect-ratio: 1; /* 強制正方形 */
   background-color: var(--bg-button);
   border-radius: var(--radius-md);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
   transition: all var(--transition-normal);
   position: relative;
+  text-decoration: none;
+  color: var(--color-text);
+  box-sizing: border-box;
 }
 
 .nav-link::before {
@@ -114,7 +132,9 @@
 }
 
 .nav-item.active .nav-link::before {
-  height: 32px;
+  height: 80%;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .nav-link:focus-visible {
@@ -130,14 +150,43 @@
   min-height: var(--icon, 24px);
   display: block;
   object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* 導航標籤文字 */
+.nav-label {
+  font-size: var(--font-size-xs, 12px);
+  font-weight: var(--font-weight-medium, 500);
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--color-text);
+  transition: color var(--transition-normal);
+}
+
+.nav-item.active .nav-label {
+  color: var(--color-accent);
 }
 
 /* 登出圖示固定在最下方 */
 .nav-logout {
   margin-top: auto;
-  
+  margin-bottom: var(--spacing-lg, 24px);
 }
-.nav-list > .nav-item.nav-logout { margin-top: auto; }
+
+.nav-list > .nav-item.nav-logout { 
+  margin-top: auto;
+  margin-bottom: 0;
+}
+
+/* 登出按鈕背景顏色與其他導航圖標一致 */
+.nav-logout .nav-link {
+  background-color: var(--bg-button, #F3F0EB);
+}
+
+.nav-logout .nav-link:hover {
+  background-color: var(--bg-button-hover, #E2D7C5);
+}
 
 /* ==============================
    📄 主內容 + Header 區
@@ -208,24 +257,26 @@
 
 /* 主內容內層 - 優化間距與滾動 */
 .page-content {
-  padding: var(--spacing-md, 16px) var(--spacing-lg, 24px); /* 減少垂直 padding，保持水平 padding */
+  padding: var(--spacing-lg, 24px);
+  background: var(--bg-main, #F5EBDD);
   flex: 1;
   overflow-y: auto; /* 允許垂直滾動 */
   overflow-x: hidden; /* 防止水平滾動 */
   min-height: 0; /* 允許 flex 子元素收縮 */
+  box-sizing: border-box;
   -webkit-overflow-scrolling: touch; /* iOS 平滑滾動 */
 }
 
 /* 響應式設計 */
 @media (max-width: 1024px) {
   .page-content {
-    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px); /* 減少垂直 padding */
+    padding: var(--spacing-md, 16px);
   }
 }
 
 @media (max-width: 768px) {
   .page-content {
-    padding: var(--spacing-sm, 8px) var(--spacing-sm, 8px); /* 減少垂直 padding */
+    padding: var(--spacing-sm, 8px);
     padding-bottom: calc(var(--spacing-sm, 8px) + 80px); /* 為底部導覽留出空間 */
   }
 }
@@ -243,48 +294,40 @@
   padding: 0;
 }
 
-/* 頁面標題區 - 增強視覺層次 */
+/* 頁面標題區 - 統一風格（參考 chat-header） */
 .page-header {
-  margin-left: var(--spacing-xl);
-  margin-bottom: var(--spacing-md, 16px); /* 減少下方間距 */
-  margin-top: var(--spacing-md, 16px); /* 減少上方間距 */
-  padding-top: var(--spacing-md, 16px); /* 減少上方內距 */
-  padding-bottom: var(--spacing-sm, 8px); /* 減少下方內距 */
-  border-bottom: 2px solid var(--color-border);
+  padding: var(--spacing-md, 16px) var(--spacing-lg, 24px);
+  background: var(--bg-main, #F5EBDD);
+  border-bottom: 2px solid var(--color-border, #D3C0A8);
+  flex-shrink: 0;
 }
 
 .page-title {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-accent);
-  margin-top: 0; /* 移除上方間距，因為 header 已有 padding-top */
-  margin-bottom: var(--spacing-xs, 4px); /* 減少下方間距 */
-  line-height: var(--line-height-tight);
+  font-size: var(--font-size-2xl, 24px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-accent, #6B4F4F);
+  margin: 0;
+  line-height: var(--line-height-tight, 1.4);
 }
 
 .page-desc {
-  margin-top: var(--spacing-xs, 4px); /* 減少上方間距 */
-  margin-bottom: var(--spacing-xs, 4px); /* 減少下方間距 */
+  margin-top: var(--spacing-xs, 4px);
 }
 
 .page-desc .desc-zh {
-  font-size: var(--font-size-base);
-  color: var(--text-muted-light);
-  line-height: var(--line-height-relaxed);
-  margin-bottom: 0;
+  font-size: var(--font-size-base, 16px);
+  color: var(--text-muted-light, #666);
+  line-height: var(--line-height-relaxed, 1.8);
+  margin: 0;
 }
 
 /* 響應式設計 */
 @media (max-width: 768px) {
   .page-header {
-    margin-left: var(--spacing-md);
-    margin-bottom: var(--spacing-sm, 8px); /* 減少下方間距 */
-    margin-top: var(--spacing-sm, 8px); /* 減少上方間距 */
-    padding-top: var(--spacing-sm, 8px); /* 減少上方內距 */
+    padding: var(--spacing-sm, 8px) var(--spacing-sm, 8px);
   }
   
   .page-title {
-    font-size: var(--font-size-xl);
-    margin-top: 0;
+    font-size: var(--font-size-xl, 20px);
   }
 }

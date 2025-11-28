@@ -18,7 +18,8 @@ WORKDIR /srv
 COPY requirements.txt .
 
 # 安裝 Python 套件
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
 
 # 複製其餘原始碼
 COPY . .

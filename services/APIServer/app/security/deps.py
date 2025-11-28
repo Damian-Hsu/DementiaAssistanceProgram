@@ -102,6 +102,17 @@ async def require_admin(user: users.Table = Depends(get_current_user)) -> users.
     return user
 
 
+async def require_user(user: users.Table = Depends(get_current_user)) -> users.Table:
+    """
+    僅允許 user 使用的依賴；admin 直接 403。
+    用於限制 admin 不能訪問一般用戶功能（home、chat、camera、recordings、events）。
+    """
+    role_val = getattr(user, "role", None)
+    if role_val != users.Role.user:
+        raise HTTPException(status_code=403, detail="此功能僅限一般用戶使用")
+    return user
+
+
 _api_key_manager = APIKeyManager(APIKeyManagerConfig(header_name="X-API-Key"))
 get_current_api_client = _api_key_manager.require()   # 不做 scope 檢查
 get_uploader_api_client = _api_key_manager.require_scopes("uploader")  # 需要 uploader scope

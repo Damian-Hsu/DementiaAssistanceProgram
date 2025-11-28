@@ -9,11 +9,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const videoTime = document.getElementById('videoTime');
   const eventsList = document.getElementById('eventsList');
   const recordingsList = document.getElementById('recordingsList');
-  const searchInput = document.getElementById('searchInput');
   const deleteVideoBtn = document.getElementById('deleteVideoBtn');
 
   let currentRecordingId = null;
   let currentRecording = null;
+  let validRecordings = []; // 保存當前載入的影片列表
+  
+  // 檢查 URL 參數中是否有 recording_id
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetRecordingId = urlParams.get('recording_id');
 
   // 格式化時間
   function formatDateTime(dateTimeStr) {
@@ -47,16 +51,62 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }
 
+  // 載入縮圖
+  async function loadThumbnail(recordingId, imgElement, thumbnailS3Key) {
+    if (!imgElement || !thumbnailS3Key) {
+      // 如果沒有縮圖元素或縮圖 key，確保縮圖區域仍然顯示黑色背景
+      return;
+    }
+    try {
+      // 嘗試獲取縮圖 URL（使用 type=thumbnail 參數）
+      const urlData = await ApiClient.recordings.getUrl(recordingId, { 
+        ttl: 3600, 
+        disposition: 'inline',
+        type: 'thumbnail'
+      });
+      
+      // 使用返回的 URL
+      if (urlData && urlData.url) {
+        imgElement.src = urlData.url;
+        imgElement.style.display = 'block';
+      } else {
+        // 如果沒有 URL，隱藏圖片，顯示黑色背景
+        imgElement.style.display = 'none';
+      }
+      
+      imgElement.onerror = () => {
+        // 載入失敗時隱藏圖片，顯示黑色背景
+        imgElement.style.display = 'none';
+      };
+    } catch (e) {
+      console.warn('無法載入縮圖:', e);
+      if (imgElement) {
+        // 錯誤時隱藏圖片，顯示黑色背景
+        imgElement.style.display = 'none';
+      }
+    }
+  }
+
   // 載入影片列表
-  async function loadRecordings(keyword = '') {
+  async function loadRecordings(keyword = '', startDate = null, endDate = null, sortOrder = '-start_time') {
     recordingsList.innerHTML = '<p class="loading">載入中...</p>';
     try {
-      const data = await ApiClient.recordings.list({ 
+      const params = {
         keywords: keyword || null,
-        sort: '-start_time', 
+        sort: sortOrder, 
         page: 1, 
-        size: 50 
-      });
+        size: 50
+      };
+      
+      // 添加日期範圍篩選
+      if (startDate) {
+        params.start_time = startDate;
+      }
+      if (endDate) {
+        params.end_time = endDate;
+      }
+      
+      const data = await ApiClient.recordings.list(params);
       recordingsList.innerHTML = '';
 
       if (!data.items || data.items.length === 0) {
@@ -65,7 +115,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // 過濾掉沒有時間資訊的影片（不顯示未知時間的影片）
-      const validRecordings = data.items.filter(rec => {
+      validRecordings = data.items.filter(rec => {
         // 檢查是否有 start_time 且為有效值
         if (!rec.start_time) return false;
         try {
@@ -91,23 +141,57 @@ document.addEventListener('DOMContentLoaded', async () => {
         const timeName = formatDateTime(rec.start_time);
         const duration = formatDuration(rec.duration);
         
+        // 所有項目都顯示縮圖區域，即使沒有縮圖也顯示黑色佔位符（3:4 比例）
         item.innerHTML = `
-          <div class="recording-title">${timeName}</div>
-          <div class="recording-meta">長度：${duration}</div>
+          <div class="recording-thumbnail">
+            ${rec.thumbnail_s3_key ? `<img src="" alt="影片縮圖" data-recording-id="${rec.id}" class="thumbnail-img" />` : ''}
+          </div>
+          <div class="recording-info">
+            <div class="recording-title">${timeName}</div>
+            <div class="recording-meta">長度：${duration}</div>
+          </div>
         `;
+        
+        // 如果有縮圖，載入縮圖 URL
+        if (rec.thumbnail_s3_key) {
+          const thumbnailImg = item.querySelector('.thumbnail-img');
+          if (thumbnailImg) {
+            loadThumbnail(rec.id, thumbnailImg, rec.thumbnail_s3_key);
+          }
+        }
         
         // 點擊選擇影片
         item.addEventListener('click', () => selectRecording(rec));
         
         recordingsList.appendChild(item);
+        
+        // 如果這是目標 recording_id，自動選擇
+        if (targetRecordingId && rec.id === targetRecordingId) {
+          selectRecording(rec, false); // 不更新 URL，因為已經在 URL 中
+        }
       });
+      
+      // 如果沒有找到目標 recording，但 URL 中有參數，嘗試直接載入
+      if (targetRecordingId && !document.querySelector(`[data-id="${targetRecordingId}"]`)) {
+        try {
+          const targetRec = validRecordings.find(r => r.id === targetRecordingId);
+          if (targetRec) {
+            selectRecording(targetRec, false); // 不更新 URL，因為已經在 URL 中
+          }
+        } catch (e) {
+          console.warn('無法載入目標影片:', e);
+        }
+      }
+      
+      // 返回 validRecordings 供外部使用
+      return validRecordings;
     } catch (e) {
       recordingsList.innerHTML = `<p class="error">錯誤：${e.message}</p>`;
     }
   }
 
   // 選擇影片
-  async function selectRecording(recording) {
+  async function selectRecording(recording, updateUrl = true) {
     try {
       // 先清除之前的錯誤處理器和影片源，避免載入舊的 URL
       videoPlayer.onerror = null;
@@ -118,6 +202,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 更新當前選擇
       currentRecordingId = recording.id;
       currentRecording = recording;
+      
+      // 更新 URL query（如果允許）
+      if (updateUrl) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('recording_id', recording.id);
+        window.history.pushState({ recording_id: recording.id }, '', url);
+      }
       
       // 更新列表中的 active 狀態
       document.querySelectorAll('.recording-item').forEach(item => {
@@ -256,7 +347,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // 保存當前關鍵字和要刪除的 ID
-    const keyword = searchInput.value.trim();
+    const keyword = keywordsInput?.value.trim() || '';
     const deletedId = currentRecordingId;
 
     try {
@@ -279,38 +370,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         item.classList.remove('active');
       });
       
-      // 重新載入列表
-      await loadRecordings(keyword);
+      // 重新載入列表（使用當前的篩選條件）
+      await loadRecordingsWithFilters();
       
       // 如果列表中有其他影片，自動選擇第一個（但不是剛刪除的那個）
       const firstItem = document.querySelector('.recording-item');
       if (firstItem && firstItem.dataset.id !== deletedId) {
         const firstId = firstItem.dataset.id;
-        // 從列表中找到對應的 recording 對象
-        try {
-          const data = await ApiClient.recordings.list({ 
-            keywords: keyword, 
-            sort: '-start_time', 
-            page: 1, 
-            size: 50 
-          });
-          // 過濾掉沒有時間資訊的影片（與 loadRecordings 中的邏輯一致）
-          const validRecordings = data.items.filter(rec => {
-            if (!rec.start_time) return false;
-            try {
-              const date = new Date(rec.start_time);
-              return !isNaN(date.getTime());
-            } catch (e) {
-              return false;
-            }
-          });
-          const firstRecording = validRecordings.find(rec => rec.id === firstId);
-          if (firstRecording) {
-            await selectRecording(firstRecording);
-          }
-        } catch (e) {
-          console.error('自動選擇第一個影片失敗：', e);
+        // 從已載入的列表中找到對應的 recording 對象
+        const firstRecording = validRecordings.find(rec => rec.id === firstId);
+        if (firstRecording) {
+          await selectRecording(firstRecording, false); // 不更新 URL
         }
+      } else if (validRecordings && validRecordings.length > 0) {
+        // 如果沒有找到第一個項目，但有列表，選擇列表中的第一個
+        await selectRecording(validRecordings[0], false); // 不更新 URL
       }
       
       alert('已刪除影片。');
@@ -321,20 +395,93 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // 搜尋功能
+  const keywordsInput = document.getElementById('keywords');
+  const startDateInput = document.getElementById('start');
+  const endDateInput = document.getElementById('end');
+  const sortOrderSelect = document.getElementById('sortOrder');
+  const resetBtn = document.getElementById('resetBtn');
+  
   let searchTimeout = null;
-  searchInput.addEventListener('input', (e) => {
-    const keyword = e.target.value.trim();
+  
+  // 關鍵字搜尋（防抖）
+  if (keywordsInput) {
+    keywordsInput.addEventListener('input', (e) => {
+      const keyword = e.target.value.trim();
+      
+      // 防抖處理
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        loadRecordingsWithFilters();
+      }, 300);
+    });
+  }
+  
+  // 日期範圍搜尋
+  if (startDateInput) {
+    startDateInput.addEventListener('change', () => {
+      loadRecordingsWithFilters();
+    });
+  }
+  
+  if (endDateInput) {
+    endDateInput.addEventListener('change', () => {
+      loadRecordingsWithFilters();
+    });
+  }
+  
+  // 排序變更
+  if (sortOrderSelect) {
+    sortOrderSelect.addEventListener('change', () => {
+      loadRecordingsWithFilters();
+    });
+  }
+  
+  // 重設按鈕
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (keywordsInput) keywordsInput.value = '';
+      if (startDateInput) startDateInput.value = '';
+      if (endDateInput) endDateInput.value = '';
+      if (sortOrderSelect) sortOrderSelect.value = '-start_time';
+      loadRecordingsWithFilters();
+    });
+  }
+  
+  // 統一的載入函數（包含所有篩選條件）
+  async function loadRecordingsWithFilters() {
+    const keyword = keywordsInput?.value.trim() || '';
+    const startDate = startDateInput?.value || null;
+    const endDate = endDateInput?.value || null;
+    const sortOrder = sortOrderSelect?.value || '-start_time';
     
-    // 防抖處理
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      loadRecordings(keyword);
-    }, 300);
-  });
+    await loadRecordings(keyword, startDate, endDate, sortOrder);
+  }
 
   // 刪除按鈕事件
   deleteVideoBtn.addEventListener('click', deleteRecording);
 
   // 初始化
-  loadRecordings();
+  await loadRecordingsWithFilters();
+  
+  // 如果 URL 中有 recording_id 參數，自動選擇對應的影片
+  if (targetRecordingId) {
+    // 等待列表載入完成後再選擇
+    setTimeout(async () => {
+      const targetItem = document.querySelector(`[data-id="${targetRecordingId}"]`);
+      if (targetItem) {
+        const targetRec = validRecordings.find(r => r.id === targetRecordingId);
+        if (targetRec) {
+          await selectRecording(targetRec, false); // 不更新 URL，因為已經在 URL 中
+        }
+      }
+    }, 500);
+  } else {
+    // 如果沒有 recording_id 參數，預載入最新的影片（不更新 URL）
+    setTimeout(async () => {
+      if (validRecordings && validRecordings.length > 0) {
+        // 使用已載入的列表中的第一個（最新的）
+        await selectRecording(validRecordings[0], false); // 預載入但不更新 URL
+      }
+    }, 500);
+  }
 });

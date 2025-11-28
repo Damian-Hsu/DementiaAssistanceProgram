@@ -27,7 +27,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 80px;
+  width: 30px;
   z-index: 10;
   background: transparent;
   cursor: pointer;
@@ -35,6 +35,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 手機模式：壓縮翻頁區域寬度 */
+@media (max-width: 768px) {
+  .book-edge-nav {
+    width: 30px;
+  }
+  
+  .book-edge-left::after {
+    border-width: 8px 10px 8px 0;
+  }
+  
+  .book-edge-right::after {
+    border-width: 8px 0 8px 10px;
+  }
 }
 
 .book-edge-nav:hover {
@@ -113,19 +128,19 @@
 .diary-refresh-icon {
   position: absolute;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+
+  transform-origin: center center;
   width: 20px;
   height: 20px;
   cursor: pointer;
-  transition: all var(--transition-normal, 0.2s ease);
+  transition: transform var(--transition-normal, 0.2s ease), opacity var(--transition-normal, 0.2s ease);
   z-index: 5;
   filter: brightness(0) saturate(100%) invert(30%) sepia(15%) saturate(1000%) hue-rotate(340deg) brightness(0.9);
   pointer-events: auto;
 }
 
 .diary-refresh-icon:hover {
-  transform: translateY(-50%) rotate(180deg);
+  transform: rotate(180deg);
   opacity: 0.8;
 }
 
@@ -188,19 +203,21 @@
   padding: var(--spacing-xl, 32px);
 }
 
-/* 日記內容樣式 */
-.diary-content {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
+
 
 .diary-content p {
-  margin-bottom: var(--spacing-md, 16px);
+  margin-top: 0;
+  margin-bottom: var(--spacing-sm, 8px); /* 減少段落間距 */
   text-indent: 2em;
 }
 
 .diary-content p:first-child {
-  text-indent: 0;
+
+  margin-top: 0;
+}
+
+.diary-content p:last-child {
+  margin-bottom: 0;
 }
 
 /* 響應式設計 - 單頁顯示（< 1150px） */
@@ -231,7 +248,7 @@
 
   /* 單頁模式下，左右翻頁區域仍然可用 */
   .book-edge-nav {
-    width: 80px;
+    width: 60px;
   }
 }
 
@@ -247,7 +264,7 @@
   }
 
   .book-edge-nav {
-    width: 60px;
+    width: 30px;
   }
 
   .book-edge-nav::after {

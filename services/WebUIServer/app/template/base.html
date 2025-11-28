@@ -21,11 +21,38 @@
 <div class="layout-container">
 <!-- 側邊欄（共用）：獨立模板，透過 active_page 控制高亮 -->
 <!-- 桌面模式顯示，手機模式隱藏 -->
-{% include 'partials/sidebar.html' %}
+<!-- 根據 active_page 判斷是否為 admin 頁面，直接載入對應的 sidebar -->
+{% set is_admin_page = active_page and active_page.startswith('admin_') %}
+<div id="sidebar-container">
+  {% if is_admin_page %}
+  <!-- Admin 版本的 sidebar（直接顯示，不隱藏） -->
+  <div id="sidebar-admin">
+    {% include 'partials/sidebar_admin.html' %}
+  </div>
+  {% else %}
+  <!-- User 版本的 sidebar -->
+  <div id="sidebar-user">
+    {% include 'partials/sidebar.html' %}
+  </div>
+  {% endif %}
+</div>
 
 <!-- 手機模式底部導覽列 -->
 <!-- 手機模式顯示，桌面模式隱藏 -->
-{% include 'partials/mobile_nav.html' %}
+<!-- 根據 active_page 判斷是否為 admin 頁面，直接載入對應的 mobile_nav -->
+<div id="mobile-nav-container">
+  {% if is_admin_page %}
+  <!-- Admin 版本的 mobile_nav（直接顯示，不隱藏） -->
+  <div id="mobile-nav-admin">
+    {% include 'partials/mobile_nav_admin.html' %}
+  </div>
+  {% else %}
+  <!-- User 版本的 mobile_nav -->
+  <div id="mobile-nav-user">
+    {% include 'partials/mobile_nav.html' %}
+  </div>
+  {% endif %}
+</div>
 
 <!-- 登出確認對話框 -->
 {% include 'partials/logout_confirm_dialog.html' %}
@@ -43,6 +70,7 @@
 {% block content %}{% endblock %}
 </main>
 </div>
+<script type="module" src="{{ url_for('static', filename='js/init_user.js') }}"></script>
 <script type="module" src="../static/js/logout.js"></script>
 <script type="module" src="{{ url_for('static', filename='js/mobile_nav.js') }}"></script>
 

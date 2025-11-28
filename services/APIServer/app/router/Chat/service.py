@@ -147,7 +147,7 @@ async def chat_with_memory_assistant(
         history_messages[-1]["parts"][0] += context_message
         
         # 使用新的 LLM 處理函數
-        final_message, function_calls_made, all_events = await process_chat_with_llm(
+        final_message, function_calls_made, all_events, all_recordings, all_diaries, all_vlogs = await process_chat_with_llm(
             model=model,
             history_messages=history_messages,
             user_message=body.message,
@@ -187,12 +187,59 @@ async def chat_with_memory_assistant(
                         print(f"[DB Query Error] {str(db_error)}")
                         pass
         
+        # 轉換影片為 RecordingSimple 格式
+        from .DTO import RecordingSimple, DiarySimple, VlogSimple
+        recording_objects = []
+        if all_recordings:
+            # 去重（根據 id）
+            seen_recording_ids = set()
+            for r in all_recordings:
+                recording_id = r.get("id")
+                if recording_id and recording_id not in seen_recording_ids:
+                    seen_recording_ids.add(recording_id)
+                    try:
+                        recording_objects.append(RecordingSimple(**r))
+                    except Exception as e:
+                        print(f"[Recording Parse Error] {str(e)}")
+                        pass
+        
+        # 轉換日記為 DiarySimple 格式
+        diary_objects = []
+        if all_diaries:
+            for d in all_diaries:
+                try:
+                    diary_objects.append(DiarySimple(**d))
+                except Exception as e:
+                    print(f"[Diary Parse Error] {str(e)}")
+                    pass
+        
+        # 轉換Vlog為 VlogSimple 格式
+        vlog_objects = []
+        if all_vlogs:
+            # 去重（根據 id）
+            seen_vlog_ids = set()
+            for v in all_vlogs:
+                vlog_id = v.get("id")
+                if vlog_id and vlog_id not in seen_vlog_ids:
+                    seen_vlog_ids.add(vlog_id)
+                    try:
+                        vlog_objects.append(VlogSimple(**v))
+                    except Exception as e:
+                        print(f"[Vlog Parse Error] {str(e)}")
+                        pass
+        
         result = ChatResponse(
             message=final_message,
             events=event_objects,
+            recordings=recording_objects,
+            diaries=diary_objects,
+            vlogs=vlog_objects,
             function_calls=function_calls_made,
             has_more=len(all_events) >= body.max_results,
-            total_events=len(event_objects)
+            total_events=len(event_objects),
+            total_recordings=len(recording_objects),
+            total_diaries=len(diary_objects),
+            total_vlogs=len(vlog_objects)
         )
         
         # 3. 將結果存入緩存
@@ -355,7 +402,8 @@ async def _generate_diary_summary(
     )
     
     # 構建提示詞（將 system_prompt 作為用戶訊息的一部分，因為模型沒有設定 system_instruction）
-    user_message = f"{system_prompt}\n\n以下是今天的事件列表：\n\n{events_text}\n\n請根據以上事件生成一篇不超過 300 字的日記。"
+    # 使用 prompt 模板，將事件列表插入到模板中
+    user_message = system_prompt.replace("{events_text}", events_text)
     
     try:
         # 調用 LLM
@@ -371,9 +419,7 @@ async def _generate_diary_summary(
                     if hasattr(part, 'text') and part.text:
                         summary += part.text
         
-        # 限制長度（300字）
-        if len(summary) > 300:
-            summary = summary[:300] + "..."
+        # 不再限制長度
         
         return summary.strip() if summary else "今天沒有記錄到任何事件。"
     
@@ -418,7 +464,7 @@ async def generate_diary_summary(
     **功能**：
     - 根據指定日期獲取該日的事件
     - 計算事件哈希值，如果與上次相同則不刷新
-    - 使用 LLM 生成不超過 300 字的日記摘要
+    - 使用 LLM 生成日記摘要（無字數限制）
     - 保存到資料庫
     
     **參數**：

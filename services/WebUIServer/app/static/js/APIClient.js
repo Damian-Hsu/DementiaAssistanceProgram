@@ -1059,12 +1059,13 @@ recordings: {
   },
 
   // 取得單一錄影的播放/下載連結
-  getUrl: async (recordingId, { ttl = 900, disposition = 'inline', filename = null } = {}) => {
+  getUrl: async (recordingId, { ttl = 900, disposition = 'inline', filename = null, type = null } = {}) => {
     const token = localStorage.getItem('jwt');
     if (!token) throw new Error('請先登入');
 
     const usp = new URLSearchParams({ ttl, disposition });
     if (filename) usp.set('filename', filename);
+    if (type) usp.set('type', type);
 
     const res = await fetch(`${BFF_ROOT}/recordings/${encodeURIComponent(recordingId)}?${usp.toString()}`, {
       method: 'GET',
@@ -1123,6 +1124,194 @@ recordings: {
       throw new Error(msg);
     }
     return await res.json(); // EventRead[]
+  }
+},
+
+// === 音樂 API ===
+music: {
+  list: async (skip = 0, limit = 100) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+
+    const params = new URLSearchParams({ skip, limit });
+    const res = await fetch(`${BFF_ROOT}/music?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  },
+
+  get: async (musicId) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+
+    const res = await fetch(`${BFF_ROOT}/music/${musicId}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  },
+
+  getUrl: async (musicId, ttl = 3600) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+
+    const params = new URLSearchParams({ ttl });
+    const res = await fetch(`${BFF_ROOT}/music/${musicId}/url?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  }
+},
+
+// === Admin API ===
+admin: {
+  apiKeys: {
+    list: async (ownerId = null) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const params = new URLSearchParams();
+      if (ownerId != null) params.set('owner_id', ownerId);
+
+      const res = await fetch(`${BFF_ROOT}/admin/api-keys?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    create: async ({ name, ownerId, rateLimitPerMin = null, quotaPerDay = null, scopes = null }) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const body = {
+        name,
+        owner_id: ownerId,
+        rate_limit_per_min: rateLimitPerMin,
+        quota_per_day: quotaPerDay,
+        scopes
+      };
+
+      const res = await fetch(`${BFF_ROOT}/admin/api-keys`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    update: async (keyId, patch) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/api-keys/${keyId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(patch)
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    rotate: async (keyId) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/api-keys/${keyId}/rotate`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    }
+  },
+
+  music: {
+    list: async (skip = 0, limit = 100) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const params = new URLSearchParams({ skip, limit });
+      const res = await fetch(`${BFF_ROOT}/admin/music?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    upload: async (formData) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/music`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    delete: async (musicId) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/music/${musicId}`, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    }
   }
 },
 
@@ -1284,4 +1473,213 @@ settings: {
     if (!res.ok) await handleApiError(res);
     return await res.json();
   }
-}};
+},
+
+// === Vlog API ===
+vlogs: {
+  // 取得指定日期的 Vlog（若不存在返回 null）
+  getDaily: async (date) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+
+    // 確保日期格式正確 (YYYY-MM-DD)
+    const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
+    console.log(`[APIClient] getDaily: date=${dateStr} (original: ${date}, type: ${typeof date})`);
+
+    const res = await fetch(`${BFF_ROOT}/vlogs/date/${dateStr}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (res.status === 404) {
+      console.log(`[APIClient] getDaily: 404 - 該日期(${dateStr})尚未生成 Vlog`);
+      return null;
+    }
+    if (!res.ok) {
+      console.error(`[APIClient] getDaily: 錯誤 ${res.status} - ${res.statusText}`);
+      await handleApiError(res);
+    }
+    const data = await res.json();
+    console.log(`[APIClient] getDaily: 成功獲取 Vlog - id=${data.id}, target_date=${data.target_date}, status=${data.status}`);
+    return data;
+  },
+
+  // 獲取指定日期的事件列表
+  getDateEvents: async (date) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+    
+    const res = await fetch(`${BFF_ROOT}/vlogs/events/${date}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  },
+
+  // AI 自動選擇事件片段
+  aiSelectEvents: async (date, summaryText = null, limit = 20) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+    
+    const body = { date, limit };
+    if (summaryText) body.summary_text = summaryText;
+    
+    const res = await fetch(`${BFF_ROOT}/vlogs/ai-select`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(body)
+    });
+    
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  },
+
+  // 創建 Vlog
+  create: async ({
+    targetDate,
+    eventIds,
+    title = null,
+    maxDuration = 180,
+    resolution = '720p',
+    musicId = null,
+    musicStart = null,
+    musicEnd = null,
+    musicFade = true,
+    musicVolume = null
+  }) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+    
+    const payload = {
+      target_date: targetDate,
+      event_ids: eventIds,
+      title,
+      max_duration: maxDuration,
+      resolution
+    };
+
+    if (musicId) payload.music_id = musicId;
+    if (musicStart !== null && musicStart !== undefined) payload.music_start = musicStart;
+    if (musicEnd !== null && musicEnd !== undefined) payload.music_end = musicEnd;
+    if (musicFade !== null && musicFade !== undefined) payload.music_fade = musicFade;
+    if (musicVolume !== null && musicVolume !== undefined) payload.music_volume = musicVolume;
+    
+    const res = await fetch(`${BFF_ROOT}/vlogs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  },
+
+  // 獲取 Vlog 列表
+  list: async ({ skip = 0, limit = 20, status = null } = {}) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+    
+    const params = new URLSearchParams({ skip, limit });
+    if (status) params.append('status', status);
+    
+    const res = await fetch(`${BFF_ROOT}/vlogs?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  },
+
+  // 獲取 Vlog 詳情
+  get: async (vlogId) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+    
+    const res = await fetch(`${BFF_ROOT}/vlogs/${vlogId}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  },
+
+  // 獲取 Vlog 播放 URL
+  getUrl: async (vlogId, ttl = 3600) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+    
+    const params = new URLSearchParams({ ttl });
+    
+    const res = await fetch(`${BFF_ROOT}/vlogs/${vlogId}/url?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  },
+
+  // 獲取 Vlog 縮圖 URL
+  getThumbnailUrl: async (vlogId, ttl = 3600) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+    
+    const params = new URLSearchParams({ ttl });
+    
+    const res = await fetch(`${BFF_ROOT}/vlogs/${vlogId}/thumbnail-url?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  },
+
+  // 刪除 Vlog
+  delete: async (vlogId) => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+    
+    const res = await fetch(`${BFF_ROOT}/vlogs/${vlogId}`, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  }
+},
+};

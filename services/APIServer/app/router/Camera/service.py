@@ -461,7 +461,7 @@ async def get_stream_status(
                         status = stream.get("status", "stopped")
                         error_message = stream.get("error_message")
                         return StreamStatusResp(
-                            is_streaming=(status in ["starting", "running"]),
+                            is_streaming=(status in ["starting", "running", "reconnecting"]),
                             status=status,
                             stream_info=stream,
                             error_message=error_message

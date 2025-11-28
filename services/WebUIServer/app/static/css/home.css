@@ -1,110 +1,100 @@
 /* Home 頁面樣式 */
 
-/* Chrome 分頁式標籤容器 */
-.home-tab-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-lg, 24px);
-  margin-bottom: var(--spacing-lg, 24px);
-  padding: 0;
-  background: transparent;
-}
-
-.chrome-tabs-container {
-  display: flex;
-  gap: 0;
-  flex: 1;
-  background: transparent;
-  border-bottom: 1px solid var(--color-border, #D3C0A8);
-  padding: 0;
-  position: relative;
-}
-
-/* Chrome 分頁樣式 */
-.chrome-tab {
-  position: relative;
-  padding: var(--spacing-sm, 8px) var(--spacing-lg, 24px);
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--color-border, #D3C0A8);
-  border-bottom: none;
-  border-radius: var(--radius-md, 12px) var(--radius-md, 12px) 0 0;
-  cursor: pointer;
-  transition: all var(--transition-normal, 0.2s ease);
-  user-select: none;
-  min-width: 80px;
-  text-align: center;
-  z-index: 1;
-  margin-right: -1px; /* 讓分頁重疊 */
-}
-
-.chrome-tab:first-child {
-  margin-left: 0;
-}
-
-.chrome-tab:not(.active) {
-  background: rgba(255, 255, 255, 0.4);
-  border-color: rgba(211, 192, 168, 0.6);
-}
-
-.chrome-tab:not(.active):hover {
-  background: rgba(255, 255, 255, 0.7);
-  z-index: 2;
-}
-
-.chrome-tab.active {
-  background: #fff;
-  border-color: var(--color-border, #D3C0A8);
-  z-index: 3;
-  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.chrome-tab-label {
-  font-size: var(--font-size-base, 16px);
-  font-weight: var(--font-weight-medium, 500);
-  color: var(--color-text, #2E2E2E);
-  white-space: nowrap;
-}
-
-.chrome-tab.active .chrome-tab-label {
-  font-weight: var(--font-weight-semibold, 600);
-  color: var(--color-accent, #6B4F4F);
-}
-
-/* 日期選擇器（同一行右側） */
-.date-selector-inline {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm, 8px);
+/* 日期選擇器（與 camera 頁面的 page-header 樣式相同） */
+.home-date-header {
+  padding: 7.6px;
+  background: var(--bg-main, #F5EBDD);
+  border-bottom: 2px solid var(--color-border, #D3C0A8);
   flex-shrink: 0;
-  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
-  background: #fff;
-  border-radius: var(--radius-md, 12px);
-  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative; /* 電腦版使用 relative，與 page-header 一致 */
 }
 
-.date-selector-inline label {
-  font-weight: var(--font-weight-medium, 500);
-  color: var(--color-text, #2E2E2E);
-  white-space: nowrap;
-  font-size: var(--font-size-sm, 14px);
+.date-selector-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  padding-bottom: var(--spacing-xs, 4px);
 }
 
 .date-selector-inline input[type="date"] {
+  position: absolute;
+  opacity: 0;
+  width: 0px;
+  height: 0px;
+  padding: 0px;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
+  background-color: transparent;
+  font-size: var(--font-size-2xl, 28px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-accent, #6B4F4F);
+  min-width: 200px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.date-selector-inline .date-display {
+  font-size: var(--font-size-2xl, 28px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-accent, #6B4F4F);
+  cursor: pointer;
+  transition: all var(--transition-normal, 0.2s ease);
   padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  padding-bottom: var(--spacing-xs, 4px);
+  border-radius: var(--radius-sm, 8px);
+  user-select: none;
+  display: inline-block; /* 確保可以正確顯示 */
+}
+
+.date-selector-inline .date-display:hover {
+  background: rgba(107, 79, 79, 0.05);
+  color: var(--color-accent, #6B4F4F);
+}
+
+.date-selector-inline input[type="date"]:focus + .date-display,
+.date-selector-inline:focus-within .date-display {
+  background: rgba(107, 79, 79, 0.1);
+  outline: 2px solid var(--color-accent, #6B4F4F);
+  outline-offset: 2px;
+}
+
+/* 當日期選擇器處於選取狀態時（通過 JavaScript 動態添加類或樣式） */
+.date-selector-inline input[type="date"].active {
+  position: static;
+  opacity: 1;
+  width: auto;
+  height: auto;
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  padding-bottom: var(--spacing-xs, 4px);
   border: 1px solid var(--color-border, #D3C0A8);
   border-radius: var(--radius-sm, 8px);
   background-color: #fff;
-  font-size: var(--font-size-sm, 14px);
-  color: var(--color-text, #2E2E2E);
+  font-size: var(--font-size-2xl, 28px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-accent, #6B4F4F);
   cursor: pointer;
+  pointer-events: auto;
   transition: all var(--transition-normal, 0.2s ease);
+  min-width: 200px;
+  line-height: 1.2;
 }
 
-.date-selector-inline input[type="date"]:focus {
+.date-selector-inline input[type="date"].active:focus {
   outline: none;
   border-color: var(--color-accent, #6B4F4F);
   box-shadow: 0 0 0 2px rgba(107, 79, 79, 0.1);
+}
+
+.date-selector-inline input[type="date"].active + .date-display {
+  display: none;
 }
 
 /* 內容區切換 */
@@ -126,26 +116,359 @@
   box-shadow: var(--shadow-md, 0 2px 6px rgba(0, 0, 0, 0.1));
 }
 
-/* 響應式設計 */
+/* 合併內容容器 */
+.merged-content-container {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  min-height: 600px;
+  padding: var(--spacing-md, 16px) 0; /* 移除左右 padding，因為翻頁按鈕已移到 header */
+}
+
+/* 響應式設計（與 page-header 一致） */
 @media (max-width: 768px) {
-  .home-tab-header {
-    flex-direction: column;
-    align-items: stretch;
+  .home-date-header {
+    padding: 7.6px;
+  }
+}
+
+/* 主佈局（參考 recordings-main-layout） */
+.home-main-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--spacing-md, 16px);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  flex: 1;
+}
+
+/* 播放區域（左側） */
+.player-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: var(--spacing-md, 16px);
+}
+
+.player-container {
+  position: relative;
+  width: 100%;
+  background: #000;
+  border-radius: var(--radius-lg, 16px);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  box-shadow: var(--shadow-lg, 0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+#dailyVlogVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none; /* 預設隱藏，有影片時顯示 */
+}
+
+#dailyVlogVideo:not(.hidden) {
+  display: block;
+}
+
+.vlog-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+}
+
+.vlog-thumbnail:not(.hidden) {
+  display: block;
+}
+
+.player-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  text-align: center;
+  padding: var(--spacing-xl, 32px);
+}
+
+.player-placeholder p {
+  margin: var(--spacing-sm, 8px) 0;
+  font-size: var(--font-size-base, 16px);
+}
+
+/* 日記區域（在播放器下方） */
+.diary-section {
+  background: #fff;
+  border-radius: var(--radius-lg, 16px);
+  padding: var(--spacing-sm, 8px) var(--spacing-lg, 24px);
+  box-shadow: var(--shadow-md, 0 2px 6px rgba(0, 0, 0, 0.1));
+  border: 2px solid var(--color-border, #D3C0A8);
+  flex: 1;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.diary-page-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.diary-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-xs, 4px) 0px;
+  margin-bottom: var(--spacing-xs, 4px);
+  border-bottom: 1px solid var(--color-border, #D3C0A8);
+}
+
+.diary-section-title {
+  font-size: var(--font-size-lg, 18px);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-accent, #6B4F4F);
+  margin: 0;
+}
+
+.diary-refresh-icon {
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  transform-origin: center center;
+  transition: transform var(--transition-normal, 0.2s ease);
+}
+
+.diary-refresh-icon:hover {
+  transform: rotate(180deg);
+}
+
+.diary-page-body {
+  flex: 1;
+  overflow-y: auto;
+  color: var(--color-text, #2E2E2E);
+  line-height: var(--line-height-relaxed, 1.8);
+  padding: 0;
+  margin: 0;
+}
+
+.diary-content {
+
+  margin: 0;
+  padding: 30px 0px;
+}
+
+.diary-content p {
+  margin-top: 0;
+  margin-bottom: var(--spacing-sm, 8px);
+  text-indent: 2em;
+}
+
+.diary-content p:first-child {
+  margin-top: 0;
+}
+
+.diary-content p:last-child {
+  margin-bottom: 0;
+}
+
+.diary-placeholder {
+  text-align: center;
+  color: var(--text-muted-light, #666);
+  padding: var(--spacing-sm, 8px) 0;
+  margin: 0;
+}
+
+/* 列表區域（右側） */
+.list-section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--spacing-md, 16px);
+  max-height: calc(100vh - 120px);
+}
+
+.list-header {
+  background: #fff;
+  border-radius: var(--radius-lg, 16px);
+  padding: var(--spacing-md, 16px);
+  box-shadow: var(--shadow-md, 0 2px 6px rgba(0, 0, 0, 0.1));
+  border: 2px solid var(--color-border, #D3C0A8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+}
+
+.list-header h2 {
+  font-size: var(--font-size-xl, 20px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-accent, #6B4F4F);
+  margin: 0;
+}
+
+/* 卡片樣式 */
+.card {
+  background: #fff;
+  border-radius: var(--radius-lg, 16px);
+  padding: var(--spacing-sm, 8px) var(--spacing-lg, 24px);
+  box-shadow: var(--shadow-md, 0 2px 6px rgba(0, 0, 0, 0.1));
+  border: 2px solid var(--color-border, #D3C0A8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+}
+
+.card h2 {
+  font-size: var(--font-size-xl, 20px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-accent, #6B4F4F);
+  margin: 0;
+  padding-bottom: var(--spacing-sm, 8px);
+  border-bottom: 1px solid var(--color-border, #D3C0A8);
+}
+
+.card h3 {
+  font-size: var(--font-size-lg, 18px);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-accent, #6B4F4F);
+  margin: 0 0 var(--spacing-sm, 8px);
+  padding-bottom: var(--spacing-sm, 8px);
+  border-bottom: 1px solid var(--color-border, #D3C0A8);
+}
+
+/* 翻頁區域樣式 */
+/* 所有模式都在 header 顯示翻頁按鈕 */
+.book-edge-header {
+  display: flex;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  z-index: 10;
+}
+
+.book-edge-header.book-edge-left {
+  left: 0;
+}
+
+.book-edge-header.book-edge-right {
+  right: 0;
+}
+
+/* 所有模式都隱藏 main 區域的翻頁按鈕 */
+.book-edge-main {
+  display: none;
+}
+
+/* 響應式設計 */
+@media (max-width: 1140px) {
+  .home-date-header {
+    padding: 7.6px ; /* 為翻頁按鈕留空間 */
+  }
+}
+
+/* 手機模式：固定日期選擇器在頂部 */
+@media (max-width: 768px) {
+  .home-date-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* 為固定的 header 留出空間 */
+  .page-content {
+    padding-top: calc(var(--spacing-sm, 8px) * 2 + 24px + 2px) !important; /* header padding + 字體高度 + 邊框 */
+  }
+
+  .date-selector-inline .date-display {
+    font-size: var(--font-size-xl, 24px);
+  }
+
+  /* 平板/手機模式：調整翻頁按鈕寬度 */
+  .book-edge-header {
+    width: 50px;
+  }
+
+  .merged-content-container {
+    padding: var(--spacing-sm, 8px); /* 手機模式移除左右 padding */
+    min-height: 500px;
+  }
+
+  .home-main-layout {
+    grid-template-columns: 1fr;
     gap: var(--spacing-md, 16px);
+    display: flex;
+    flex-direction: column;
   }
 
-  .chrome-tabs-container {
-    width: 100%;
+  /* 平板模式順序：Vlog > 操作 > 影片資訊 > 日記 */
+  .vlog-player-container {
+    order: 1;
   }
 
-  .chrome-tab {
-    flex: 1;
+  .vlog-controls-card {
+    order: 2;
+  }
+
+  .vlog-info-card {
+    order: 3;
+  }
+
+  .diary-section-container {
+    order: 4;
+  }
+
+  .player-section {
+    display: contents; /* 讓子元素直接參與 flex 布局 */
+  }
+
+  .list-section {
+    display: contents; /* 讓子元素直接參與 flex 布局 */
+    max-height: none;
+  }
+
+  .player-container {
+    aspect-ratio: 16 / 9;
+  }
+
+  .diary-section {
+    padding: var(--spacing-sm, 8px) var(--spacing-lg, 24px);
+    min-height: 200px;
+  }
+  
+  .card {
+    padding: var(--spacing-sm, 8px) var(--spacing-lg, 24px);
+  }
+}
+
+/* 小手機 */
+@media (max-width: 480px) {
+  .merged-content-container {
+    padding: 0px;
+  }
+
+  .diary-section {
+    padding: var(--spacing-xs, 4px) var(--spacing-md, 16px);
+  }
+  
+  .diary-page-header {
+    padding: var(--spacing-xs, 4px) 0px;
+    margin-bottom: var(--spacing-xs, 4px);
+  }
+
+  .card {
     padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
-    font-size: var(--font-size-sm, 14px);
-  }
-
-  .date-selector-inline {
-    width: 100%;
-    justify-content: space-between;
   }
 }

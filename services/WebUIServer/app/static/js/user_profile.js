@@ -102,6 +102,11 @@ function renderJwtRemaining(token) {
   __jwtCountdownTimer = setInterval(tick, 1000);
 }
 
+// 暴露到全域，供自動刷新機制使用
+if (typeof window !== 'undefined') {
+  window.renderJwtRemaining = renderJwtRemaining;
+}
+
 
 function fillUser(user) {
   // user_id 儲存
@@ -153,7 +158,7 @@ async function loadMe() {
     const data = me && me.user ? me.user : me;
 
     fillUser(data);
-    showSuccess && showSuccess('已載入目前使用者資料');
+    // 不顯示載入成功提示
   } catch (e) {
     console.error('[user_profile] 載入 /users/me 失敗：', e);
     // ⚠️ 有 JWT 但 API 失敗，不要馬上導回 auth，避免被 bounce 到 chat
@@ -237,43 +242,7 @@ async function changePassword() {
   }
 }
 
-async function refreshJwt() {
-  const btn = document.getElementById('btnRefreshJwt');
-  try {
-    setBtnLoading(btn, true);
-    // 走你已經實作的 API
-    let data;
-    if (typeof ApiClient.refreshUserToken === 'function') {
-      data = await ApiClient.refreshUserToken();
-    } else {
-      const res = await fetch(`${settings.BFF_ROOT}/users/token/refresh`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt') || ''}` }
-      });
-      if (!res.ok) throw new Error('重新取得 JWT 失敗');
-      data = await res.json().catch(()=>({}));
-    }
-
-    // 兼容不同欄位名
-    const newToken = data?.access_token || data?.token || data?.jwt;
-    if (!newToken) throw new Error('回應未含新 JWT');
-
-    // 存起來（你已經有 AuthService 可用）
-    if (window.AuthService && typeof window.AuthService.saveToken === 'function') {
-      window.AuthService.saveToken(newToken);
-    } else {
-      localStorage.setItem('jwt', newToken);
-    }
-
-    // 改為顯示剩餘時間（而不是整串 token）
-    renderJwtRemaining(newToken);
-    showSuccess('已重新取得並覆寫 JWT');
-  } catch (e) {
-    showError(e?.message || '重新取得 JWT 失敗');
-  } finally {
-    setBtnLoading(btn, false);
-  }
-}
+// refreshJwt 函數已移除，改由自動刷新機制處理
 
 // 載入應用程式設定
 async function loadAppSettings() {
@@ -307,6 +276,17 @@ async function loadAppSettings() {
       const diaryIntervalInput = document.getElementById('setting_diary_auto_refresh_interval');
       if (diaryIntervalInput && !diaryIntervalInput.value) {
         diaryIntervalInput.value = 30;
+      }
+    }
+    
+    if (settings && settings.default_stream_ttl !== undefined) {
+      const streamTtlInput = document.getElementById('setting_default_stream_ttl');
+      if (streamTtlInput) streamTtlInput.value = settings.default_stream_ttl;
+    } else {
+      // 如果沒有設定，使用預設值 300 秒
+      const streamTtlInput = document.getElementById('setting_default_stream_ttl');
+      if (streamTtlInput && !streamTtlInput.value) {
+        streamTtlInput.value = 300;
       }
     }
   } catch (e) {
@@ -383,6 +363,7 @@ async function saveAppSettings() {
     const updateData = {
       timezone: document.getElementById('setting_timezone')?.value || undefined,
       diary_auto_refresh_interval_minutes: document.getElementById('setting_diary_auto_refresh_interval')?.value ? parseInt(document.getElementById('setting_diary_auto_refresh_interval').value) : undefined,
+      default_stream_ttl: document.getElementById('setting_default_stream_ttl')?.value ? parseInt(document.getElementById('setting_default_stream_ttl').value) : undefined,
     };
 
     // 移除 undefined 值
@@ -441,20 +422,10 @@ async function loadModelSettings() {
         }
       });
       
-      // 也支援直接訪問 google, openai, anthropic
+      // 只支援 Google
       if (llmProviders.google?.api_key) {
         const googleKeyInput = document.getElementById('provider_google_api_key');
         if (googleKeyInput) googleKeyInput.value = llmProviders.google.api_key;
-      }
-      
-      if (llmProviders.openai?.api_key) {
-        const openaiKeyInput = document.getElementById('provider_openai_api_key');
-        if (openaiKeyInput) openaiKeyInput.value = llmProviders.openai.api_key;
-      }
-      
-      if (llmProviders.anthropic?.api_key) {
-        const anthropicKeyInput = document.getElementById('provider_anthropic_api_key');
-        if (anthropicKeyInput) anthropicKeyInput.value = llmProviders.anthropic.api_key;
       }
     }
   } catch (e) {
@@ -479,17 +450,12 @@ async function saveModelSettings() {
       default_llm_model: document.getElementById('setting_llm_model')?.value || undefined,
     };
 
-    // 構建 LLM 供應商配置
-    // 總是發送所有供應商的當前值，這樣可以正確更新和清除
+    // 構建 LLM 供應商配置（只支援 Google）
     const llmProviders = {};
     const googleKey = (document.getElementById('provider_google_api_key')?.value || '').trim();
-    const openaiKey = (document.getElementById('provider_openai_api_key')?.value || '').trim();
-    const anthropicKey = (document.getElementById('provider_anthropic_api_key')?.value || '').trim();
 
-    // 發送所有供應商的設定（包括空值，用於清除）
+    // 只發送 Google 的設定
     llmProviders.google = { api_key: googleKey, model_names: [] };
-    llmProviders.openai = { api_key: openaiKey, model_names: [] };
-    llmProviders.anthropic = { api_key: anthropicKey, model_names: [] };
 
     updateData.llm_providers = llmProviders;
 
@@ -513,7 +479,7 @@ function bindEvents() {
     document.getElementById('changepassworddialog').showModal();
   });
   document.getElementById('btnSubmitChangePassword')?.addEventListener('click', changePassword);
-  document.getElementById('btnRefreshJwt')?.addEventListener('click', refreshJwt);
+  // 延長登入期限按鈕已移除，不再需要事件監聽器
   document.getElementById('btnSaveAppSettings')?.addEventListener('click', saveAppSettings);
   document.getElementById('btnSaveModelSettings')?.addEventListener('click', saveModelSettings);
 }

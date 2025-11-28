@@ -69,6 +69,9 @@ class UserSettings(BaseModel):
     diary_auto_refresh_enabled: bool = Field(default=True, description="是否啟用日記自動刷新")
     diary_auto_refresh_interval_minutes: int = Field(default=30, ge=5, le=1440, description="日記自動刷新間隔（分鐘）")
     
+    # 串流 TTL 設定
+    default_stream_ttl: int = Field(default=300, ge=30, le=3600, description="預設串流 TTL（秒），範圍：30-3600")
+    
     @field_validator('timezone')
     def validate_timezone(cls, v):
         """驗證時區是否有效"""
@@ -135,7 +138,8 @@ def get_default_user_settings() -> UserSettings:
         theme="light",
         notifications_enabled=True,
         diary_auto_refresh_enabled=True,
-        diary_auto_refresh_interval_minutes=30
+        diary_auto_refresh_interval_minutes=30,
+        default_stream_ttl=300
     )
 
 
@@ -161,7 +165,8 @@ def create_user_settings_with_llm_config(
         theme="light",
         notifications_enabled=True,
         diary_auto_refresh_enabled=True,
-        diary_auto_refresh_interval_minutes=30
+        diary_auto_refresh_interval_minutes=30,
+        default_stream_ttl=300
     )
 
 
@@ -184,6 +189,9 @@ class UpdateUserSettingsRequest(BaseModel):
     # 日記自動刷新設定
     diary_auto_refresh_enabled: Optional[bool] = Field(None, description="是否啟用日記自動刷新")
     diary_auto_refresh_interval_minutes: Optional[int] = Field(None, ge=5, le=1440, description="日記自動刷新間隔（分鐘）")
+    
+    # 串流 TTL 設定
+    default_stream_ttl: Optional[int] = Field(None, ge=30, le=3600, description="預設串流 TTL（秒），範圍：30-3600")
 
 
 class UserSettingsResponse(BaseModel):

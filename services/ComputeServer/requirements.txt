@@ -3,6 +3,9 @@ python-dotenv
 transformers
 numpy
 boto3
+minio
+sqlalchemy
+psycopg2-binary
 # opencv-python
 opencv-python-headless
 pillow
@@ -16,3 +19,7 @@ google-generativeai
 torch
 torchvision
 --extra-index-url https://download.pytorch.org/whl/cu126
+sentence-transformers
+jieba
+rank_bm25
+pgvector

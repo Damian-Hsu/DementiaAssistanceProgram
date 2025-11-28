@@ -19,7 +19,7 @@ function formatEventTime(isoString) {
   const HH = String(t.getHours()).padStart(2, "0");
   const MM = String(t.getMinutes()).padStart(2, "0");
   return { 
-    date: `${mm}-${dd}`, 
+    date: `${yyyy}-${mm}-${dd}`,  // 改為年-月-日格式
     dateFull: `${yyyy}-${mm}-${dd}`, 
     time: `${HH}:${MM}`,
     datetime: `${yyyy}-${mm}-${dd} ${HH}:${MM}`
@@ -81,6 +81,33 @@ function bindEvents() {
   el("nextBtn")?.addEventListener("click", async () => {
     pageNow++;
     await loadEvents();
+  });
+
+  // 頁數輸入框
+  el("pageInput")?.addEventListener("change", async () => {
+    const inputValue = parseInt(el("pageInput").value, 10);
+    const maxPage = parseInt(el("pageInput")?.max || "1", 10);
+    if (inputValue && inputValue >= 1 && inputValue <= maxPage) {
+      pageNow = inputValue;
+      await loadEvents();
+    } else {
+      // 如果輸入無效，恢復當前頁數
+      el("pageInput").value = pageNow;
+    }
+  });
+
+  el("pageInput")?.addEventListener("keypress", async (e) => {
+    if (e.key === "Enter") {
+      const inputValue = parseInt(el("pageInput").value, 10);
+      const maxPage = parseInt(el("pageInput")?.max || "1", 10);
+      if (inputValue && inputValue >= 1 && inputValue <= maxPage) {
+        pageNow = inputValue;
+        await loadEvents();
+      } else {
+        // 如果輸入無效，恢復當前頁數
+        el("pageInput").value = pageNow;
+      }
+    }
   });
 
   // 每頁筆數
@@ -146,8 +173,16 @@ function renderList(resp) {
   const pageTotal = resp.page_total || (items.length < size ? page : page + 1);
 
   // 更新分頁資訊
-  el("resultSummary").textContent = `共 ${total} 筆 / 第 ${page} 頁（每頁 ${size} 筆）`;
-  el("pageInfo").textContent = `第 ${page} / ${pageTotal} 頁`;
+  if (el("pageInput")) {
+    el("pageInput").value = page;
+    el("pageInput").max = pageTotal;
+  }
+  if (el("pageTotal")) {
+    el("pageTotal").textContent = `/ ${pageTotal}`;
+  }
+  if (el("totalCount")) {
+    el("totalCount").textContent = total;
+  }
 
   // 更新每頁筆數輸入框的值
   if (el("pageSize")) {
@@ -263,12 +298,42 @@ async function handleEventAction(btn) {
     const { date, time } = formatEventTime(item.start_time);
 
     dialogTitle.textContent = "事件詳情";
+    
+    // 如果有 recording_id，添加連結到影片管理頁面的按鈕
+    let viewVideoButton = '';
+    if (item.recording_id) {
+      viewVideoButton = `
+        <div class="dlg__field" style="margin-top: 16px;">
+          <a href="/recordings.html?recording_id=${item.recording_id}" class="btn-primary" style="display: inline-block; text-decoration: none; padding: 8px 16px; border-radius: 4px;">
+            查看對應影片
+          </a>
+        </div>
+      `;
+    }
+    
+    // 顯示物件標籤
+    let objectsHtml = '';
+    if (item.objects && Array.isArray(item.objects) && item.objects.length > 0) {
+      objectsHtml = `
+        <p><strong>物件：</strong></p>
+        <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px;">
+          ${item.objects.map(obj => `
+            <span style="display: inline-flex; align-items: center; padding: 4px 8px; background-color: var(--color-accent, #6B4F4F); color: #fff; border-radius: 6px; font-size: 14px;">
+              ${obj}
+            </span>
+          `).join('')}
+        </div>
+      `;
+    }
+    
     dialogContent.innerHTML = `
       <p><strong>日期：</strong>${date}</p>
       <p><strong>時間：</strong>${time}</p>
-      <p><strong>行為：</strong>${item.action}</p>
-      <p><strong>地點：</strong>${item.scene}</p>
-      <p><strong>摘要：</strong>${item.summary}</p>
+      <p><strong>行為：</strong>${item.action || "—"}</p>
+      <p><strong>地點：</strong>${item.scene || "—"}</p>
+      ${objectsHtml}
+      <p><strong>摘要：</strong>${item.summary || "—"}</p>
+      ${viewVideoButton}
     `;
     dialog.showModal();
   }
@@ -276,18 +341,84 @@ async function handleEventAction(btn) {
   if (action === "edit") {
     const item = await ApiClient.getEvent(id);
     dialogTitle.textContent = "編輯事件";
+    
+    // 初始化物件列表
+    let objectsList = Array.isArray(item.objects) ? [...item.objects] : [];
+    
+    // 生成物件標籤 HTML
+    function renderObjectsTags() {
+      const tagsHtml = objectsList.map((obj, idx) => `
+        <span class="object-tag">
+          ${obj}
+          <button type="button" class="object-tag-remove" data-index="${idx}">×</button>
+        </span>
+      `).join('');
+      return tagsHtml;
+    }
+    
     dialogContent.innerHTML = `
+      <div class="dlg__field-group">
+        <div class="dlg__field dlg__field-inline">
+          <label>行為：</label>
+          <input id="editAction" type="text" value="${item.action || ""}">
+        </div>
+        <div class="dlg__field dlg__field-inline">
+          <label>地點：</label>
+          <input id="editScene" type="text" value="${item.scene || ""}">
+        </div>
+      </div>
+      <div class="dlg__field">
+        <label>物件：</label>
+        <div class="objects-tags-container">
+          <div class="objects-tags-list" id="objectsTagsList">${renderObjectsTags()}</div>
+          <div class="objects-tags-input-wrapper">
+            <input type="text" id="newObjectInput" placeholder="輸入物件名稱後按 Enter 新增" />
+          </div>
+        </div>
+      </div>
       <div class="dlg__field">
         <label>摘要：</label>
-        <input id="editSummary" type="text" value="${item.summary || ""}">
+        <textarea id="editSummary" rows="3">${item.summary || ""}</textarea>
       </div>
-      <button id="saveEditBtn" class="btn-primary">儲存</button>
+      <div class="dlg__footer">
+        <button id="saveEditBtn" class="btn-primary">儲存</button>
+      </div>
     `;
     dialog.showModal();
 
+    // 綁定物件標籤刪除事件
+    const objectsTagsList = el("objectsTagsList");
+    objectsTagsList?.addEventListener("click", (e) => {
+      if (e.target.classList.contains("object-tag-remove")) {
+        const index = parseInt(e.target.getAttribute("data-index"));
+        objectsList.splice(index, 1);
+        objectsTagsList.innerHTML = renderObjectsTags();
+      }
+    });
+
+    // 綁定新增物件輸入框
+    const newObjectInput = el("newObjectInput");
+    newObjectInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && newObjectInput.value.trim()) {
+        const newObject = newObjectInput.value.trim();
+        if (!objectsList.includes(newObject)) {
+          objectsList.push(newObject);
+          objectsTagsList.innerHTML = renderObjectsTags();
+          newObjectInput.value = "";
+        }
+      }
+    });
+
     el("saveEditBtn").addEventListener("click", async () => {
-      const newSummary = el("editSummary").value;
-      await ApiClient.updateEvent(id, { summary: newSummary });
+      const newAction = el("editAction").value.trim();
+      const newScene = el("editScene").value.trim();
+      const newSummary = el("editSummary").value.trim();
+      await ApiClient.updateEvent(id, { 
+        action: newAction,
+        scene: newScene,
+        summary: newSummary,
+        objects: objectsList.length > 0 ? objectsList : null
+      });
       dialog.close();
       await loadEvents();
     });
@@ -326,7 +457,7 @@ function showEventDetail(data) {
 }
 // ====== 排序設定 ======
 let sortField = "start_time";
-let sortOrder = "asc";
+let sortOrder = "desc"; // 預設由最近排到最遠
 
 // ====== 綁定排序事件 ======
 document.addEventListener("DOMContentLoaded", () => {

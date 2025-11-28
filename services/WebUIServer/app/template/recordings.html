@@ -4,7 +4,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/recordings.css') }}">
   
   <div class="page-content">
-    <div class="container">
       <!-- YouTube 風格主布局 -->
       <main class="recordings-main-layout">
         <!-- 左側：影片播放區 -->
@@ -41,16 +40,36 @@
         <section class="list-section">
           <div class="list-header">
             <h2>影片列表</h2>
-            <div class="search-box">
-              <input type="text" id="searchInput" placeholder="搜尋影片（關鍵字）" />
-            </div>
+            <section class="search-bar">
+              <div class="search-group">
+                <label for="keywords">搜尋</label>
+                <input id="keywords" type="text" placeholder="請輸入關鍵字" />
+              </div>
+              <div class="search-group">
+                <label for="start">起始日期</label>
+                <input id="start" type="date" />
+              </div>
+              <div class="search-group">
+                <label for="end">結束日期</label>
+                <input id="end" type="date" />
+              </div>
+              <div class="search-group">
+                <label for="sortOrder">排序</label>
+                <select id="sortOrder">
+                  <option value="-start_time">時間：新到舊</option>
+                  <option value="+start_time">時間：舊到新</option>
+                </select>
+              </div>
+              <div class="search-actions">
+                <button id="resetBtn" class="btn-secondary">重設</button>
+              </div>
+            </section>
           </div>
           <div class="recordings-list" id="recordingsList">
             <p class="loading">載入中...</p>
           </div>
         </section>
       </main>
-    </div>
   </div>
 
   <script type="module" src="/static/js/recordings.js"></script>

@@ -153,21 +153,21 @@
 }
 
 .logout-dialog-footer .btn.danger {
-  background: var(--color-danger, #EF4444);
+  background: var(--color-accent, #6B4F4F);
   color: #fff;
-  border-color: var(--color-danger, #EF4444);
+  border-color: var(--color-accent, #6B4F4F);
 }
 
 .logout-dialog-footer .btn.danger:hover {
-  background: #DC2626;
-  border-color: #DC2626;
+  background: var(--color-accent-dark, #5a3f3f);
+  border-color: var(--color-accent-dark, #5a3f3f);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-md, 0 4px 8px rgba(239, 68, 68, 0.3));
+  box-shadow: var(--shadow-md, 0 4px 8px rgba(107, 79, 79, 0.3));
 }
 
 .logout-dialog-footer .btn.danger:active {
   transform: translateY(0);
-  box-shadow: var(--shadow-sm, 0 2px 4px rgba(239, 68, 68, 0.2));
+  box-shadow: var(--shadow-sm, 0 2px 4px rgba(107, 79, 79, 0.2));
 }
 
 /* 響應式設計 */

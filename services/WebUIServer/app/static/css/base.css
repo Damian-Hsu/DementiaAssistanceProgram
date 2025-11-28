@@ -17,6 +17,7 @@
   --text-muted-light: #666;
   --dia-bg: rgba(0,0,0,.45);
   --scrollbar-track-bg: #f1f1f1;
+  --scrollbar-thumb-opacity: 0.2; /* 平常透明度 20% */
   
   /* ===== 尺寸系統 ===== */
   --sidebar-w: 80px;           /* 側邊欄寬度 */
@@ -225,8 +226,7 @@ ul,ol{
 }
 
 .hidden {
-  opacity: 0;
-  pointer-events: none;
+  display: none !important;
 }
 
 dialog{
@@ -287,8 +287,13 @@ dialog .dlg__close:active {
   transform: scale(0.95);
 }
 
-/* === Body：外距 === */
-dialog .dlg__body{ padding: 16px 18px 20px; }
+/* === Body：外距 + 可滾動 === */
+dialog .dlg__body{ 
+  padding: 16px 18px 20px; 
+  max-height: 70vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
 
 /* === 內框板（第二張圖的內層框） === */
 dialog .dlg__panel{
@@ -304,35 +309,213 @@ dialog .dlg__field{
   background: #E7DCC9;
   border-radius: 14px;
   padding: 12px;
-  margin: 10px 0;
+  margin: 8px 0;
 }
-dialog .dlg__field input{
+
+/* 欄位群組（用於並排顯示） */
+dialog .dlg__field-group {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+dialog .dlg__field-group .dlg__field {
+  flex: 1;
+  margin: 0;
+}
+
+/* 內聯欄位（標籤和輸入在同一行） */
+dialog .dlg__field-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+dialog .dlg__field-inline label {
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 50px;
+}
+
+dialog .dlg__field-inline input {
+  flex: 1;
+  margin: 0;
+}
+
+dialog .dlg__field label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--color-text, #2E2E2E);
+}
+
+dialog .dlg__field input,
+dialog .dlg__field textarea {
   width: 100%;
   padding: 10px 14px;
   border: none; outline: none;
   background: #EDEAE4;
   border-radius: 999px;
   font-size: 16px; color: var(--color-text);
+  font-family: inherit;
+  box-sizing: border-box;
 }
-dialog .dlg__field input:focus {
+
+dialog .dlg__field textarea {
+  border-radius: 14px;
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* 對話框底部按鈕區域 */
+dialog .dlg__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border, #D3C0A8);
+}
+
+dialog .dlg__field input:focus,
+dialog .dlg__field textarea:focus {
   box-shadow: 0 0 0 3px rgba(178,138,97,.25);
   outline: none;
   transform: translateY(-1px);
   transition: all var(--transition-normal);
 }
 
-dialog .dlg__field input:focus-visible {
+dialog .dlg__field input:focus-visible,
+dialog .dlg__field textarea:focus-visible {
   box-shadow: 0 0 0 3px rgba(178,138,97,.35);
 }
 
+/* 物件標籤樣式 */
+.objects-tags-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm, 8px);
+}
+
+.objects-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs, 4px);
+  min-height: 32px;
+  padding: var(--spacing-xs, 4px);
+  border: 1px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-sm, 6px);
+  background-color: #fff;
+}
+
+.object-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  padding: 4px 8px;
+  background-color: var(--color-accent, #6B4F4F);
+  color: #fff;
+  border-radius: var(--radius-sm, 6px);
+  font-size: var(--font-size-sm, 14px);
+  line-height: 1.4;
+}
+
+.object-tag-remove {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color var(--transition-fast, 0.15s ease);
+}
+
+.object-tag-remove:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.objects-tags-input-wrapper {
+  width: 100%;
+}
+
+.objects-tags-input-wrapper input {
+  width: 100%;
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  border: 2px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-md, 12px);
+  font-size: var(--font-size-base, 16px);
+  background-color: #fff;
+  color: var(--color-text, #2E2E2E);
+  transition: all var(--transition-normal, 0.2s ease);
+  box-sizing: border-box;
+  min-height: 44px;
+}
+
+.objects-tags-input-wrapper input:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+}
+
 /* ✨ 捲軸樣式 */
+/* 滾動條樣式 - 平常透明度 10% */
 ::-webkit-scrollbar {
   width: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: var(--color-secondary);
+  background-color: rgba(164, 113, 72, 0.1); /* 平常透明度 10% */
   border-radius: 4px;
+  transition: background-color 0.3s ease; /* 變淡動畫較慢，更平滑 */
 }
 ::-webkit-scrollbar-track {
-  background-color: var(--scrollbar-track-bg);
+  background-color: transparent; /* 軌道透明，保留頁面顏色 */
+}
+
+/* 當頁面被點擊時，滾動條透明度變為 70% - 純 CSS 動畫 */
+body.scrollbar-active ::-webkit-scrollbar-thumb {
+  background-color: rgba(164, 113, 72, 0.7); /* 點擊後透明度 70% */
+  transition: background-color 0.3s ease; /* 變亮時動畫較快 */
+}
+
+/* Firefox 滾動條樣式 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(164, 113, 72, 0.1) transparent; /* 平常透明度 10%，軌道透明 */
+  transition: scrollbar-color 0.3s ease; /* Firefox 變淡動畫 */
+}
+
+body.scrollbar-active * {
+  scrollbar-color: rgba(164, 113, 72, 0.7) transparent; /* 點擊後透明度 70% */
+  transition: scrollbar-color 0.3s ease; /* Firefox 變亮時動畫較快 */
+}
+
+/* Modal Close 按鈕 - 全局樣式 */
+.modal-close {
+  background: transparent !important;
+  font-size: 28px;
+  color: #6B4F4F;
+  cursor: pointer;
+  display: inline-block;
+  transition: color 0.2s;
+  user-select: none;
+}
+
+.modal-close:hover {
+  background: transparent !important;
+  color: #A47148;
+}
+
+.modal-close:active {
+  background: transparent !important;
+  color: #6B4F4F;
 }

@@ -1,18 +1,6 @@
 /* ===== 設定頁面樣式 - 與攝影機頁面一致 ===== */
 
-/* 容器設定 - 允許滾動 */
-.container {
-  padding: var(--spacing-lg, 24px);
-  background: var(--bg-main, #F5EBDD);
-  overflow-y: auto; /* 允許垂直滾動 */
-  overflow-x: hidden; /* 防止水平滾動 */
-  flex: 1; /* 佔滿可用空間 */
-  min-height: 0; /* 允許 flex 子元素收縮 */
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch; /* iOS 平滑滾動 */
-  width: 100%;
-  max-width: 100%;
-}
+/* 容器設定已移至 layout.css 的 .page-content */
 
 /* 設定容器 */
 .settings-container {
@@ -478,9 +466,6 @@
 }
 
 @media (max-width: 480px) {
-  .container {
-    padding: var(--spacing-sm, 8px);
-  }
 
   .info-group,
   .token-card {

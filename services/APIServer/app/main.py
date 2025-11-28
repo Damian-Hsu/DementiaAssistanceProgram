@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import asyncio
 from .DataAccess.Connect import create_db_and_tables
 from .DTO import DateTimeResponse
-from .security.deps import get_current_user, get_current_api_client, get_uploader_api_client
+from .security.deps import get_current_user, require_user,require_admin, get_current_api_client, get_uploader_api_client
 from .config.path import (API_ROOT)
 from .router.Authentication.service import auth_router, m2m_router
 from .router.User.service import user_router
@@ -16,6 +16,9 @@ from .router.Camera.service import camera_router
 from .router.Events.service import events_router
 from .router.Recordings.service import recordings_router
 from .router.Chat.service import chat_router
+from .router.Vlogs.service import vlogs_router
+from .router.Music import music_router, admin_music_router
+
 """
 這個檔案負責"呼叫"各個Business Logic Functions，並提供API介面。
 規劃：
@@ -108,16 +111,24 @@ app.add_middleware(
 
 # 基本權限控制路由，公開
 app.include_router(auth_router)
+# 在路由中自行判斷權限
+app.include_router(music_router)
+app.include_router(vlogs_router)
+app.include_router(jobs_router)
 # 機器對機器的測試路由，要使用 API Key(header: X-API-Key)
 app.include_router(m2m_router, dependencies=[Depends(get_current_api_client)])
-# Jobs 路由：不同端點使用不同的 API Key 依賴（在端點層級定義）
-app.include_router(jobs_router)
+# 帳號設定路由：所有用戶都可訪問
 app.include_router(user_router, dependencies=[Depends(get_current_user)])
-app.include_router(admin_router, dependencies=[Depends(get_current_user)])
-app.include_router(camera_router, dependencies=[Depends(get_current_user)])
-app.include_router(events_router, dependencies=[Depends(get_current_user)])
-app.include_router(recordings_router, dependencies=[Depends(get_current_user)])
-app.include_router(chat_router, dependencies=[Depends(get_current_user)])
+# Admin 路由：需要 admin 權限
+app.include_router(admin_router, dependencies=[Depends(require_admin)])
+app.include_router(admin_music_router, dependencies=[Depends(require_admin)])
+# user 路由：需要 user 權限
+app.include_router(camera_router, dependencies=[Depends(require_user)])
+app.include_router(events_router, dependencies=[Depends(require_user)])
+app.include_router(recordings_router, dependencies=[Depends(require_user)])
+app.include_router(chat_router, dependencies=[Depends(require_user)])
+
+
 # ======================== User Signup API =======================
 
 @app.get("/",tags=["system"])

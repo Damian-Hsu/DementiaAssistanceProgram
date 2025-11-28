@@ -103,12 +103,19 @@ def _normalize_key(key: str) -> str:
     
     return key
 
-def _presign_get(key: str, ttl: int, *, disposition: Optional[str], filename: Optional[str]) -> str:
+def _presign_get(key: str, ttl: int, *, disposition: Optional[str], filename: Optional[str], content_type: Optional[str] = None) -> str:
     key = _normalize_key(key)  # 如果你有這支，保留
     params = {"Bucket": S3_BUCKET, "Key": key}
 
-    # 讓瀏覽器以串流播放
-    params["ResponseContentType"] = "video/mp4"
+    # 根據文件類型設置 ContentType（縮圖為 image/jpeg，影片為 video/mp4）
+    if content_type:
+        params["ResponseContentType"] = content_type
+    else:
+        # 根據 key 的副檔名判斷類型
+        if key.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
+            params["ResponseContentType"] = "image/jpeg"
+        else:
+            params["ResponseContentType"] = "video/mp4"
 
     # 預設 inline；若你從 query 傳進來就尊重使用者
     disp = disposition or "inline"
@@ -274,9 +281,21 @@ async def get_recording_url(
     if current_user.role != Role.admin and rec.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="沒有權限訪問此錄影")
 
-    url = _presign_get(rec.s3_key, ttl, disposition=disposition, filename=filename)
-    now = int(datetime.now(timezone.utc).timestamp())
-    return RecordingUrlResp(url=url, ttl=ttl, expires_at=now + ttl)
+    # 根據 type 參數決定使用哪個 s3_key
+    if type == "thumbnail" and rec.thumbnail_s3_key:
+        s3_key = rec.thumbnail_s3_key
+        url = _presign_get(s3_key, ttl, disposition=disposition, filename=filename, content_type="image/jpeg")
+        now = int(datetime.now(timezone.utc).timestamp())
+        return RecordingUrlResp(url=url, ttl=ttl, expires_at=now + ttl)
+    else:
+        s3_key = rec.s3_key
+        url = _presign_get(s3_key, ttl, disposition=disposition, filename=filename, content_type="video/mp4")
+        now = int(datetime.now(timezone.utc).timestamp())
+        # 如果有縮圖，同時返回縮圖 URL
+        thumbnail_url = None
+        if rec.thumbnail_s3_key:
+            thumbnail_url = _presign_get(rec.thumbnail_s3_key, ttl, disposition="inline", content_type="image/jpeg")
+        return RecordingUrlResp(url=url, ttl=ttl, expires_at=now + ttl, thumbnail_url=thumbnail_url)
 
 
 @recordings_router.delete("/{recording_id}", response_model=OkResp, status_code=status.HTTP_200_OK)
@@ -460,6 +479,7 @@ async def list_recordings(
             "end_time": end_time_user,
             "video_metadata": rec.video_metadata,
             "summary": first_summary,  # 添加 summary
+            "thumbnail_s3_key": rec.thumbnail_s3_key,  # 添加縮圖路徑
             "created_at": created_at_user,
             "updated_at": updated_at_user,
         }
@@ -467,6 +487,30 @@ async def list_recordings(
     
     return RecordingListResp(items=items_with_summary, total=total)
 
+
+@recordings_router.patch("/{recording_id}/thumbnail")
+async def update_recording_thumbnail(
+    recording_id: uuid.UUID = Path(..., description="錄影 ID"),
+    thumbnail_s3_key: str = Query(..., description="縮圖 S3 路徑"),
+    db: AsyncSession = Depends(get_session),
+    api_client = Depends(lambda: None)  # 內部 API，暫時不驗證
+):
+    """
+    [內部] 更新錄影的縮圖路徑
+    供 Compute Server 調用
+    """
+    stmt = select(recordings_table.Table).where(recordings_table.Table.id == recording_id)
+    result = await db.execute(stmt)
+    recording = result.scalar_one_or_none()
+    
+    if not recording:
+        raise HTTPException(status_code=404, detail="錄影不存在")
+    
+    recording.thumbnail_s3_key = thumbnail_s3_key
+    await db.commit()
+    await db.refresh(recording)
+    
+    return {"ok": True, "recording_id": str(recording_id), "thumbnail_s3_key": thumbnail_s3_key}
 
 @recordings_router.get("/{recording_id}/events", response_model=List[EventRead])
 async def get_recording_events(

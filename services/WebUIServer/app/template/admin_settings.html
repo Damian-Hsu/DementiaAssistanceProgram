@@ -1,0 +1,301 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  {% include './partials/header.html'%}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/user_profile.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_dashboard.css') }}">
+  
+  <div class="page-content">
+      <!-- 訊息提示 -->
+      <div id="successMessage" class="messagesuccess hidden"></div>
+      <div id="errorMessage" class="messageerror hidden"></div>
+
+      <div class="settings-container">
+        <!-- 使用者設定區塊 -->
+        <section class="settings-section">
+          <div class="settings-section-header">
+            <h2 class="settings-section-title">使用者設定</h2>
+            <p class="settings-section-desc">管理您的個人資料與基本偏好設定</p>
+          </div>
+
+          <div class="profile-container">
+            <!-- 左側：基本資料 -->
+            <div class="profile-left">
+              <div class="info-group">
+                <label for="user_account">帳號</label>
+                <input id="user_account" type="text" readonly>
+
+                <label for="user_birthday">生日</label>
+                <input id="user_birthday" type="date">
+
+                <label for="user_email">信箱</label>
+                <input id="user_email" type="email">
+
+                <label for="user_phone">電話</label>
+                <input id="user_phone" type="tel">
+              </div>
+
+              <div class="button-group">
+                <button id="btnSaveProfile" class="edit-btn">
+                  儲存個人資料
+                </button>
+                <button id="btnChangePassword" class="change-btn">
+                  變更密碼
+                </button>
+              </div>
+            </div>
+
+            <!-- 右側：系統資訊與 JWT -->
+            <div class="profile-right">
+              <div class="info-group">
+                <label for="user_name">姓名</label>
+                <input id="user_name" type="text">
+
+                <label for="user_gender">性別</label>
+                <select id="user_gender" name="gender">
+                  <option value="male">男性</option>
+                  <option value="female">女性</option>
+                </select>
+              </div>
+
+              <div class="token-card">
+                <h3>自動登出期限</h3>
+                <div id="current_jwt_display" class="jwt-display"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 應用程式設定區塊 -->
+        <section class="settings-section">
+          <div class="settings-section-header">
+            <h2 class="settings-section-title">應用程式設定</h2>
+            <p class="settings-section-desc">調整系統行為與介面偏好</p>
+          </div>
+
+          <div class="info-group">
+            <label for="setting_timezone">時區</label>
+            <select id="setting_timezone">
+              <option value="">載入中...</option>
+            </select>
+
+            <label for="setting_diary_auto_refresh_interval">日記刷新間隔（分鐘）</label>
+            <input id="setting_diary_auto_refresh_interval" type="number" min="5" max="1440" step="5" placeholder="30">
+            <div class="settings-note">
+              <p><strong>說明：</strong>設定系統自動刷新當天日記的間隔時間（範圍：5-1440 分鐘）。預設為 30 分鐘。系統預設啟用日記自動刷新功能。</p>
+            </div>
+
+            <div class="button-group">
+              <button id="btnSaveAppSettings" class="edit-btn">
+                儲存應用程式設定
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 模型設定區塊 -->
+        <section class="settings-section">
+          <div class="settings-section-header">
+            <h2 class="settings-section-title">AI 模型設定</h2>
+            <p class="settings-section-desc">配置 AI 助手使用的語言模型與供應商</p>
+          </div>
+
+          <div class="info-group">
+            <label for="setting_llm_provider">預設 LLM 供應商</label>
+            <select id="setting_llm_provider">
+              <option value="google">Google (Gemini)</option>
+            </select>
+
+            <label for="setting_llm_model">預設 LLM 模型</label>
+            <input id="setting_llm_model" type="text" placeholder="例如：gemini-2.0-flash-exp">
+
+            <div class="settings-note">
+              <p><strong>注意：</strong>模型設定需要 API 金鑰。請在下方配置各供應商的 API 金鑰。</p>
+            </div>
+
+            <!-- LLM 供應商配置 -->
+            <div class="llm-providers-config">
+              <h3 class="llm-providers-title">供應商 API 金鑰</h3>
+              
+              <div class="provider-config-group">
+                <label for="provider_google_api_key">Google API 金鑰</label>
+                <input id="provider_google_api_key" type="text" placeholder="輸入 Google API 金鑰">
+              </div>
+            </div>
+
+            <div class="button-group">
+              <button id="btnSaveModelSettings" class="edit-btn">
+                儲存模型設定
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- API Key 管理區塊 -->
+        <section class="settings-section">
+          <div class="settings-section-header">
+            <h2 class="settings-section-title">API Key 管理</h2>
+            <p class="settings-section-desc">建立、查看與管理系統用的 API Key</p>
+          </div>
+
+          <form id="apiKeyForm" class="admin-form">
+            <div class="form-grid">
+              <label class="form-field">
+                <span>名稱 *</span>
+                <input type="text" id="apiKeyName" placeholder="Key 名稱" required>
+              </label>
+              <label class="form-field">
+                <span>Owner ID *</span>
+                <input type="number" id="apiKeyOwner" placeholder="擁有者使用者 ID" required min="1">
+              </label>
+              <label class="form-field">
+                <span>每分鐘上限</span>
+                <input type="number" id="apiKeyRate" placeholder="可選" min="0">
+              </label>
+              <label class="form-field">
+                <span>每日額度</span>
+                <input type="number" id="apiKeyQuota" placeholder="可選" min="0">
+              </label>
+            </div>
+            <div class="form-field">
+              <span>允許的 Scopes *</span>
+              <div class="scopes-checkbox-group" id="apiKeyScopes">
+                <label class="scope-checkbox">
+                  <input type="checkbox" value="uploader">
+                  <span>uploader - 允許呼叫 /jobs 建任務</span>
+                </label>
+                <label class="scope-checkbox">
+                  <input type="checkbox" value="compute">
+                  <span>compute - 允許呼叫 /jobs/{id}/complete 回報</span>
+                </label>
+                <label class="scope-checkbox">
+                  <input type="checkbox" value="mediamtx">
+                  <span>mediamtx - 允許呼叫 /m2m/streams/auth</span>
+                </label>
+                <label class="scope-checkbox">
+                  <input type="checkbox" value="streaming">
+                  <span>streaming - 允許呼叫 /m2m/streams</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn primary">建立 API Key</button>
+              <span class="form-hint" id="apiKeyTokenMessage" aria-live="polite"></span>
+            </div>
+          </form>
+
+          <div class="table-wrapper">
+            <table class="admin-table" id="apiKeyTable" aria-live="polite">
+              <thead>
+                <tr>
+                  <th scope="col">名稱</th>
+                  <th scope="col">Owner</th>
+                  <th scope="col">狀態</th>
+                  <th scope="col">Scopes</th>
+                  <th scope="col">Flow</th>
+                  <th scope="col">每日額度</th>
+                  <th scope="col">建立時間</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="empty-row">
+                  <td colspan="8">尚無 API Key，請建立新的 Key。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+    </div>
+  </div>
+
+  <!-- 修改密碼對話框 -->
+  <dialog id="changepassworddialog" aria-labelledby="cp-title">
+    <header class="dlg__header">
+      <h3 id="cp-title" class="dlg__title">修改密碼</h3>
+      <form method="dialog"><button class="dlg__close" aria-label="關閉">✕</button></form>
+    </header>
+
+    <div class="dlg__body">
+      <div class="dlg__panel">
+        <div id="successMessage" class="messagesuccess" style="display:none;"></div>
+        <div id="errorMessage" class="messageerror" style="display:none;"></div>
+        <div class="dlg__field">
+          <input id="current_password" type="password"
+                 inputmode="numeric"
+                 oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)"
+                 placeholder="請輸入舊密碼"
+                 pattern="\d{6}" minlength="6" maxlength="6"
+                 autocomplete="new-password" required>
+        </div>
+        <div class="dlg__field">
+          <input id="new_password" type="password"
+                 inputmode="numeric"
+                 oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)"
+                 placeholder="請輸入新密碼"
+                 pattern="\d{6}" minlength="6" maxlength="6"
+                 autocomplete="new-password" required>
+        </div>
+        <div class="dlg__footer">
+          <button type="button" class="btn-submit" id="btnSubmitChangePassword">
+            確認變更
+          </button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 編輯 API Key 對話框 -->
+  <dialog id="editApiKeyDialog" aria-labelledby="edit-api-key-title">
+    <header class="dlg__header">
+      <h3 id="edit-api-key-title" class="dlg__title">編輯 API Key</h3>
+      <form method="dialog"><button class="dlg__close" aria-label="關閉">✕</button></form>
+    </header>
+
+    <div class="dlg__body">
+      <div class="dlg__panel">
+        <form id="editApiKeyForm">
+          <div class="dlg__field">
+            <label for="editApiKeyName">名稱 *</label>
+            <input type="text" id="editApiKeyName" required>
+          </div>
+          <div class="dlg__field">
+            <label for="editApiKeyRate">每分鐘上限</label>
+            <input type="number" id="editApiKeyRate" min="0">
+          </div>
+          <div class="dlg__field">
+            <label for="editApiKeyQuota">每日額度</label>
+            <input type="number" id="editApiKeyQuota" min="0">
+          </div>
+          <div class="dlg__field">
+            <label>允許的 Scopes *</label>
+            <div class="scopes-checkbox-group" id="editApiKeyScopes">
+              <label class="scope-checkbox">
+                <input type="checkbox" value="uploader">
+                <span>uploader - 允許呼叫 /jobs 建任務</span>
+              </label>
+              <label class="scope-checkbox">
+                <input type="checkbox" value="compute">
+                <span>compute - 允許呼叫 /jobs/{id}/complete 回報</span>
+              </label>
+              <label class="scope-checkbox">
+                <input type="checkbox" value="mediamtx">
+                <span>mediamtx - 允許呼叫 /m2m/streams/auth</span>
+              </label>
+              <label class="scope-checkbox">
+                <input type="checkbox" value="streaming">
+                <span>streaming - 允許呼叫 /m2m/streams</span>
+              </label>
+            </div>
+          </div>
+          <div class="dlg__footer">
+            <button type="button" class="btn-secondary" onclick="document.getElementById('editApiKeyDialog').close()">取消</button>
+            <button type="submit" class="btn-submit" id="btnSubmitEditApiKey">儲存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="{{ url_for('static', filename='js/admin_settings.js') }}"></script>
+{% endblock %}

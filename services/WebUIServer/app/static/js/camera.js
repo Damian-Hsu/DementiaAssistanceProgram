@@ -9,6 +9,26 @@ window.CameraService = CameraService;
 const svc = new CameraService(ApiClient);
 
 // ----------------------------------------------------
+// 使用者設定（TTL）
+let userStreamTTL = 300; // 預設值
+
+// 載入使用者設定
+async function loadUserSettings() {
+  try {
+    if (ApiClient && ApiClient.settings) {
+      const response = await ApiClient.settings.get();
+      const settings = response.settings || response;
+      if (settings && settings.default_stream_ttl !== undefined) {
+        userStreamTTL = settings.default_stream_ttl;
+        console.log('[Camera] 已載入使用者串流 TTL 設定:', userStreamTTL);
+      }
+    }
+  } catch (e) {
+    console.warn('[Camera] 載入使用者設定失敗，使用預設 TTL:', e);
+  }
+}
+
+// ----------------------------------------------------
 // DOM 快捷
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -73,6 +93,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     await ApiClient.getCurrentUser();
+    
+    // 載入使用者設定（包含 TTL）
+    await loadUserSettings();
   } catch (e) {
     console.warn(e);
     window.location.href = "/auth.html";
@@ -94,11 +117,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ----------------------------------------------------
-// TTL：讀取全頁共用輸入（#cameraTTL）
+// TTL：從使用者設定讀取
 function getTTL() {
-  const v = Number($("#cameraTTL")?.value);
-  if (Number.isFinite(v) && v >= 30 && v <= 3600) return v;
-  return 300;
+  // 確保 TTL 在有效範圍內
+  if (userStreamTTL >= 30 && userStreamTTL <= 3600) {
+    return userStreamTTL;
+  }
+  return 300; // 預設值
 }
 
 // ----------------------------------------------------
@@ -693,21 +718,28 @@ function showCameraInfo(camera) {
   }
 }
 
-// 更新串流狀態顯示
+// 更新串流狀態顯示（完全根據後端返回的狀態）
 function updateStreamStatusDisplay(isStreaming, status) {
   const statusDot = $("#streamStatusDot");
   const statusText = $("#streamStatusText");
   
   if (!statusDot || !statusText) return;
   
-  if (isStreaming) {
+  // 根據後端返回的狀態顯示
+  if (status === "reconnecting") {
+    // 重連中狀態（後端明確返回）
+    statusDot.className = "status-dot reconnecting";
+    statusText.textContent = "重連中...";
+  } else if (status === "running") {
+    // 運行中
     statusDot.className = "status-dot streaming";
-    if (status === "starting") {
-      statusText.textContent = "串流啟動中...";
-    } else {
-      statusText.textContent = "串流中";
-    }
+    statusText.textContent = "串流中";
+  } else if (status === "starting") {
+    // 啟動中
+    statusDot.className = "status-dot streaming";
+    statusText.textContent = "串流啟動中...";
   } else {
+    // stopped, error 或其他狀態
     statusDot.className = "status-dot stopped";
     statusText.textContent = "未串流";
   }
@@ -730,37 +762,66 @@ async function updateStreamStatus() {
     const isStreaming = statusResp?.is_streaming || false;
     const status = statusResp?.status || "stopped";
     
-    // 更新顯示
-    updateStreamStatusDisplay(isStreaming, status);
+    // 完全依賴後端返回的狀態，不自己判斷
+    // 後端會返回: "starting", "running", "stopped", "error", "reconnecting"
     
-    // 檢測狀態變化並自動觸發 WebRTC 播放/停止
-    const currentStatus = isStreaming && status === "running" ? "running" : "stopped";
-    if (lastStreamStatus !== currentStatus) {
-      console.log(`[Stream Status] Status changed: ${lastStreamStatus} -> ${currentStatus}`);
-      lastStreamStatus = currentStatus;
+    // 更新顯示（根據後端返回的狀態）
+    // 完全依賴後端返回的狀態
+    if (status === "running") {
+      updateStreamStatusDisplay(true, "running");
       
-      if (currentStatus === "running") {
+      // 檢測狀態變化並自動觸發 WebRTC 播放
+      if (lastStreamStatus !== "running") {
+        console.log(`[Stream Status] Status changed: ${lastStreamStatus} -> running`);
+        lastStreamStatus = "running";
+        
         // 串流狀態變為 running，自動啟動預覽
         if (!isPreviewActive) {
           console.log("[Stream Status] Stream is running, auto-starting preview");
           startPreview();
         }
-      } else {
-        // 串流狀態變為 stopped 或 error，自動停止預覽
-        if (isPreviewActive) {
-          console.log("[Stream Status] Stream stopped, auto-stopping preview");
+      }
+    } else if (status === "reconnecting") {
+      // 後端明確返回重連中狀態
+      updateStreamStatusDisplay(true, "reconnecting");
+      
+      if (lastStreamStatus !== "reconnecting") {
+        console.log(`[Stream Status] Status changed: ${lastStreamStatus} -> reconnecting (backend reported)`);
+        lastStreamStatus = "reconnecting";
+      }
+    } else {
+      // stopped, error, starting 等狀態
+      updateStreamStatusDisplay(isStreaming, status);
+      
+      // 如果狀態變為 stopped 或 error，停止預覽
+      if ((status === "stopped" || status === "error") && isPreviewActive) {
+        if (lastStreamStatus !== status) {
+          console.log(`[Stream Status] Status changed: ${lastStreamStatus} -> ${status}, stopping preview`);
+          lastStreamStatus = status;
           stopPreview();
         }
+      } else if (lastStreamStatus !== status) {
+        console.log(`[Stream Status] Status changed: ${lastStreamStatus} -> ${status}`);
+        lastStreamStatus = status;
       }
     }
   } catch (err) {
     console.warn("[Stream Status] Failed to get stream status:", err);
+    
+    // API 錯誤時，如果之前有串流，給一次機會（不清除狀態）
+    // 但不要自己判斷重連，等後端恢復後再判斷
     updateStreamStatusDisplay(false, "stopped");
-    // 如果獲取狀態失敗，停止預覽
-    if (isPreviewActive) {
-      stopPreview();
+    if (isPreviewActive && lastStreamStatus === "running") {
+      // 如果之前是運行狀態，可能是暫時的 API 錯誤，不立即停止預覽
+      // 但清除狀態追蹤，讓下次成功獲取狀態時再判斷
+      console.log("[Stream Status] API error, but keeping preview active temporarily");
+    } else {
+      // 如果之前就不是運行狀態，直接停止
+      if (isPreviewActive) {
+        stopPreview();
+      }
+      lastStreamStatus = null;
     }
-    lastStreamStatus = null;
   }
 }
 

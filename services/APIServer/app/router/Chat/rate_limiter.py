@@ -20,12 +20,12 @@ class RateLimiter:
     - 每日 25 次請求 (RPD)
     """
     
-    def __init__(self, rpm: int = 4, rpd: int = 20):
+    def __init__(self, rpm: int = 10, rpd: int = 20):
         """
         初始化速率限制器
         
         Args:
-            rpm: 每分鐘請求數限制（設為 4 保留緩衝）
+            rpm: 每分鐘請求數限制（設為 10）
             rpd: 每日請求數限制（設為 20 保留緩衝）
         """
         self.rpm = rpm
@@ -158,7 +158,7 @@ class RequestCache:
 
 
 # 全局實例（單例模式）
-_rate_limiter = RateLimiter(rpm=4, rpd=20)
+_rate_limiter = RateLimiter(rpm=10, rpd=20)
 _request_cache = RequestCache(ttl=300)
 
 

@@ -35,7 +35,7 @@ webrtcIPsFromInterfaces: yes     # 從網絡接口獲取 IP，但 webrtcAddition
 # 注意：不設置 webrtcLocalTCPAddress，讓 MediaMTX 自動處理 TCP 回退
 # 讓 APIServer 決定誰能 publish/read
 authMethod: http
-authHTTPAddress: http://api:30000/api/v1/m2m/check-stream-pwd?api-key=Iwala9jXETjq0PIfBHpwVAILyb3IhDmxIfKHWrx2CKAdgX0VTV2Vf-5NBbGORkDE
+authHTTPAddress: http://api:30000/api/v1/m2m/check-stream-pwd?api-key=0bZWuqcN8okMP9AA9tY3ZoU9ifaSy0k1Fox5S7qjhNF-4KVaDIz6jRwH4qRYFl3P
 authHTTPExclude:
   - action: api
   - action: metrics

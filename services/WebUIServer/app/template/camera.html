@@ -4,7 +4,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/camera.css') }}">
   
   <div class="page-content">
-    <div class="container">
       <!-- 主內容：YouTube 風格布局 -->
       <main class="camera-main-layout">
         <!-- 左側：預覽畫面 -->
@@ -67,10 +66,6 @@
                 <label for="camera_name">鏡頭名稱</label>
             <input id="camera_name" name="camera_name" type="text" placeholder="例如：實驗室入口"/>
           </div>
-          <div class="form-row">
-                <label for="cameraTTL">TTL（秒）</label>
-                <input id="cameraTTL" type="number" min="30" max="3600" value="300" />
-              </div>
               <div class="form-row">
                 <button type="submit" class="btn primary">建立鏡頭</button>
               </div>
@@ -78,7 +73,6 @@
           </div>
       </section>
     </main>
-    </div>
   </div>
 
   {% include './partials/stop_stream_confirm_dialog.html' %}

@@ -26,6 +26,7 @@ class RecordingRead(BaseModel):
     end_time: Optional[datetime] = None
     video_metadata: Optional[dict[str, Any]] = None
     summary: Optional[str] = None  # 🔧 修復：添加 summary 欄位（從關聯的 events 聚合）
+    thumbnail_s3_key: Optional[str] = None  # 縮圖 S3 路徑
 
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -38,6 +39,7 @@ class RecordingUrlResp(BaseModel):
     url: str
     ttl: int = Field(ge=30, le=7*24*3600)
     expires_at: int  # epoch seconds
+    thumbnail_url: Optional[str] = None  # 縮圖 URL（如果有的話）
 
 # ====== 事件（精簡版）======
 class EventRead(BaseModel):

@@ -5,15 +5,16 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/events.css') }}">
 
   <div class="page-content">
-    <div class="container">
     <section class="search-bar">
       <div class="search-group">
-        <label for="keywords">搜尋</label>
+        <label for="keywords">事件搜尋</label>
         <input id="keywords" type="text" placeholder="請輸入關鍵字" />
       </div>
       <div class="search-group">
         <label for="start">起始日期</label>
         <input id="start" type="date" />
+      </div>
+      <div class="search-group">
         <label for="end">結束日期</label>
         <input id="end" type="date" />
       </div>
@@ -29,10 +30,10 @@
         <thead>
           <tr>
             <th data-sort="start_time">發生日期</th>
-            <th data-sort="start_time">紀錄時間</th>
-            <th data-sort="action">進行行為</th>
-            <th data-sort="scene">發生地點</th>
-            <th data-sort="summary">事件摘要</th>
+            <th>紀錄時間</th>
+            <th>進行行為</th>
+            <th>發生地點</th>
+            <th>事件摘要</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -46,15 +47,19 @@
 
       <div class="pagination">
           <button id="prevBtn" class="page-btn">&lt;</button>
-          <span id="pageInfo">第 1 頁</span>
+          <span>第</span>
+          <input id="pageInput" type="number" min="1" value="1" />
+          <span id="pageTotal">/ 1</span>
+          <span>頁</span>
           <button id="nextBtn" class="page-btn">&gt;</button>
-          <div class="pagination-size">
-            <label for="pageSize">每頁</label>
+          <span class="pagination-info">
+            <span>每頁</span>
             <input id="pageSize" type="number" min="1" max="100" value="20" />
-            <label for="pageSize">筆</label>
-          </div>
+            <span>筆, 共</span>
+            <span id="totalCount">0</span>
+            <span>筆</span>
+          </span>
         </div>
-        <div id="resultSummary" class="result-info"></div>
       </section>
       <dialog id="eventDialog">
   <div class="dlg__header">
@@ -65,7 +70,6 @@
     <div id="dialogContent"></div>
   </div>
 </dialog>
-    </div>
   </div>
 
 <script type="module" src="{{ url_for('static', filename='js/events.js') }}"></script>

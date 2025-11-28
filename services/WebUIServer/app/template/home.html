@@ -2,80 +2,234 @@
 {% block content %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/diary.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/vlog.css') }}">
+
+  <!-- 日期選擇器（與 camera 頁面的 page-header 結構相同） -->
+  <section class="home-date-header">
+        <!-- 左側翻頁區域（手機模式） -->
+        <div class="book-edge-nav book-edge-left book-edge-header" id="prevPageAreaHeader"></div>
+        
+        <div class="date-selector-inline">
+          <input type="date" id="diaryDate" />
+          <span class="date-display" id="dateDisplay">2025-10-27</span>
+        </div>
+        
+        <!-- 右側翻頁區域（手機模式） -->
+        <div class="book-edge-nav book-edge-right book-edge-header" id="nextPageAreaHeader"></div>
+  </section>
 
   <div class="page-content">
-    <div class="container">
-      <!-- Chrome 分頁式標籤切換 + 日期選擇器 -->
-      <section class="home-tab-header">
-        <div class="chrome-tabs-container">
-          <div class="chrome-tab active" id="diaryTab" data-tab="diary">
-            <span class="chrome-tab-label">日記</span>
-          </div>
-          <div class="chrome-tab" id="vlogTab" data-tab="vlog">
-            <span class="chrome-tab-label">Vlog</span>
-          </div>
-        </div>
-        <div class="date-selector-inline">
-          <label for="diaryDate">選擇日期</label>
-          <input type="date" id="diaryDate" />
+      <!-- 主內容區（參考影片管理頁面結構） -->
+      <section class="home-content-section active" id="mergedSection">
+        <!-- 翻頁容器 -->
+        <div class="merged-content-container">
+          <!-- 左側翻頁區域（電腦模式） -->
+          <div class="book-edge-nav book-edge-left book-edge-main" id="prevPageArea"></div>
+          
+          <!-- 主佈局（參考 recordings-main-layout） -->
+          <main class="home-main-layout">
+            <!-- 左側：Vlog 播放區 + 日記 -->
+            <section class="player-section">
+              <!-- Vlog 播放器 -->
+              <div class="player-container vlog-player-container">
+                <video id="dailyVlogVideo" playsinline controls poster=""></video>
+                <img id="dailyVlogThumbnail" class="vlog-thumbnail hidden" alt="Vlog 縮圖" />
+                <div class="player-placeholder" id="dailyVlogPlaceholder">
+                  <div class="vlog-loader-spinner hidden" id="dailyVlogLoader"></div>
+                  <p id="dailyVlogPlaceholderText">目前沒有可預覽的影片</p>
+                </div>
+              </div>
+              
+              <!-- 日記區域（在播放器下方，對應影片管理中的「影片內的事件」） -->
+              <div class="diary-section diary-section-container" id="diarySection">
+                <div class="diary-page-content">
+                  <div class="diary-page-header">
+                    <h3 class="diary-section-title">今日日記</h3>
+                    <img class="diary-refresh-icon" id="currentPageRefreshBtn" src="{{ url_for('static', filename='icons/refresh-line.svg') }}" alt="重新整理" />
+                  </div>
+                  <div class="diary-page-body" id="currentPageContent">
+                    <p class="diary-placeholder">載入中...</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- 右側：Vlog 資訊與操作 -->
+            <section class="list-section">
+              <!-- Vlog 資訊卡片 -->
+              <div class="card vlog-info-card">
+                <h2 id="dailyVlogTitle">今日 Vlog</h2>
+                <div class="vlog-info-row">
+                  <span class="label">狀態：</span>
+                  <span id="dailyVlogStatus" class="value">載入中...</span>
+                </div>
+
+                <div class="vlog-info-row">
+                  <span class="label">日期：</span>
+                  <span id="dailyVlogDate" class="value">--</span>
+                </div>
+
+                <div class="vlog-info-row">
+                  <span class="label">影片長度：</span>
+                  <span id="dailyVlogDuration" class="value">-</span>
+                </div>
+
+                <div class="vlog-message" id="dailyVlogMessage">準備載入今日 Vlog...</div>
+
+                <!-- 進度條 -->
+                <div class="vlog-progress-container hidden" id="dailyVlogProgressBar">
+                  <div class="vlog-progress-track">
+                    <div class="vlog-progress-fill" id="dailyVlogProgressFill"></div>
+                  </div>
+                  <span class="vlog-progress-text" id="dailyVlogProgressValue">0%</span>
+                </div>
+              </div>
+
+              <!-- 操作卡片 -->
+              <div class="card vlog-controls-card">
+                <h3>操作</h3>
+                <div class="vlog-control-buttons">
+                  <button class="btn primary" id="generateVlogBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    生成 Vlog
+                  </button>
+
+                  <button class="btn danger hidden" id="deleteDailyVlogBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    刪除 Vlog
+                  </button>
+                </div>
+              </div>
+            </section>
+          </main>
+          
+          <!-- 右側翻頁區域（電腦模式） -->
+          <div class="book-edge-nav book-edge-right book-edge-main" id="nextPageArea"></div>
         </div>
       </section>
+  </div>
 
-      <!-- 日記內容區 -->
-      <section class="home-content-section active" id="diarySection">
-        <!-- 雙頁日記容器 -->
-        <div class="diary-book-container">
-          <!-- 左側翻頁區域（書的兩旁） -->
-          <div class="book-edge-nav book-edge-left" id="prevPageArea"></div>
-          
-          <!-- 日記書本 -->
-          <div class="diary-book">
-            <!-- 左頁 -->
-            <div class="diary-page diary-page-left" id="leftPage">
-              <div class="diary-page-content">
-                <div class="diary-page-header">
-                  <h2 class="diary-date-title" id="leftPageDate">2025-10-27</h2>
-                  <img class="diary-refresh-icon" id="leftPageRefreshBtn" src="{{ url_for('static', filename='icons/refresh-line.svg') }}" alt="重新整理" />
+  <!-- 事件選擇懸浮頁面 -->
+  <div class="modal-overlay" id="eventSelectModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>選擇事件片段</h3>
+        <span class="modal-close" id="closeEventModal">&times;</span>
+      </div>
+      <div class="modal-body">
+        
+        <div class="ai-select-section">
+          <button class="btn-secondary" id="aiSelectBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+            AI 自動推薦
+          </button>
+          <label for="aiSelectLimit">數量:</label>
+          <input type="number" id="aiSelectLimit" min="10" max="100" value="20" title="AI 推薦的事件數量" />
+        </div>
+
+        <div class="event-list" id="eventList">
+          <div class="event-loading">請選擇日期載入事件...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="cancelEventSelect">取消</button>
+        <button class="btn-primary" id="confirmEventSelect" disabled>下一步</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vlog 設定懸浮頁面 -->
+  <div class="modal-overlay" id="vlogSettingsModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>Vlog 設定</h3>
+        <span class="modal-close" id="closeSettingsModal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="settings-section">
+          <label for="vlogTitle">標題:</label>
+          <input type="text" id="vlogTitle" placeholder="請輸入 Vlog 標題 (選填)" />
+        </div>
+
+        <div class="settings-section music-settings">
+          <label for="musicSelect">音樂選擇：</label>
+          <div class="music-selector-controls">
+            <select id="musicSelect">
+              <option value="">請選擇音樂</option>
+            </select>
+          </div>
+
+          <div class="music-preview hidden" id="musicPreview">
+            <div class="music-info" id="musicInfo">
+              <div class="music-info-content">
+                <h4 class="music-info-title" id="musicInfoTitle"></h4>
+                <p class="music-info-description" id="musicInfoDescription"></p>
+              </div>
+            </div>
+            <div class="music-waveform-wrapper">
+              <canvas id="musicWaveform"></canvas>
+              <div class="music-selection-overlay" id="musicSelectionOverlay"></div>
+              <div class="music-playhead hidden" id="musicPlayhead"></div>
+              <!-- 時間標記 -->
+              <div class="music-time-markers">
+                <div class="time-marker time-marker-start" id="timeMarkerStart">
+                  <span class="time-label">00:00</span>
                 </div>
-                <div class="diary-page-body" id="leftPageContent">
-                  <p class="diary-placeholder">載入中...</p>
+                <div class="time-marker time-marker-end" id="timeMarkerEnd">
+                  <span class="time-label">00:00</span>
                 </div>
               </div>
             </div>
 
-            <!-- 書脊分隔線 -->
-            <div class="diary-spine"></div>
-
-            <!-- 右頁 -->
-            <div class="diary-page diary-page-right" id="rightPage">
-              <div class="diary-page-content">
-                <div class="diary-page-header">
-                  <h2 class="diary-date-title" id="rightPageDate">2025-10-28</h2>
-                  <img class="diary-refresh-icon" id="rightPageRefreshBtn" src="{{ url_for('static', filename='icons/refresh-line.svg') }}" alt="重新整理" />
-                </div>
-                <div class="diary-page-body" id="rightPageContent">
-                  <p class="diary-placeholder">載入中...</p>
-                </div>
+            <div class="music-control-bar">
+              <div class="playback-controls">
+                <img class="btn-icon" id="musicPlayBtn" src="{{ url_for('static', filename='icons/play.svg') }}" alt="播放" aria-label="播放" />
+                <span class="relative-time" id="musicCurrentTime">00:00/00:00</span>
+                <span class="music-total-duration">原始長度: <span id="musicTotalDuration">00:00</span></span>
+                <span class="music-avg-segment-time">平均分鏡時間: <span id="musicAvgSegmentTime">--</span></span>
               </div>
+              <label class="fade-toggle">
+                <input type="checkbox" id="musicFadeToggle" checked>
+                淡入淡出
+              </label>
             </div>
           </div>
-          
-          <!-- 右側翻頁區域（書的兩旁） -->
-          <div class="book-edge-nav book-edge-right" id="nextPageArea"></div>
-        </div>
-      </section>
 
-      <!-- Vlog 內容區 -->
-      <section class="home-content-section" id="vlogSection">
-        <div class="vlog-placeholder">
-          <h2>Vlog 頁面</h2>
-          <p>此頁面正在開發中...</p>
+          <div class="music-empty-state" id="musicEmptyState">請選擇音樂後即可預覽與裁切片段。</div>
         </div>
-      </section>
+
+        <div class="settings-section">
+          <label for="vlogResolution">解析度:</label>
+          <select id="vlogResolution">
+            <option value="480p">480p (標準)</option>
+            <option value="720p">720p (高清)</option>
+            <option value="1080p" selected>1080p (全高清)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="backToEventSelect">上一步</button>
+        <button class="btn-primary" id="confirmVlogGenerate">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          生成 Vlog
+        </button>
+      </div>
     </div>
   </div>
 
   <script type="module" src="{{ url_for('static', filename='js/diary.js') }}"></script>
   <script type="module" src="{{ url_for('static', filename='js/home.js') }}"></script>
+  <script type="module" src="{{ url_for('static', filename='js/vlog.js') }}"></script>
 
 {% endblock %}

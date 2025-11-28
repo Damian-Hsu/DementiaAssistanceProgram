@@ -1,16 +1,6 @@
 /* ===== 影片管理頁面樣式 ===== */
 
-/* 容器設定 */
-.container {
-  padding: var(--spacing-lg, 24px);
-  background: var(--bg-main, #F5EBDD);
-  overflow-y: auto;
-  overflow-x: hidden;
-  flex: 1;
-  min-height: 0;
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch;
-}
+/* 容器設定已移至 layout.css 的 .page-content */
 
 /* YouTube 風格主布局 */
 .recordings-main-layout {
@@ -183,7 +173,6 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  max-height: calc(100vh - 120px);
 }
 
 .list-header {
@@ -205,11 +194,33 @@
   margin: 0;
 }
 
-.search-box {
+/* 搜尋欄樣式（垂直排列） */
+.list-header .search-bar {
+  margin-left: 0;
+  margin-bottom: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+}
+
+.list-header .search-bar .search-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 4px);
   width: 100%;
 }
 
-.search-box input {
+.list-header .search-bar .search-group label {
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-accent, #6B4F4F);
+  font-size: var(--font-size-sm, 14px);
+}
+
+.list-header .search-bar .search-group input[type="text"],
+.list-header .search-bar .search-group input[type="date"],
+.list-header .search-bar .search-group select {
   width: 100%;
   padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
   border: 2px solid var(--color-border, #D3C0A8);
@@ -222,19 +233,65 @@
   min-height: 44px;
 }
 
-.search-box input:focus {
+.list-header .search-bar .search-group input[type="text"]:focus,
+.list-header .search-bar .search-group input[type="date"]:focus,
+.list-header .search-bar .search-group select:focus {
   outline: none;
   border-color: var(--color-accent, #6B4F4F);
   box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
 }
 
-.recordings-list {
+.list-header .search-bar .search-group select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B4F4F' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--spacing-md, 16px) center;
+  padding-right: calc(var(--spacing-md, 16px) * 2 + 12px);
+}
+
+.list-header .search-bar .search-actions {
+  display: flex;
+  gap: var(--spacing-md, 16px);
+  width: 100%;
+}
+
+.list-header .search-bar .search-actions button {
   flex: 1;
-  overflow-y: auto;
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  font-size: var(--font-size-base, 16px);
+  min-height: 44px;
+  border-radius: var(--radius-md, 12px);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-normal, 0.2s ease);
+  font-weight: 600;
+}
+
+.list-header .search-bar .search-actions .btn-primary {
+  background-color: var(--color-accent, #6B4F4F);
+  color: #fff;
+}
+
+.list-header .search-bar .search-actions .btn-primary:hover {
+  background-color: var(--color-accent-dark, #5a3f3f);
+}
+
+.list-header .search-bar .search-actions .btn-secondary {
+  background-color: var(--bg-button, #F3F0EB);
+  color: var(--color-accent, #6B4F4F);
+  border: 1px solid var(--color-border, #D3C0A8);
+}
+
+.list-header .search-bar .search-actions .btn-secondary:hover {
+  background-color: var(--bg-button-hover, #E2D7C5);
+  border-color: var(--color-secondary, #A47148);
+}
+
+.recordings-list {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm, 8px);
-  padding-right: var(--spacing-xs, 4px);
 }
 
 .recordings-list .loading,
@@ -262,8 +319,51 @@
   cursor: pointer;
   transition: all var(--transition-normal, 0.2s ease);
   display: flex;
+  flex-direction: row;
+  gap: var(--spacing-md, 16px);
+  overflow: hidden;
+  align-items: center;
+  min-height: 100px; /* 確保最小高度與縮圖一致 */
+}
+
+.recording-item .recording-thumbnail {
+  width: 120px;
+  height: 80px;
+  min-width: 120px;
+  min-height: 80px;
+  background: #000;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm, 8px);
+  display: block;
+  flex-shrink: 0;
+}
+
+.recording-item .recording-thumbnail .thumbnail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+/* 當圖片載入失敗或不存在時，顯示黑色背景 */
+.recording-item .recording-thumbnail .thumbnail-img[src=""],
+.recording-item .recording-thumbnail .thumbnail-img:not([src]),
+.recording-item .recording-thumbnail .thumbnail-img[style*="display: none"] {
+  display: none !important;
+}
+
+.recording-item .recording-info {
+  flex: 1;
+  display: flex;
   flex-direction: column;
   gap: var(--spacing-xs, 4px);
+  min-width: 0;
+  padding: var(--spacing-xs, 4px) 0;
 }
 
 .recording-item:hover {
@@ -285,23 +385,39 @@
   margin: 0;
   line-height: var(--line-height-tight, 1.4);
   word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .recording-item .recording-meta {
   font-size: var(--font-size-sm, 14px);
   color: var(--text-muted-light, #666);
   margin: 0;
+  margin-top: auto;
 }
 
 /* 響應式設計 - 手機模式（上下排列） */
-@media (max-width: 768px) {
-  .container {
-    padding: var(--spacing-sm, 8px);
-  }
+@media (max-width: 1100px) {
 
   .recordings-main-layout {
     grid-template-columns: 1fr;
     gap: var(--spacing-md, 16px);
+  }
+
+  .recording-item {
+    flex-direction: row;
+    padding: var(--spacing-sm, 8px);
+    min-height: 80px;
+  }
+
+  .recording-item .recording-thumbnail {
+    width: 120px;
+    height: 80px;
+    min-width: 120px;
+    min-height: 80px;
   }
 
   .player-section {

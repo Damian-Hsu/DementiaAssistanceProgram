@@ -33,8 +33,7 @@ class APIKeyManagerConfig:
         "uploader",   # 允許呼叫 /jobs 建任務
         "compute",    # 允許呼叫 /jobs/{id}/complete 回報
         "mediamtx",   # 允許呼叫 /m2m/streams/auth
-        "streaming",  # 允許呼叫 /m2m/streams/*（若有）
-        "admin"       # 內部維運
+        "streaming"  # 允許呼叫 /m2m/streams
     })
 
 

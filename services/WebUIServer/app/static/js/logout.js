@@ -22,10 +22,17 @@ function closeLogoutConfirm() {
 // 執行登出
 function performLogout() {
   try {
+    // 清除所有認證相關的資料
     AuthService.delToken();
-    showSuccess("已成功登出！");
-    // 立刻換頁
-    location.replace('/auth.html');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_id');
+    // 清除緩存的用戶資訊
+    if (window.__CURRENT_USER) {
+      delete window.__CURRENT_USER;
+    }
+    
+    // 立刻換頁到登入頁面
+    window.location.replace('/auth');
   } catch (err) {
     console.error("登出錯誤:", err);
     showError("登出時發生錯誤");
@@ -96,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function(){
     
     // no token guard
     if (!(window.AuthService && window.AuthService.isLoggedIn && window.AuthService.isLoggedIn())) {
-      window.location.href = '/auth.html';
+      window.location.href = '/auth';
     }
   } catch (e) {}
 });

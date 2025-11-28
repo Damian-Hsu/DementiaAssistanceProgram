@@ -1,16 +1,6 @@
 /* ===== 鏡頭管理頁面樣式 ===== */
 
-/* 容器設定 */
-.container {
-  padding: var(--spacing-lg, 24px);
-  background: var(--bg-main, #F5EBDD);
-  overflow-y: auto;
-  overflow-x: hidden;
-  flex: 1;
-  min-height: 0;
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch;
-}
+/* 容器設定已移至 layout.css 的 .page-content */
 
 /* YouTube 風格主布局 */
 .camera-main-layout {
@@ -164,6 +154,21 @@
   background-color: #4CAF50; /* 綠色 - 串流中 */
   box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
   animation: pulse 2s infinite;
+}
+
+.status-dot.reconnecting {
+  background-color: #FFA500; /* 橙色，表示重連中 */
+  box-shadow: 0 0 8px rgba(255, 165, 0, 0.5);
+  animation: reconnectPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes reconnectPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .status-dot.stopped {
@@ -322,10 +327,7 @@
 }
 
 /* 響應式設計 - 手機模式（上下排列） */
-@media (max-width: 768px) {
-  .container {
-    padding: var(--spacing-sm, 8px);
-  }
+@media (max-width: 1100px) {
 
   .camera-main-layout {
     grid-template-columns: 1fr;

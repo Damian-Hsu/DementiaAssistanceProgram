@@ -29,9 +29,10 @@ class RecordingsTable(ORMBase, TimestampMixin):
         nullable=True
     )
     s3_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    thumbnail_s3_key: Mapped[str | None] = mapped_column(Text, nullable=True)  # 縮圖 S3 路徑
     duration: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_processed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_embedding: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_embedding: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 10/20/2025: for RAG embedding
     size_bytes: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
     upload_status: Mapped[UploadStatus] = mapped_column(UploadStatusEnum, nullable=False, default=UploadStatus.pending)
     start_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -40,6 +40,14 @@
         <span class="mobile-nav-label">事件</span>
       </a>
     </li>
+
+    <!-- 6. 管理儀表板 -->
+    <li class="mobile-nav-item {{ 'active' if active_page == 'admin_dashboard' else '' }} hidden" data-requires-admin>
+      <a class="mobile-nav-link" href="{{ url_for('admin_dashboard') }}" aria-label="管理儀表板">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/dashboard.svg') }}" alt="管理儀表板" />
+        <span class="mobile-nav-label">管理</span>
+      </a>
+    </li>
     
     <!-- 6. 設定 -->
     <li class="mobile-nav-item {{ 'active' if active_page == 'settings' or active_page == 'user_profile' else '' }}">

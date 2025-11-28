@@ -34,6 +34,6 @@ class StreamInfo(BaseModel):
     segment_seconds: int
     align_first_cut: bool
     pid: Optional[int]
-    status: Literal["starting", "running", "stopped", "error"]
+    status: Literal["starting", "running", "stopped", "error", "reconnecting"]
     cmdline: str
     error_message: Optional[str] = None

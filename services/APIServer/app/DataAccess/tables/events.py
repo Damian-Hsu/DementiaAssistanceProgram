@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import String, DateTime, Text, Float, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from pgvector.sqlalchemy import Vector
 
 from . import ORMBase, TimestampMixin, TimestampSchema
 from .__Function import create_uuid7
@@ -52,4 +53,5 @@ class EventsTable(ORMBase, TimestampMixin):
     duration: Mapped[float|None] = mapped_column(
         Float, nullable=True
     )
+    embedding: Mapped[Vector | None] = mapped_column(Vector(1024), nullable=True)
 Table = EventsTable

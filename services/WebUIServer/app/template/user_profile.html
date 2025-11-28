@@ -5,7 +5,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/user_profile.css') }}">
   
   <div class="page-content">
-    <div class="container">
       <!-- 訊息提示 -->
       <div id="successMessage" class="messagesuccess hidden"></div>
       <div id="errorMessage" class="messageerror hidden"></div>
@@ -61,7 +60,6 @@
               <div class="token-card">
                 <h3>自動登出期限</h3>
                 <div id="current_jwt_display" class="jwt-display"></div>
-                <button id="btnRefreshJwt" class="refresh-btn">延長登入期限</button>
               </div>
             </div>
           </div>
@@ -86,6 +84,12 @@
               <p><strong>說明：</strong>設定系統自動刷新當天日記的間隔時間（範圍：5-1440 分鐘）。預設為 30 分鐘。系統預設啟用日記自動刷新功能。</p>
             </div>
 
+            <label for="setting_default_stream_ttl">預設串流 TTL（秒）</label>
+            <input id="setting_default_stream_ttl" type="number" min="30" max="3600" step="30" placeholder="300">
+            <div class="settings-note">
+              <p><strong>說明：</strong>設定相機串流的預設有效時間（範圍：30-3600 秒）。預設為 300 秒（5 分鐘）。此設定會作為建立新串流時的預設值。</p>
+            </div>
+
             <div class="button-group">
               <button id="btnSaveAppSettings" class="edit-btn">
                 儲存應用程式設定
@@ -105,8 +109,6 @@
             <label for="setting_llm_provider">預設 LLM 供應商</label>
             <select id="setting_llm_provider">
               <option value="google">Google (Gemini)</option>
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic (Claude)</option>
             </select>
 
             <label for="setting_llm_model">預設 LLM 模型</label>
@@ -124,16 +126,6 @@
                 <label for="provider_google_api_key">Google API 金鑰</label>
                 <input id="provider_google_api_key" type="text" placeholder="輸入 Google API 金鑰">
               </div>
-
-              <div class="provider-config-group">
-                <label for="provider_openai_api_key">OpenAI API 金鑰</label>
-                <input id="provider_openai_api_key" type="text" placeholder="輸入 OpenAI API 金鑰">
-              </div>
-
-              <div class="provider-config-group">
-                <label for="provider_anthropic_api_key">Anthropic API 金鑰</label>
-                <input id="provider_anthropic_api_key" type="text" placeholder="輸入 Anthropic API 金鑰">
-              </div>
             </div>
 
             <div class="button-group">
@@ -143,7 +135,6 @@
             </div>
           </div>
         </section>
-      </div>
     </div>
   </div>
 

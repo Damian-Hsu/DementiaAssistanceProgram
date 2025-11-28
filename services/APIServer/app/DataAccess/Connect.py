@@ -59,6 +59,26 @@ async def create_db_and_tables() -> None:
     import_models()
     async with engine.begin() as conn:
         await conn.run_sync(tables.ORMBase.metadata.create_all)
+        await conn.execute(text(
+            "ALTER TABLE IF EXISTS vlogs "
+            "ADD COLUMN IF NOT EXISTS progress DOUBLE PRECISION DEFAULT 0"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE IF EXISTS vlogs "
+            "ADD COLUMN IF NOT EXISTS status_message TEXT"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE IF EXISTS recordings "
+            "ADD COLUMN IF NOT EXISTS thumbnail_s3_key TEXT"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE IF EXISTS vlogs "
+            "ADD COLUMN IF NOT EXISTS thumbnail_s3_key TEXT"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE IF EXISTS music "
+            "ADD COLUMN IF NOT EXISTS content_type VARCHAR(100)"
+        ))
 async def recreate_all():
     import_models()
     async with engine.begin() as conn:

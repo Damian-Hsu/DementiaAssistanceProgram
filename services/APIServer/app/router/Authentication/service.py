@@ -28,7 +28,7 @@ from ...config.path import (AUTH_PREFIX,
 
 auth_router = APIRouter(prefix=AUTH_PREFIX, tags=["auth"])
 m2m_router = APIRouter(prefix=M2M_PREFIX, tags=["machine-to-machine"])
-jwt_manager = JWTManager(expire_minutes=60)
+jwt_manager = JWTManager(expire_minutes=60)  # 預設 1 小時
 user_service = UserService(jwt_manager)
 stream_jwt = CameraJWTManager()  # 串流用短效 JWT
 

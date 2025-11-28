@@ -429,8 +429,43 @@ async def complete_job(job_id: str, body: JobCompleteDTO, db: AsyncSession = Dep
                         scene=event.get("scene"),
                         summary=event.get("summary"),
                         objects=event.get("objects"),
+                        embedding=event.get("embedding"), # 10/20/2025 Add embedding
                         start_time=vstart + timedelta(seconds=event.get("start_time")) if vstart and event.get("start_time") is not None else None,
                         duration=event.get("end_time") - event.get("start_time") if event.get("end_time") is not None and event.get("start_time") is not None else None
                     )
                     db.add(ev)
+                
+                # 提交事件到資料庫
+                await db.commit()
+                
+                # 如果事件中沒有 embedding,則觸發 embedding 生成任務
+                has_embedding = any(event.get("embedding") for event in body.events)
+                if not has_embedding:
+                    try:
+                        from ...DataAccess.task_producer import enqueue
+                        enqueue("tasks.generate_embeddings_for_recording", {
+                            "recording_id": str(vid)
+                        })
+                        print(f"[Job] 已觸發 embedding 生成任務: recording_id={vid}")
+                    except Exception as e:
+                        print(f"[Job] 觸發 embedding 生成任務失敗: {e}")
+                
+                # 觸發縮圖生成任務
+                try:
+                    from ...DataAccess.task_producer import enqueue
+                    # 獲取錄影的 s3_key
+                    res_s3 = await db.execute(
+                        select(recordings.Table.s3_key).where(recordings.Table.id == vid)
+                    )
+                    s3_key = res_s3.scalar_one_or_none()
+                    if s3_key:
+                        enqueue("tasks.generate_video_thumbnail", {
+                            "recording_id": str(vid),
+                            "video_url": s3_key if s3_key.startswith("s3://") else f"s3://{os.getenv('MINIO_BUCKET', 'media-bucket')}/{s3_key}",
+                            "user_id": recording_user_id
+                        })
+                        print(f"[Job] 已觸發縮圖生成任務: recording_id={vid}")
+                except Exception as e:
+                    print(f"[Job] 觸發縮圖生成任務失敗: {e}")
+    
     return OKRespDTO()

@@ -1,0 +1,36 @@
+<!-- 手機模式底部導覽列（管理員版本） -->
+<nav class="mobile-nav" aria-label="管理員手機導覽">
+  <ul class="mobile-nav-list">
+    <!-- 1. 管理首頁 -->
+    <li class="mobile-nav-item {{ 'active' if active_page == 'admin_home' else '' }}">
+      <a class="mobile-nav-link" href="{{ url_for('admin_home') }}" aria-label="管理首頁">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/home.svg') }}" alt="管理首頁" />
+        <span class="mobile-nav-label">首頁</span>
+      </a>
+    </li>
+    
+    <!-- 2. 管理儀表板 -->
+    <li class="mobile-nav-item {{ 'active' if active_page == 'admin_dashboard' else '' }}">
+      <a class="mobile-nav-link" href="{{ url_for('admin_dashboard') }}" aria-label="管理儀表板">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/dashboard.svg') }}" alt="管理儀表板" />
+        <span class="mobile-nav-label">儀表板</span>
+      </a>
+    </li>
+    
+    <!-- 3. 設定 -->
+    <li class="mobile-nav-item {{ 'active' if active_page == 'admin_settings' else '' }}">
+      <a class="mobile-nav-link" href="{{ url_for('admin_settings') }}" aria-label="設定">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/settings.svg') }}" alt="設定" />
+        <span class="mobile-nav-label">設定</span>
+      </a>
+    </li>
+    
+    <!-- 4. 登出 -->
+    <li class="mobile-nav-item mobile-nav-logout">
+      <button id="mobileLogoutBtn" class="mobile-nav-link" type="button" aria-label="登出">
+        <img class="mobile-nav-icon" src="{{ url_for('static', filename='icons/logout.svg') }}" alt="登出" />
+        <span class="mobile-nav-label">登出</span>
+      </button>
+    </li>
+  </ul>
+</nav>

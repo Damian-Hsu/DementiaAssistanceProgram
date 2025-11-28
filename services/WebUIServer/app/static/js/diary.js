@@ -8,12 +8,36 @@ window.AuthService = AuthService;
 function el(id) { return document.getElementById(id); }
 
 // ====== 狀態管理 ======
-let currentDate = new Date(); // 當前選擇的日期（右頁）
-let leftPageDate = null; // 左頁日期
-let rightPageDate = null; // 右頁日期
+let currentDate = new Date(); // 當前選擇的日期（單頁顯示）
 let diaryAutoRefreshInterval = null; // 自動刷新定時器
 let lastEventsHash = {}; // 記錄每個日期的上次事件哈希 { dateStr: hash }
 let userSettings = null; // 用戶設定
+
+// ====== URL Query 參數處理 ======
+function getDateFromURL() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const dateParam = urlParams.get('date');
+  if (dateParam) {
+    // 驗證日期格式 (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (dateRegex.test(dateParam)) {
+      const date = new Date(dateParam + "T00:00:00");
+      // 檢查日期是否有效
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+  }
+  return null;
+}
+
+function updateURLDate(date) {
+  const dateStr = formatDate(date);
+  const url = new URL(window.location);
+  url.searchParams.set('date', dateStr);
+  // 使用 replaceState 而不是 pushState，避免產生過多歷史記錄
+  window.history.replaceState({ date: dateStr }, '', url);
+}
 
 // ====== 初始化 ======
 document.addEventListener("DOMContentLoaded", async () => {
@@ -31,12 +55,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // 初始化日期選擇器為今天
-  const today = new Date();
+  // 從 URL query 參數讀取日期，如果沒有則使用今天
+  const urlDate = getDateFromURL();
+  const initialDate = urlDate || new Date();
   const dateInput = el("diaryDate");
   if (dateInput) {
-    dateInput.value = formatDateForInput(today);
-    currentDate = today;
+    dateInput.value = formatDateForInput(initialDate);
+    currentDate = initialDate;
+  }
+
+  // 如果從 URL 讀取到日期，更新 URL（確保格式一致）
+  if (urlDate) {
+    updateURLDate(initialDate);
   }
 
   // 初始化頁面
@@ -48,56 +78,119 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 載入用戶設定並啟動自動刷新
   await loadUserSettings();
   startDiaryAutoRefresh();
+  
+  // 確保 VlogManager 初始化完成後載入 Vlog
+  // 使用 setTimeout 確保在 DOM 完全載入後執行
+  setTimeout(async () => {
+    if (window.vlogManager) {
+      // 等待 VlogManager 初始化完成
+      if (window.vlogManager.initPromise) {
+        try {
+          await window.vlogManager.initPromise;
+        } catch (error) {
+          console.error('[diary] VlogManager 初始化失敗:', error);
+          // 即使初始化失敗，也嘗試載入 Vlog
+          await window.vlogManager.syncSelectedDate();
+          window.vlogManager.loadDailyVlog();
+        }
+      } else {
+        // 如果 initPromise 不存在，確保日期同步並載入 Vlog
+        await window.vlogManager.syncSelectedDate();
+        window.vlogManager.loadDailyVlog();
+      }
+    } else {
+      // 如果 vlogManager 還不存在，等待它被創建（最多等待 1 秒）
+      let attempts = 0;
+      const maxAttempts = 20; // 20 * 50ms = 1秒
+      const checkVlogManager = setInterval(async () => {
+        attempts++;
+        if (window.vlogManager) {
+          clearInterval(checkVlogManager);
+          if (window.vlogManager.initPromise) {
+            try {
+              await window.vlogManager.initPromise;
+            } catch (error) {
+              console.error('[diary] VlogManager 初始化失敗:', error);
+              await window.vlogManager.syncSelectedDate();
+              window.vlogManager.loadDailyVlog();
+            }
+          } else {
+            await window.vlogManager.syncSelectedDate();
+            window.vlogManager.loadDailyVlog();
+          }
+        } else if (attempts >= maxAttempts) {
+          clearInterval(checkVlogManager);
+          console.warn('[diary] VlogManager 未在預期時間內創建');
+        }
+      }, 50);
+    }
+  }, 100);
 });
 
 // ====== 事件綁定 ======
 function bindEvents() {
   // 日期選擇器變更
   el("diaryDate")?.addEventListener("change", async (e) => {
-    const selectedDate = new Date(e.target.value);
+    const selectedDate = new Date(e.target.value + "T00:00:00");
     currentDate = selectedDate;
+    updateDateDisplay();
+    // 更新 URL query 參數
+    updateURLDate(selectedDate);
     await loadDiaryPages();
+    // 同時更新 vlog
+    if (window.vlogManager) {
+      await window.vlogManager.syncSelectedDate();
+      window.vlogManager.loadDailyVlog();
+    }
   });
 
-  // 左側翻頁區域（上一頁）
-  el("prevPageArea")?.addEventListener("click", async (e) => {
+  // 翻頁處理函數
+  const handlePrevPage = async (e) => {
     e.stopPropagation();
     currentDate = new Date(currentDate);
-    // 根據螢幕寬度決定翻頁步長：雙頁模式翻兩頁，單頁模式翻一頁
-    const isSinglePage = window.innerWidth <= 1150;
-    const step = isSinglePage ? 1 : 2;
-    currentDate.setDate(currentDate.getDate() - step);
+    currentDate.setDate(currentDate.getDate() - 1);
     updateDateInput();
+    // 更新 URL query 參數
+    updateURLDate(currentDate);
     await loadDiaryPages();
-  });
+    // 同時更新 vlog
+    if (window.vlogManager) {
+      await window.vlogManager.syncSelectedDate();
+      window.vlogManager.loadDailyVlog();
+    }
+  };
 
-  // 右側翻頁區域（下一頁）
-  el("nextPageArea")?.addEventListener("click", async (e) => {
+  const handleNextPage = async (e) => {
     e.stopPropagation();
     currentDate = new Date(currentDate);
-    // 根據螢幕寬度決定翻頁步長：雙頁模式翻兩頁，單頁模式翻一頁
-    const isSinglePage = window.innerWidth <= 1150;
-    const step = isSinglePage ? 1 : 2;
-    currentDate.setDate(currentDate.getDate() + step);
+    currentDate.setDate(currentDate.getDate() + 1);
     updateDateInput();
+    // 更新 URL query 參數
+    updateURLDate(currentDate);
     await loadDiaryPages();
-  });
+    // 同時更新 vlog
+    if (window.vlogManager) {
+      await window.vlogManager.syncSelectedDate();
+      window.vlogManager.loadDailyVlog();
+    }
+  };
 
-  // 移除點擊頁面翻頁功能
-  // 左頁和右頁不再響應點擊事件來切換日期
+  // 左側翻頁區域（上一頁）- 電腦模式（main 區域）
+  el("prevPageArea")?.addEventListener("click", handlePrevPage);
+  
+  // 左側翻頁區域（上一頁）- 手機模式（header 區域）
+  el("prevPageAreaHeader")?.addEventListener("click", handlePrevPage);
 
-  // 左頁刷新按鈕
-  el("leftPageRefreshBtn")?.addEventListener("click", async (e) => {
+  // 右側翻頁區域（下一頁）- 電腦模式（main 區域）
+  el("nextPageArea")?.addEventListener("click", handleNextPage);
+  
+  // 右側翻頁區域（下一頁）- 手機模式（header 區域）
+  el("nextPageAreaHeader")?.addEventListener("click", handleNextPage);
+
+  // 當前頁刷新按鈕
+  el("currentPageRefreshBtn")?.addEventListener("click", async (e) => {
     e.stopPropagation();
-    // TODO: 未來實現刷新功能
-    await refreshDiaryPage(leftPageDate, "leftPageContent");
-  });
-
-  // 右頁刷新按鈕
-  el("rightPageRefreshBtn")?.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    // TODO: 未來實現刷新功能
-    await refreshDiaryPage(rightPageDate, "rightPageContent");
+    await refreshDiaryPage(currentDate, "currentPageContent");
   });
 }
 
@@ -108,20 +201,12 @@ async function initializePages() {
 
 // ====== 載入日記頁面 ======
 async function loadDiaryPages() {
-  // 計算左右頁日期
-  // 右頁顯示當前選擇的日期
-  rightPageDate = new Date(currentDate);
-  
-  // 左頁顯示前一天
-  leftPageDate = new Date(currentDate);
-  leftPageDate.setDate(leftPageDate.getDate() - 1);
-
+  // 單頁顯示：只顯示當前選擇的日期
   // 更新日期顯示
   updateDateDisplay();
 
   // 載入日記內容
-  await loadDiaryContent(leftPageDate, "leftPageContent");
-  await loadDiaryContent(rightPageDate, "rightPageContent");
+  await loadDiaryContent(currentDate, "currentPageContent");
 }
 
 // ====== 刷新日記頁面 ======
@@ -151,10 +236,11 @@ async function refreshDiaryPage(date, containerId) {
     
     // 如果有內容，顯示日記內容
     if (diaryData.content) {
-      // 將換行符轉換為段落
+      // 將換行符轉換為段落，空行不加入<br>
       const formattedContent = diaryData.content
         .split('\n')
-        .map(line => `<p>${line || '<br>'}</p>`)
+        .filter(line => line.trim() !== '') // 過濾空行
+        .map(line => `<p>${line}</p>`)
         .join('');
       
       container.innerHTML = `
@@ -185,18 +271,16 @@ async function refreshDiaryPage(date, containerId) {
 
 // ====== 更新日期顯示 ======
 function updateDateDisplay() {
-  if (leftPageDate) {
-    const leftDateEl = el("leftPageDate");
-    if (leftDateEl) {
-      leftDateEl.textContent = formatDate(leftPageDate);
-    }
+  // 更新當前頁日期顯示
+  const currentDateEl = el("currentPageDate");
+  if (currentDateEl) {
+    currentDateEl.textContent = formatDate(currentDate);
   }
-
-  if (rightPageDate) {
-    const rightDateEl = el("rightPageDate");
-    if (rightDateEl) {
-      rightDateEl.textContent = formatDate(rightPageDate);
-    }
+  
+  // 更新日期選擇器顯示
+  const dateDisplay = el("dateDisplay");
+  if (dateDisplay) {
+    dateDisplay.textContent = formatDate(currentDate);
   }
 }
 
@@ -321,15 +405,15 @@ async function checkAndRefreshTodayDiary() {
     const today = new Date();
     const todayStr = formatDate(today);
     
-    // 檢查是否正在查看今天（右頁是今天）
-    if (!rightPageDate) {
+    // 檢查是否正在查看今天
+    if (!currentDate) {
       return; // 還沒有初始化頁面
     }
     
-    const rightPageDateStr = formatDate(rightPageDate);
+    const currentDateStr = formatDate(currentDate);
     
     // 只刷新當天的日記（如果用戶正在查看今天）
-    if (rightPageDateStr === todayStr) {
+    if (currentDateStr === todayStr) {
       console.log('[diary] 檢查今天的事件是否有變化...');
       
       // 獲取今天的事件列表來計算哈希
@@ -359,9 +443,9 @@ async function checkAndRefreshTodayDiary() {
         // 更新哈希記錄
         lastEventsHash[todayStr] = currentHash;
         
-        // 刷新右頁（今天）的日記
+        // 刷新當前頁（今天）的日記
         // 使用 generateDiarySummary，它會自動檢查哈希並只在需要時刷新
-        await refreshDiaryPage(rightPageDate, "rightPageContent");
+        await refreshDiaryPage(currentDate, "currentPageContent");
       } else {
         console.log('[diary] 事件沒有變化，無需刷新');
       }
@@ -414,10 +498,11 @@ async function loadDiaryContent(date, containerId) {
     
     // 如果有內容，顯示日記內容
     if (diaryData.content) {
-      // 將換行符轉換為 <br> 或使用 <pre> 標籤
+      // 將換行符轉換為段落，空行不加入<br>
       const formattedContent = diaryData.content
         .split('\n')
-        .map(line => `<p>${line || '<br>'}</p>`)
+        .filter(line => line.trim() !== '') // 過濾空行
+        .map(line => `<p>${line}</p>`)
         .join('');
       
       container.innerHTML = `

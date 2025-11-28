@@ -1,11 +1,14 @@
 """
-python video2ip_camera_sim.py --video sample.mp4 --rtsp-url        
+python video2ip_camera_sim.py --video video_samples/4.mp4 --rtsp-url        
 """
 import argparse
 import cv2
 import sys
 import time
 import subprocess
+import queue
+import threading
+
 from typing import Optional
 
 def seconds_to_hhmmss(sec: float) -> str:
@@ -17,8 +20,8 @@ def seconds_to_hhmmss(sec: float) -> str:
         return f"{h:02d}:{m:02d}:{s:02d}"
     return f"{m:02d}:{s:02d}"
 
-def draw_hud(frame, text, pos=(10, 28)):
-    cv2.putText(frame, text, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (8, 255, 8), 2, cv2.LINE_AA)
+# def draw_hud(frame, text, pos=(10, 28)):
+#     cv2.putText(frame, text, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (8, 255, 8), 2, cv2.LINE_AA)
 
 def print_progress_bar(curr_sec, total_sec, width=42):
     if total_sec <= 0:
@@ -27,7 +30,6 @@ def print_progress_bar(curr_sec, total_sec, width=42):
     done = int(ratio * width)
     bar = "█" * done + "·" * (width - done)
     print(f"\r[{bar}] {seconds_to_hhmmss(curr_sec)} / {seconds_to_hhmmss(total_sec)}", end="", flush=True)
-
 class RtspPusher:
     def __init__(self, w: int, h: int, fps: float, rtsp_url: str, bitrate: str = "1500k", gop: int = 30):
         self.w, self.h, self.fps = w, h, max(1, int(round(fps or 30)))
@@ -36,51 +38,95 @@ class RtspPusher:
         self.gop = gop
         self.proc: Optional[subprocess.Popen] = None
 
+        # 新增：背景推流用 queue & thread
+        self._queue: queue.Queue[bytes] = queue.Queue(maxsize=self.fps * 2)  # 約 2 秒緩衝
+        self._writer_thread: Optional[threading.Thread] = None
+        self._stop_flag = threading.Event()
+
     def start(self):
         cmd = [
             "ffmpeg",
             "-loglevel", "warning",
-            "-re",                         # 原速餵入，讓時間基準穩定
+            "-re",
             "-f", "rawvideo",
             "-pix_fmt", "bgr24",
             f"-s", f"{self.w}x{self.h}",
             "-r", str(self.fps),
-            "-i", "-",                     # 從 stdin 收 raw frame
+            "-i", "-",
             "-an",
             "-c:v", "libx264",
             "-b:v", self.bitrate,
             "-preset", "faster",
             "-tune", "zerolatency",
-            "-bf", "0",                     # 禁用 B-frames，WebRTC 相容
+            "-bf", "0",
             "-g", str(self.gop),
-            "-keyint_min", str(self.gop),   # 最小關鍵幀間隔
-            "-pix_fmt", "yuv420p",         # 相容性最好
-            "-rtsp_transport", "tcp",      # 一般較穩
+            "-keyint_min", str(self.gop),
+            "-pix_fmt", "yuv420p",
+            "-rtsp_transport", "tcp",
             "-f", "rtsp",
             self.rtsp_url
         ]
         try:
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            self._stop_flag.clear()
+            # 啟動背景 writer
+            self._writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
+            self._writer_thread.start()
             print(f"\n[RTSP] 推流啟動：{self.rtsp_url} ({self.w}x{self.h}@{self.fps} • {self.bitrate} • gop={self.gop})")
         except FileNotFoundError:
             print("[ERR] 找不到 ffmpeg（請先安裝或加入 PATH）。", file=sys.stderr)
             sys.exit(1)
 
+    def _writer_loop(self):
+        """在背景 thread、阻塞地寫入 ffmpeg stdin，主線程不被卡住。"""
+        if self.proc is None or self.proc.stdin is None:
+            return
+        try:
+            while not self._stop_flag.is_set():
+                try:
+                    frame_bytes = self._queue.get(timeout=0.1)
+                except queue.Empty:
+                    continue
+                try:
+                    self.proc.stdin.write(frame_bytes)
+                except (BrokenPipeError, ValueError):
+                    break
+        finally:
+            try:
+                if self.proc and self.proc.stdin:
+                    self.proc.stdin.close()
+            except Exception:
+                pass
+
     def alive(self) -> bool:
-        return self.proc is not None and self.proc.poll() is None and self.proc.stdin is not None
+        return self.proc is not None and self.proc.poll() is None
 
     def write(self, frame) -> bool:
+        """主迴圈只負責把 frame 丟進 queue；滿了就丟掉。"""
         if not self.alive():
             return False
+        if self._queue.full():
+            # 丟掉最舊一個，保留較新的（維持即時性）
+            try:
+                _ = self._queue.get_nowait()
+            except queue.Empty:
+                pass
         try:
-            self.proc.stdin.write(frame.tobytes())
+            self._queue.put_nowait(frame.tobytes())
             return True
-        except (BrokenPipeError, ValueError):
-            return False
+        except queue.Full:
+            # 萬一還是滿，就乾脆放棄這一幀
+            return True
 
     def stop(self):
         if not self.proc:
             return
+        self._stop_flag.set()
+        try:
+            if self._writer_thread and self._writer_thread.is_alive():
+                self._writer_thread.join(timeout=1.0)
+        except Exception:
+            pass
         try:
             if self.proc.stdin:
                 self.proc.stdin.close()
@@ -89,6 +135,10 @@ class RtspPusher:
             self.proc.kill()
         finally:
             self.proc = None
+            self._writer_thread = None
+            with self._queue.mutex:
+                self._queue.queue.clear()
+
 
 def open_source(video_path: str = "", camera: Optional[int] = None) -> cv2.VideoCapture:
     if camera is not None:
@@ -150,12 +200,12 @@ def main():
         frame_idx = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
         curr_sec = (frame_idx / fps) if total_duration > 0 else (frame_idx / fps)
 
-        # 疊字 HUD
-        if total_duration > 0:
-            hud = f"{seconds_to_hhmmss(curr_sec)} / {seconds_to_hhmmss(total_duration)}"
-        else:
-            hud = f"{seconds_to_hhmmss(curr_sec)}"
-        draw_hud(frame, hud, (10, 28))
+        # # 疊字 HUD
+        # if total_duration > 0:
+        #     hud = f"{seconds_to_hhmmss(curr_sec)} / {seconds_to_hhmmss(total_duration)}"
+        # else:
+        #     hud = f"{seconds_to_hhmmss(curr_sec)}"
+        # draw_hud(frame, hud, (10, 28))
 
         # 視窗縮放顯示
         show = frame

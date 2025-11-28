@@ -112,6 +112,6 @@ class PlayWebRTCURLResp(BaseModel):
 
 class StreamStatusResp(BaseModel):
     is_streaming: bool
-    status: Optional[Literal["starting", "running", "stopped", "error"]] = None
+    status: Optional[Literal["starting", "running", "stopped", "error", "reconnecting"]] = None
     stream_info: Optional[dict[str, Any]] = None
     error_message: Optional[str] = None

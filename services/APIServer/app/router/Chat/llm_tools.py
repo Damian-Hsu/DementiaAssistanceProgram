@@ -14,10 +14,15 @@ except ImportError:
     raise ImportError("google-generativeai package not installed. Run: pip install google-generativeai")
 
 from ...DataAccess.tables import events as events_table
+from ...DataAccess.tables import recordings as recordings_table
 from .DTO import FunctionCallResult, EventSimple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
-from .tools_schema import SEARCH_EVENTS_BY_TIME_TOOL, SEARCH_EVENTS_BY_LOCATION_TOOL, SEARCH_EVENTS_BY_ACTIVITY_TOOL, GET_DAILY_SUMMARY_TOOL
+from sqlalchemy import select, and_, or_, exists
+from .tools_schema import (
+    SEARCH_EVENTS_BY_TIME_TOOL, SEARCH_EVENTS_BY_LOCATION_TOOL, SEARCH_EVENTS_BY_ACTIVITY_TOOL,
+    GET_DAILY_SUMMARY_TOOL, SEARCH_RECORDINGS_BY_ACTIVITY_TOOL,
+    GET_DIARY_TOOL, REFRESH_DIARY_TOOL, SEARCH_VLOGS_BY_DATE_TOOL
+)
 
 # ====== 全域變數 ======
 HERE = Path(__file__).resolve().parent           # .../Chat
@@ -39,6 +44,10 @@ ALL_TOOLS = [
     SEARCH_EVENTS_BY_LOCATION_TOOL,
     SEARCH_EVENTS_BY_ACTIVITY_TOOL,
     GET_DAILY_SUMMARY_TOOL,
+    SEARCH_RECORDINGS_BY_ACTIVITY_TOOL,
+    GET_DIARY_TOOL,
+    REFRESH_DIARY_TOOL,
+    SEARCH_VLOGS_BY_DATE_TOOL,
 ]
 
 
@@ -602,6 +611,403 @@ async def get_daily_summary(
     return await search_events_by_time(db, user_id, target_date, target_date, limit=50, user_timezone=user_timezone)
 
 
+async def search_recordings_by_activity(
+    db: AsyncSession,
+    user_id: int,
+    activity: str,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 10,
+    user_timezone: str = "Asia/Taipei"
+) -> List[Dict[str, Any]]:
+    """按活動類型查詢影片（支援使用者時區）"""
+    conditions = [
+        recordings_table.Table.user_id == user_id,
+    ]
+    
+    # 時間範圍條件（支援相對時間）
+    if date_from:
+        # 先嘗試解析為相對時間
+        parsed_date = _parse_relative_date(date_from, user_timezone)
+        from_date = None
+        if parsed_date:
+            from_date = parsed_date
+        else:
+            try:
+                from_date = date.fromisoformat(date_from)
+            except ValueError:
+                pass
+        
+        if from_date:
+            import pytz
+            user_tz = pytz.timezone(user_timezone)
+            from_datetime_user = user_tz.localize(datetime.combine(from_date, time.min))
+            from_datetime = from_datetime_user.astimezone(timezone.utc)
+            conditions.append(recordings_table.Table.start_time >= from_datetime)
+    
+    if date_to:
+        # 先嘗試解析為相對時間
+        parsed_date = _parse_relative_date(date_to, user_timezone)
+        to_date = None
+        if parsed_date:
+            to_date = parsed_date
+        else:
+            try:
+                to_date = date.fromisoformat(date_to)
+            except ValueError:
+                pass
+        
+        if to_date:
+            import pytz
+            user_tz = pytz.timezone(user_timezone)
+            to_datetime_user = user_tz.localize(datetime.combine(to_date, time.max))
+            to_datetime = to_datetime_user.astimezone(timezone.utc)
+            conditions.append(recordings_table.Table.start_time <= to_datetime)
+    
+    # 通過事件表查詢包含該活動的影片
+    # 使用 exists 子查詢：查找包含該活動的 recording_id
+    event_conditions = [
+        events_table.Table.recording_id == recordings_table.Table.id,
+        or_(
+            events_table.Table.action.ilike(f"%{activity}%"),
+            events_table.Table.summary.ilike(f"%{activity}%")
+        )
+    ]
+    
+    subq = select(events_table.Table.id).where(and_(*event_conditions))
+    conditions.append(exists(subq))
+    
+    stmt = (
+        select(recordings_table.Table)
+        .where(and_(*conditions))
+        .order_by(recordings_table.Table.start_time.desc())
+        .limit(limit)
+    )
+    
+    result = await db.execute(stmt)
+    recordings = result.scalars().all()
+    
+    # 轉換時間為使用者時區
+    import pytz
+    user_tz = pytz.timezone(user_timezone)
+    
+    # 為每個 recording 獲取第一個事件的 summary
+    recordings_list = []
+    for rec in recordings:
+        # 查詢該 recording 的第一個 event 的 summary
+        stmt_event = (
+            select(events_table.Table.summary, events_table.Table.action, events_table.Table.scene)
+            .where(events_table.Table.recording_id == rec.id)
+            .order_by(events_table.Table.start_time.asc())
+            .limit(1)
+        )
+        result_event = await db.execute(stmt_event)
+        event_row = result_event.first()
+        
+        summary = None
+        action = None
+        scene = None
+        if event_row:
+            summary = event_row.summary
+            action = event_row.action
+            scene = event_row.scene
+        
+        # 轉換時間
+        start_time_user = None
+        if rec.start_time:
+            if rec.start_time.tzinfo is None:
+                rec.start_time = rec.start_time.replace(tzinfo=timezone.utc)
+            start_time_user = rec.start_time.astimezone(user_tz)
+        
+        recordings_list.append({
+            "id": str(rec.id),
+            "time": start_time_user.strftime("%Y-%m-%d %H:%M") if start_time_user else "未知時間",
+            "duration": rec.duration or 0.0,
+            "summary": summary or "無描述",
+            "action": action,
+            "scene": scene,
+            "thumbnail_s3_key": rec.thumbnail_s3_key,
+        })
+    
+    return recordings_list
+
+
+def _parse_relative_date(date_str: Optional[str], user_timezone: str = "Asia/Taipei") -> Optional[date]:
+    """
+    解析相對時間或日期字串為 date 對象
+    支持：
+    - 絕對日期：YYYY-MM-DD
+    - 相對時間：今天、昨天、三天前、一週前等
+    """
+    if not date_str:
+        return None
+    
+    date_str = date_str.strip()
+    
+    # 嘗試解析為 ISO 格式日期
+    try:
+        return date.fromisoformat(date_str)
+    except ValueError:
+        pass
+    
+    # 解析相對時間
+    import pytz
+    user_tz = pytz.timezone(user_timezone)
+    now_user = datetime.now(timezone.utc).astimezone(user_tz)
+    today = now_user.date()
+    
+    # 常見相對時間
+    relative_map = {
+        "今天": 0,
+        "今日": 0,
+        "昨天": -1,
+        "昨日": -1,
+        "前天": -2,
+        "大前天": -3,
+    }
+    
+    if date_str in relative_map:
+        days_offset = relative_map[date_str]
+        return today + timedelta(days=days_offset)
+    
+    # 解析「N天前」格式
+    import re
+    match = re.match(r'(\d+)天前', date_str)
+    if match:
+        days = int(match.group(1))
+        return today + timedelta(days=-days)
+    
+    # 解析「N週前」格式
+    match = re.match(r'(\d+)週前', date_str)
+    if match:
+        weeks = int(match.group(1))
+        return today + timedelta(weeks=-weeks)
+    
+    # 解析「N個月前」格式（簡化為30天）
+    match = re.match(r'(\d+)個月前', date_str)
+    if match:
+        months = int(match.group(1))
+        return today + timedelta(days=-months * 30)
+    
+    # 如果無法解析，返回 None
+    return None
+
+
+async def get_diary(
+    db: AsyncSession,
+    user_id: int,
+    date_str: Optional[str] = None,
+    user_timezone: str = "Asia/Taipei"
+) -> Dict[str, Any]:
+    """查詢日記（支援相對時間）"""
+    from ...DataAccess.tables import diary as diary_table
+    
+    # 解析日期
+    if date_str:
+        target_date = _parse_relative_date(date_str, user_timezone)
+        if not target_date:
+            # 如果無法解析，嘗試使用今天
+            import pytz
+            user_tz = pytz.timezone(user_timezone)
+            now_user = datetime.now(timezone.utc).astimezone(user_tz)
+            target_date = now_user.date()
+    else:
+        # 預設為今天
+        import pytz
+        user_tz = pytz.timezone(user_timezone)
+        now_user = datetime.now(timezone.utc).astimezone(user_tz)
+        target_date = now_user.date()
+    
+    # 查詢日記
+    stmt = select(diary_table.Table).where(
+        and_(
+            diary_table.Table.user_id == user_id,
+            diary_table.Table.diary_date == target_date
+        )
+    )
+    result = await db.execute(stmt)
+    diary_entry = result.scalar_one_or_none()
+    
+    if not diary_entry or not diary_entry.content:
+        return {
+            "date": target_date.isoformat(),
+            "content": None,
+            "exists": False
+        }
+    
+    return {
+        "date": target_date.isoformat(),
+        "content": diary_entry.content,
+        "exists": True
+    }
+
+
+async def refresh_diary(
+    db: AsyncSession,
+    user_id: int,
+    date_str: Optional[str] = None,
+    user_timezone: str = "Asia/Taipei"
+) -> Dict[str, Any]:
+    """刷新日記（支援相對時間）"""
+    from ...router.Chat.service import generate_diary_summary
+    from ...router.Chat.DTO import DiarySummaryRequest
+    
+    # 解析日期
+    if date_str:
+        target_date = _parse_relative_date(date_str, user_timezone)
+        if not target_date:
+            import pytz
+            user_tz = pytz.timezone(user_timezone)
+            now_user = datetime.now(timezone.utc).astimezone(user_tz)
+            target_date = now_user.date()
+    else:
+        import pytz
+        user_tz = pytz.timezone(user_timezone)
+        now_user = datetime.now(timezone.utc).astimezone(user_tz)
+        target_date = now_user.date()
+    
+    # 調用日記生成 API
+    request = DiarySummaryRequest(
+        diary_date=target_date,
+        force_refresh=True
+    )
+    
+    # 需要獲取 current_user，這裡我們需要從 db 獲取
+    from ...DataAccess.tables import users
+    user_obj = await db.get(users.Table, user_id)
+    if not user_obj:
+        return {
+            "date": target_date.isoformat(),
+            "success": False,
+            "message": "用戶不存在"
+        }
+    
+    # 直接調用內部函數
+    from .service import _generate_diary_summary
+    # 使用本文件中的 search_events_by_time 函數
+    
+    # 獲取事件
+    date_iso = target_date.isoformat()
+    events = await search_events_by_time(
+        db=db,
+        user_id=user_id,
+        date_from=date_iso,
+        date_to=date_iso,
+        limit=100,
+        user_timezone=user_timezone
+    )
+    
+    # 生成日記
+    try:
+        content = await _generate_diary_summary(
+            events=events,
+            user_id=user_id,
+            user_timezone=user_timezone,
+            db=db
+        )
+        
+        # 保存到資料庫
+        from ...DataAccess.tables import diary as diary_table
+        stmt = select(diary_table.Table).where(
+            and_(
+                diary_table.Table.user_id == user_id,
+                diary_table.Table.diary_date == target_date
+            )
+        )
+        result = await db.execute(stmt)
+        existing = result.scalar_one_or_none()
+        
+        if existing:
+            existing.content = content
+            await db.commit()
+            await db.refresh(existing)
+        else:
+            new_diary = diary_table.Table(
+                user_id=user_id,
+                diary_date=target_date,
+                content=content
+            )
+            db.add(new_diary)
+            await db.commit()
+            await db.refresh(new_diary)
+        
+        return {
+            "date": target_date.isoformat(),
+            "success": True,
+            "content": content
+        }
+    except Exception as e:
+        return {
+            "date": target_date.isoformat(),
+            "success": False,
+            "message": str(e)
+        }
+
+
+async def search_vlogs_by_date(
+    db: AsyncSession,
+    user_id: int,
+    date_str: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 10,
+    user_timezone: str = "Asia/Taipei"
+) -> List[Dict[str, Any]]:
+    """查詢 Vlog（支援相對時間和日期範圍）"""
+    from ...DataAccess.tables import vlogs as vlogs_table
+    
+    conditions = [
+        vlogs_table.Table.user_id == user_id,
+    ]
+    
+    # 如果指定了單個日期
+    if date_str and not date_from and not date_to:
+        target_date = _parse_relative_date(date_str, user_timezone)
+        if target_date:
+            conditions.append(vlogs_table.Table.target_date == target_date)
+    # 如果指定了日期範圍
+    elif date_from or date_to:
+        if date_from:
+            from_date = _parse_relative_date(date_from, user_timezone)
+            if from_date:
+                conditions.append(vlogs_table.Table.target_date >= from_date)
+        if date_to:
+            to_date = _parse_relative_date(date_to, user_timezone)
+            if to_date:
+                conditions.append(vlogs_table.Table.target_date <= to_date)
+    # 如果都沒有指定，預設查詢今天
+    else:
+        import pytz
+        user_tz = pytz.timezone(user_timezone)
+        now_user = datetime.now(timezone.utc).astimezone(user_tz)
+        today = now_user.date()
+        conditions.append(vlogs_table.Table.target_date == today)
+    
+    stmt = (
+        select(vlogs_table.Table)
+        .where(and_(*conditions))
+        .order_by(vlogs_table.Table.target_date.desc(), vlogs_table.Table.created_at.desc())
+        .limit(limit)
+    )
+    
+    result = await db.execute(stmt)
+    vlogs_list = result.scalars().all()
+    
+    # 轉換為字典格式
+    vlogs_result = []
+    for v in vlogs_list:
+        vlogs_result.append({
+            "id": str(v.id),
+            "title": v.title,
+            "date": v.target_date.isoformat() if v.target_date else None,
+            "status": v.status,
+            "duration": v.duration,
+            "thumbnail_s3_key": v.thumbnail_s3_key,
+        })
+    
+    return vlogs_result
+
+
 # ====== Function Calling 調度器 ======
 
 async def execute_function_call(
@@ -652,6 +1058,44 @@ async def execute_function_call(
             user_timezone=user_timezone,
         )
     
+    elif function_name == "search_recordings_by_activity":
+        return await search_recordings_by_activity(
+            db=db,
+            user_id=user_id,
+            activity=arguments.get("activity"),
+            date_from=arguments.get("date_from"),
+            date_to=arguments.get("date_to"),
+            limit=arguments.get("limit", 10),
+            user_timezone=user_timezone,
+        )
+    
+    elif function_name == "get_diary":
+        return await get_diary(
+            db=db,
+            user_id=user_id,
+            date_str=arguments.get("date"),
+            user_timezone=user_timezone,
+        )
+    
+    elif function_name == "refresh_diary":
+        return await refresh_diary(
+            db=db,
+            user_id=user_id,
+            date_str=arguments.get("date"),
+            user_timezone=user_timezone,
+        )
+    
+    elif function_name == "search_vlogs_by_date":
+        return await search_vlogs_by_date(
+            db=db,
+            user_id=user_id,
+            date_str=arguments.get("date"),
+            date_from=arguments.get("date_from"),
+            date_to=arguments.get("date_to"),
+            limit=arguments.get("limit", 10),
+            user_timezone=user_timezone,
+        )
+    
     else:
         return {"error": f"Unknown function: {function_name}"}
 
@@ -698,6 +1142,9 @@ async def process_chat_with_llm(
     # 處理 Function Calling
     function_calls_made = []
     all_events = []
+    all_recordings = []
+    all_diaries = []
+    all_vlogs = []
     
     iteration = 0
     
@@ -727,6 +1174,7 @@ async def process_chat_with_llm(
                 
                 # 執行函數
                 try:
+                    print(f"[Function Call] 調用函數: {fc.name}, 參數: {args}")
                     result = await execute_function_call(
                         function_name=fc.name,
                         arguments=args,
@@ -734,6 +1182,7 @@ async def process_chat_with_llm(
                         user_id=user_id,
                         user_timezone=user_timezone
                     )
+                    print(f"[Function Call] 函數 {fc.name} 返回結果: type={type(result)}, length={len(result) if isinstance(result, list) else 'N/A'}")
                     
                     # 記錄函數調用
                     function_calls_made.append(
@@ -744,9 +1193,36 @@ async def process_chat_with_llm(
                         )
                     )
                     
-                    # 收集事件
-                    if isinstance(result, list):
-                        all_events.extend(result)
+                    # 收集事件、影片、日記和Vlog
+                    if isinstance(result, list) and len(result) > 0:
+                        # 判斷是事件、影片還是Vlog
+                        first_item = result[0]
+                        print(f"[Function Call Result] function={fc.name}, result_type=list, first_item_keys={list(first_item.keys()) if isinstance(first_item, dict) else 'not_dict'}")
+                        
+                        if "location" in first_item:
+                            # 這是事件列表
+                            print(f"[Function Call Result] 識別為事件列表，數量={len(result)}")
+                            all_events.extend(result)
+                        elif "duration" in first_item and isinstance(first_item.get("duration"), (int, float)) and "date" not in first_item:
+                            # 這是影片列表（有duration但沒有date欄位）
+                            print(f"[Function Call Result] 識別為影片列表，數量={len(result)}")
+                            all_recordings.extend(result)
+                        elif "date" in first_item and "status" in first_item:
+                            # 這是Vlog列表
+                            print(f"[Function Call Result] 識別為Vlog列表，數量={len(result)}")
+                            all_vlogs.extend(result)
+                        else:
+                            # 預設當作事件處理
+                            print(f"[Function Call Result] 預設識別為事件列表，數量={len(result)}")
+                            all_events.extend(result)
+                    elif isinstance(result, dict):
+                        # 判斷是日記還是其他字典結果
+                        if "content" in result or "exists" in result:
+                            # 這是日記結果
+                            all_diaries.append(result)
+                        elif "success" in result:
+                            # 這是刷新日記的結果
+                            all_diaries.append(result)
                     
                     # 將結果返回給 LLM（加入錯誤處理）
                     try:
@@ -805,4 +1281,4 @@ async def process_chat_with_llm(
     if not final_message:
         final_message = "抱歉，我無法理解您的問題。請試著換個方式描述。"
     
-    return final_message, function_calls_made, all_events
+    return final_message, function_calls_made, all_events, all_recordings, all_diaries, all_vlogs

@@ -1,19 +1,9 @@
-/* 事件頁面容器 - 允許滾動 */
-.container{
-  padding: var(--spacing-lg, 24px);
-  background: var(--bg-main, #F5EBDD);
-  overflow-y: auto; /* 允許垂直滾動 */
-  overflow-x: hidden; /* 防止水平滾動 */
-  flex: 1; /* 佔滿可用空間 */
-  min-height: 0; /* 允許 flex 子元素收縮 */
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch; /* iOS 平滑滾動 */
-}
+/* 容器設定已移至 layout.css 的 .page-content */
 /* --- 區塊：讓事件區在容器中更聚焦，但不和外層 container 衝突 --- */
 .events-section {
   background: var(--bg-main, #F5EBDD);                          /* 內層白底，和外層米色背景對比 */
   border-radius: calc(var(--radius-lg, 16px) + 4px);
-  padding: var(--spacing-lg, 24px);
+  padding: var(--spacing-lg, 24px) 0;
   margin-bottom: var(--spacing-lg, 24px);
   overflow-y: visible; /* 允許內容滾動 */
   overflow-x: hidden; /* 防止水平滾動 */
@@ -22,13 +12,13 @@
 
 /* --- 搜尋列：沿用 components.css 的 .search-bar，再加些空氣感 --- */
 .search-bar {
-  margin-left: 24px;
-  padding: 24px;
+
+  padding: 0px;
   display: grid;
-  grid-template-columns: 2fr 2fr auto; /* 關鍵字、日期、按鈕各區塊 */
+  grid-template-columns: 2fr 1.5fr 1.5fr auto; /* 關鍵字、起始日期、結束日期、按鈕各區塊 */
   gap: 12px 16px;                      /* 行內與列間距 */
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 0px;
 }
 
 /* 關鍵字與日期群組設定 */
@@ -42,13 +32,17 @@
   grid-column: 1;
 }
 
-.search-group:last-of-type {
+.search-group:nth-child(2) {
   grid-column: 2;
+}
+
+.search-group:nth-child(3) {
+  grid-column: 3;
 }
 
 /* 搜尋動作按鈕組 */
 .search-actions {
-  grid-column: 3;
+  grid-column: 4;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -68,9 +62,9 @@
 }
 
 /* 中等螢幕寬度優化：當寬度 < 1400px 時調整布局 */
-@media (max-width: 1400px) {
+@media (max-width: 1100px) {
   .search-bar {
-    grid-template-columns: 1fr 1fr; /* 改為兩列布局 */
+    grid-template-columns: 1fr; /* 改為單列垂直布局 */
     gap: 12px;
   }
   
@@ -79,18 +73,35 @@
     grid-row: 1;
   }
   
-  .search-group:last-of-type {
-    grid-column: 2;
-    grid-row: 1;
+  .search-group:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  
+  .search-group:nth-child(3) {
+    grid-column: 1;
+    grid-row: 3;
   }
   
   .search-actions {
-    grid-column: 1 / -1; /* 跨越兩列 */
-    grid-row: 2;
+    grid-column: 1;
+    grid-row: 4;
     justify-content: flex-start; /* 左對齊 */
     align-items: center; /* 垂直居中 */
-    margin-top: 4px;
     gap: 8px; /* 確保按鈕間距一致 */
+  }
+  
+  /* 讓 search-group 內的 input 填滿 */
+  .search-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-group input[type="text"],
+  .search-group input[type="date"] {
+    width: 100%;
+    max-width: none;
   }
 }
 
@@ -105,13 +116,19 @@
 /* 日期輸入框 */
 .search-group input[type="date"] {
   width: 100%;
-  max-width: 160px;
   padding: 6px 8px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background-color: #fff;
   font-size: 0.95rem;
   color: var(--text-main);
+}
+
+/* 手機模式下，日期選擇框寬度與文字輸入框一致 */
+@media (max-width: 768px) {
+  .search-group input[type="date"] {
+    max-width: none;
+  }
 }
 
 /* 小螢幕響應式：改為縱向排列 */
@@ -124,19 +141,28 @@
   }
   .search-group {
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px; /* 減少間距 */
+    flex-direction: column;
+    gap: 4px;
   }
-  .search-group:first-child,
-  .search-group:last-of-type {
+  .search-group:first-child {
     grid-column: 1;
+    grid-row: 1;
+  }
+  .search-group:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .search-group:nth-child(3) {
+    grid-column: 1;
+    grid-row: 3;
   }
   .search-actions {
     grid-column: 1;
+    grid-row: 4;
     display: flex;
-    gap: 6px; /* 減少間距 */
+    gap: 8px;
     justify-content: flex-start;
-    flex-wrap: wrap; /* 允許按鈕換行 */
+    margin-top: 4px;
   }
   
   /* 手機版按鈕優化 */
@@ -287,8 +313,32 @@ td.date {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 10px;
+  gap: var(--spacing-xs, 4px);
   flex-wrap: wrap;
+}
+
+.pagination #pageInput {
+  width: 50px;
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  border: 2px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-sm, 8px);
+  font-size: var(--font-size-base, 16px);
+  background-color: #fff;
+  color: var(--color-text, #2E2E2E);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.pagination #pageInput:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+}
+
+.pagination span {
+  font-size: var(--font-size-base, 16px);
+  color: var(--color-text, #2E2E2E);
+  white-space: nowrap;
 }
 
 .pagination .page-btn {
@@ -313,6 +363,33 @@ td.date {
 .pagination .page-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.pagination-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  margin-left: var(--spacing-md, 16px);
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text, #2E2E2E);
+}
+
+.pagination-info input {
+  width: 60px;
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  border: 2px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-sm, 8px);
+  font-size: var(--font-size-base, 16px);
+  background-color: #fff;
+  color: var(--color-text, #2E2E2E);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.pagination-info input:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
 }
 
 .pagination-size {
@@ -359,9 +436,6 @@ td.date {
 
 /* --- 手機版卡片布局 --- */
 @media (max-width: 768px) {
-  .events-section {
-    padding: var(--spacing-md, 16px);
-  }
 
   /* 隱藏桌面版表格 */
   .table {
@@ -473,7 +547,7 @@ td.date {
   
   /* 優化手機版間距 */
   .events-section {
-    padding: var(--spacing-sm, 8px);
+    padding: var(--spacing-sm, 8px) 0;
     margin-bottom: var(--spacing-sm, 8px);
   }
   
@@ -482,15 +556,11 @@ td.date {
     padding: var(--spacing-sm, 8px);
     gap: 8px;
   }
-  
-  .container {
-    padding: var(--spacing-sm, 8px);
-  }
 }
 
 /* --- 小尺寸螢幕優化：讓表格可水平捲動、避免擠壓 --- */
 @media (min-width: 769px) and (max-width: 920px) {
-  .events-section { padding: 16px 12px; }
+  .events-section { padding: 16px 0px; }
   .events-section .table { display: block; overflow-x: auto; }
   .events-section .table table { min-width: 720px; }
 }

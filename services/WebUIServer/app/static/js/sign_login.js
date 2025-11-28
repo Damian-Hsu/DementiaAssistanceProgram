@@ -1,4 +1,20 @@
-function __redirectAfterAuthSuccess(){ try{ window.location.href = '/home'; }catch(e){} }
+async function __redirectAfterAuthSuccess(){ 
+  try{ 
+    // 根據用戶角色導向不同頁面
+    const response = await ApiClient.getCurrentUser();
+    const currentUser = response?.user || response;
+    const isAdmin = currentUser?.role === 'admin';
+    
+    if (isAdmin) {
+      window.location.href = '/admin/home';
+    } else {
+      window.location.href = '/home';
+    }
+  } catch(e) {
+    console.error('獲取用戶資訊失敗，預設導向 /home:', e);
+    window.location.href = '/home';
+  }
+}
 import { ApiClient } from "./APIClient.js";
 import { AuthService } from "./AuthService.js";
 import settings from "./settings.js";
@@ -182,10 +198,23 @@ loginform.addEventListener("submit", async (e) => {
 });
 
 
-document.addEventListener("DOMContentLoaded", function () {
-    // 如果已經有 JWT，就直接跳到 home.html
+document.addEventListener("DOMContentLoaded", async function () {
+    // 如果已經有 JWT，根據角色導向不同頁面
     if (window.AuthService && window.AuthService.isLoggedIn && window.AuthService.isLoggedIn()) {
-      window.location.href = "/home.html";
+      try {
+        const response = await ApiClient.getCurrentUser();
+        const currentUser = response?.user || response;
+        const isAdmin = currentUser?.role === 'admin';
+        
+        if (isAdmin) {
+          window.location.href = "/admin/home";
+        } else {
+          window.location.href = "/home";
+        }
+      } catch (e) {
+        console.error('獲取用戶資訊失敗，預設導向 /home:', e);
+        window.location.href = "/home";
+      }
     }
   });
   // 控制區塊顯示

@@ -21,7 +21,8 @@ COPY requirements.txt .
 
 # 安裝 Python 套件（用 BuildKit 的 pip cache）
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+    pip install --upgrade pip --default-timeout=100 && \
+    pip install -r requirements.txt --default-timeout=100
 
 # 複製其餘原始碼
 COPY . .
@@ -42,28 +43,18 @@ USER appuser
 RUN python - <<'PY'
 from transformers import BlipProcessor, BlipForConditionalGeneration
 m = "Salesforce/blip-image-captioning-base"
-BlipProcessor.from_pretrained(m, cache_dir="/srv/app/adapters/.cache/transformers")
+BlipProcessor.from_pretrained(m, cache_dir="/srv/app/adapters/.cache/transformers", use_fast=True )
 BlipForConditionalGeneration.from_pretrained(m, cache_dir="/srv/app/adapters/.cache/transformers")
 PY
 
 # 啟動 Celery Worker
-# 注意：JSON array 內的行尾不要放反斜線 + 空白；每個參數獨立成一個字串元素即可
-CMD ["celery", "-A", "app.main:app", "worker", \
-     "-l", "info", \
-     "-Q", "default", \
-     "-P", "prefork", \
-     "-c", "4", \
-     "--max-tasks-per-child=100", \
-     "--prefetch-multiplier=1"]
 
-
-# 啟動 StreamingServer（FastAPI + Uvicorn）
 CMD ["celery", "-A", "app.main:app", "worker",\
      "-l", "info",\
      "-Q", "default",\
      "-P", "prefork",\ 
-     "-c", "4",\ 
-     "--max-tasks-per-child=100",\
+     "-c", "1",\ 
+     "--max-tasks-per-child=50",\
      "--prefetch-multiplier=1"]
 # CMD ["celery", "-A", "app.main.app", "worker",
 #      "-l", "info",

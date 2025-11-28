@@ -15,7 +15,7 @@ app = Flask(__name__,
 # CORS設置 - 允許跨域請求
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://127.0.0.1:8001", "http://192.168.191.20:8001","http://192.168.191.254:8001"],
+        "origins": ["http://127.0.0.1:30202", "http://192.168.191.20:30202","http://192.168.191.254:30202"],
         "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "Accept"],
         "supports_credentials": True
@@ -39,17 +39,15 @@ def auth():
 def home():
     return render_template(
         'home.html',
-        title_zh='即時動態',
+        title_zh='主頁',
         active_page='home'
     )
-
-@app.route('/user_profile')
 @app.route('/settings')
 def settings():
     return render_template(
         'user_profile.html',
         title_zh='設定',
-        desc_zh='管理個人設定與偏好',
+        desc_zh='',
         active_page='settings'
     )
 
@@ -58,7 +56,7 @@ def events():
     return render_template(
         'events.html',
         title_zh='事件檢視',
-        desc_zh='看看過去的記憶',
+        desc_zh='',
         active_page='events'
     )
 
@@ -66,7 +64,7 @@ def events():
 def camera():
     return render_template(
         'camera.html',
-        title_zh='鏡頭',
+        title_zh='鏡頭串流',
         desc_zh='',
         active_page='camera'
     )
@@ -76,7 +74,7 @@ def recordings():
     return render_template(
         'recordings.html',
         title_zh='影片管理',
-        desc_zh='觀賞美好時光',
+        desc_zh='',
         active_page='recordings'
     )
 
@@ -85,27 +83,40 @@ def chat():
     return render_template(
         'chat.html',
         title_zh='AI助手',
-        desc_zh='透過對話，查詢生活事件與記錄',
+        desc_zh='',
         active_page='chat'
     )
 
-@app.route('/diary')
-def diary():
+
+@app.route('/admin/home')
+@app.route('/admin')
+def admin_home():
     return render_template(
-        'diary.html',
-        title_zh='日記',
-        desc_zh='記錄每一天的美好時光',
-        active_page='diary'
+        'admin_home.html',
+        title_zh='管理員首頁',
+        desc_zh='',
+        active_page='admin_home'
     )
 
-@app.route('/vlog')
-def vlog():
+@app.route('/admin/dashboard')
+def admin_dashboard():
     return render_template(
-        'vlog.html',
-        title_zh='Vlog',
-        desc_zh='回憶短片',
-        active_page='vlog'
+        'admin_dashboard.html',
+        title_zh='管理儀表板',
+        desc_zh='',
+        active_page='admin_dashboard'
     )
+
+@app.route('/admin/settings')
+def admin_settings():
+    return render_template(
+        'admin_settings.html',
+        title_zh='管理員設定',
+        desc_zh='',
+        active_page='admin_settings'
+    )
+
+
 # 靜態文件路由 - 確保JS文件能正確載入
 @app.route('/static/<path:filename>')
 def static_files(filename):
@@ -140,9 +151,11 @@ def proxy_to_backend(path):
                    if k.lower() not in {"host","content-length","transfer-encoding","connection","accept-encoding"}}
 
     is_json = request.headers.get("Content-Type", "").startswith("application/json")
+    # AI 推薦需要載入模型，可能需要較長時間，設定為 150 秒
+    timeout_seconds = 150 if path == "vlogs/ai-select" else 30
     kwargs = dict(
         method=request.method, url=backend_url, params=request.args,
-        headers=fwd_headers, cookies=request.cookies, allow_redirects=False, timeout=30,
+        headers=fwd_headers, cookies=request.cookies, allow_redirects=False, timeout=timeout_seconds,
     )
     if is_json:
         kwargs["json"] = request.get_json(silent=True)

@@ -1398,8 +1398,6 @@ _（待後續總結）_
 2. **影片處理效能優化**
 3. **前後端整合的坑**
 
----
-
 ### 專案管理層面
 
 #### 成功經驗
@@ -2733,7 +2731,7 @@ function switchPage(pageName) {
 // 設定載入和儲存
 async function loadSettings() {
   const r = await api('/users/settings');
-  // 填入表單欄位
+  # 填入表單欄位
 }
 
 async function saveUserSettings() {
@@ -2872,3 +2870,233 @@ async function playVideoModal(recordingId, startTime, duration) {
 
 ---
 
+## [2025-11-22] 任務更新：RAG 與 Vlog 生成系統
+
+- **Files Updated:**
+  - `services/APIServer/app/router/Vlogs/DTO.py`
+  - `services/APIServer/app/router/Vlogs/service.py`
+  - `services/ComputeServer/app/tasks/rag_tasks.py`
+  - `services/ComputeServer/app/tasks/vlog_generation.py`
+  - `services/WebUIServer/app/template/home.html`
+  - `services/WebUIServer/app/static/css/vlog.css`
+  - `services/WebUIServer/app/static/js/vlog.js`
+  - `services/WebUIServer/app/static/js/APIClient.js`
+
+- **Issue:**
+  1. Compute Server 直接訪問數據庫違反架構規則
+  2. AI 自動推薦功能需要支持可配置的事件數量 (Top K)
+  3. AI 推薦結果無法正確獲取 (Celery result backend 問題)
+  4. API Server 啟動失敗 (DTO 引用錯誤)
+
+- **Solution:**
+  1. **架構重構**: Compute Server 改為通過內部 API 訪問數據庫
+  2. **功能增強**: 前端新增數量輸入，API 與 Task 支持 limit 參數
+  3. **問題修復**: 
+     - 使用本地 RAG 邏輯解決 Celery backend 問題
+     - 修復 DTO 定義缺失問題
+     - 修復前端 API 調用參數傳遞
+
+- **Status:** Completed
+
+### 詳細變更
+
+1. **API Server**:
+   - 新增內部 API (`/internal/segments`, `/internal/status`) 供 Compute Server 調用
+   - 更新 Vlog DTO，支持 `limit` 參數
+   - 將 RAG 邏輯移至本地執行，避免 Celery backend 依賴
+
+2. **Compute Server**:
+   - 移除直接數據庫訪問代碼
+   - 使用 `requests` 調用 API Server 獲取數據和更新狀態
+   - 更新 RAG task 支持 `limit` 參數截斷結果
+
+3. **WebUI**:
+   - `home.html`: 新增數量輸入框
+   - `vlog.css`: 新增輸入框樣式
+   - `vlog.js`: 讀取數量參數並傳遞給 API
+   - `APIClient.js`: 更新 `aiSelectEvents` 方法簽名
+
+### 驗證步驟
+
+1. 重啟服務: `docker compose -f deploy/docker-compose.yml up -d --build api compute webui`
+2. 前端測試:
+   - 進入 Vlog 生成頁面
+   - 選擇日期
+   - 設定數量 (如 15)
+   - 點擊 AI 推薦
+   - 確認推薦結果數量正確
+   - 點擊生成 Vlog
+3. 監控日誌: `docker logs compute_server --follow` 確認流程正常
+
+---
+
+## [2025-01-XX] 任務更新：實現兩階段壓縮（先 cap，再線性縮放）
+
+- **Files Updated:**
+  - `services/ComputeServer/app/tasks/vlog_generation.py`
+
+- **Issue:**
+  避免某些合併後區間（event union range）非常長，導致它在「線性縮放前」的基準時長過大，最後仍佔 vlog 很大比例。
+
+- **Solution:**
+  實現兩階段壓縮流程：
+  1. **Stage 1（基準時長 cap）**：對每個合併區間先做最大直線縮（cap 到 6 秒）
+  2. **Stage 2（全局線性縮放）**：再對所有段落做全局線性縮放到 max_duration
+
+- **Status:** Completed
+
+### 實現內容
+
+#### 1. 新增常數定義
+- 添加 `MAX_BASE_DURATION = 6.0` 秒（可通過環境變數 `VLOG_MAX_BASE_DURATION` 配置）
+- 用於 Stage 1 的基準時長上限
+
+#### 2. Stage 1：基準時長 cap
+- 對每個合併區間計算 `range_duration = end - start`
+- 計算 `base_duration_i = clamp(range_duration, MIN_SEGMENT_DURATION, MAX_BASE_DURATION)`
+- 這一步保證「再長的事件，基準時長最多也只算 6 秒」，不會在比例計算時吃掉太多權重
+
+#### 3. Stage 2：全局線性縮放
+- 計算基準總長：`total_base = sum(base_duration_i)`
+- 若 `total_base <= max_duration`：不用縮放，`clip_duration_i = base_duration_i`
+- 若 `total_base > max_duration`：
+  - 計算全局比例：`scale = max_duration / total_base`
+  - 每段縮放後長度：`clip_duration_i = max(MIN_SEGMENT_DURATION, base_duration_i * scale)`
+
+#### 4. 剪輯位置仍用「中線縮短」
+- 每段最終用 `clip_duration_i`，以合併區間的中線為中心剪：
+  - `mid = range_start + range_duration/2`
+  - `clip_start = mid - clip_duration_i/2`
+  - `clip_end = mid + clip_duration_i/2`
+- 然後 clamp 到 `[range_start, range_end]` 和 `[0, recording_duration]`
+
+### 技術細節
+
+1. **兩階段壓縮邏輯**：
+   - Stage 1 先限制單個區間的最大基準時長，避免長區間佔用過多權重
+   - Stage 2 再進行全局線性縮放，確保總時長不超過 max_duration
+   - 兩階段結合，既保證公平性，又確保所有事件都能出現在 vlog 中
+
+2. **日誌輸出**：
+   - Stage 1 輸出每個區間的原長和基準時長
+   - Stage 2 輸出縮放比例和每個區間的最終時長
+   - 便於調試和驗證壓縮效果
+
+3. **向後兼容**：
+   - 保留原有的 padding、邊界限制等邏輯
+   - 兩階段壓縮只影響時長分配，不影響剪輯位置計算
+
+### 範例
+
+假設：
+- 有一段事件 union range 長 40 秒
+- 其他 9 段各 3 秒
+- max_duration = 30 秒
+
+**Stage 1 cap：**
+- 長的那段 base = min(40, 6) = 6 秒
+- 其他 base = 3 秒
+- total_base = 6 + 9×3 = 33 秒
+
+**Stage 2 scale：**
+- scale = 30/33 = 0.909
+- 長段變 6×0.909 ≈ 5.45 秒
+- 短段變 3×0.909 ≈ 2.73 秒
+
+→ 長段不會爆佔比，但仍比短段稍長，符合直覺。
+
+### 驗收標準
+
+1. ✅ 任一段「cap 前 range_duration 多長都無所謂」，其基準時長 `base_duration_i` **不得超過 6 秒**
+2. ✅ 若 `total_base > max_duration`，必須全局線性縮放
+3. ✅ 所有段落都要出現在 vlog（不丟事件）
+4. ✅ 仍維持「中線剪輯」與「不重播幀（union ranges）」的既有規則
+
+### 效果
+
+- ✅ 長區間不會佔用過多權重
+- ✅ 所有事件都能出現在 vlog 中
+- ✅ 時長分配更公平
+- ✅ 保持中線剪輯邏輯
+
+---
+
+## [2025-01-XX] 任務更新：修復兩階段壓縮的三個關鍵問題
+
+- **Files Updated:**
+  - `services/ComputeServer/app/tasks/vlog_generation.py`
+
+- **Issue:**
+  兩階段壓縮邏輯雖然已實現，但實際輸出的 vlog 沒有按照預期方式壓縮，發現三個關鍵問題：
+  1. `max_duration` 可能沒正確傳入（從 settings 取值可能有問題）
+  2. Stage 2 計算時用的是不含 padding 的基準時長，但實際輸出時長包含了 padding，導致總時長超標
+  3. 有 `MIN_SEGMENT_DURATION` 下限時，需要二次正規化，否則總和可能重新 > max_duration
+
+- **Solution:**
+  1. 添加 debug 日誌確認 max_duration 是否正確傳入
+  2. 修改 Stage 2 邏輯，使用「含 padding 的基準」去算比例
+  3. 實現二次正規化，處理 MIN_SEGMENT_DURATION 下限問題
+
+- **Status:** Completed
+
+### 修復內容
+
+#### 1. 問題 1：max_duration 可能沒正確傳入
+- **問題**：`max_duration = float(settings.get('max_duration', 180) if settings else 180)` 可能因為 key 名稱不一致或 settings 結構問題，永遠使用 180 秒
+- **解決**：
+  - 添加詳細的 debug 日誌，輸出 raw 值和 final 值
+  - 輸出 settings 的所有 keys，便於排查
+  - 確保能正確識別 max_duration 是否傳入
+
+#### 2. 問題 2：Stage 2 計算時沒考慮 padding
+- **問題**：Stage 2 使用不含 padding 的基準時長計算比例，但實際輸出時長包含了前後 padding（2 秒），導致總時長超標
+- **解決**（修法 A）：
+  - Stage 2 使用「含 padding 的基準」去算比例：
+    - `base_with_padding_i = base_duration_i + 2 * padding`
+    - `total_base_with_padding = sum(base_with_padding_i)`
+    - `scale = max_duration / total_base_with_padding`
+  - 這樣確保比例計算時就考慮了 padding，最終總時長不會超標
+
+#### 3. 問題 3：MIN_SEGMENT_DURATION 下限需要二次正規化
+- **問題**：當事件很多、max_duration 很小時，大量段落會被抬到 `MIN_SEGMENT_DURATION`，導致總和重新 > max_duration
+- **解決**：實現二次正規化邏輯：
+  1. 先算 `scaled_i = base_i * scale`
+  2. 把 `scaled_i < MIN` 的固定成 MIN（鎖住）
+  3. 剩下的事件再用剩餘時間重新算 scale：
+     - `remaining_duration = max_duration - locked_total`
+     - `unlocked_base_with_padding = sum(未鎖定事件的 base_with_padding)`
+     - `new_scale = remaining_duration / unlocked_base_with_padding`
+     - 重新計算未鎖定事件的 `clip_duration_i`
+
+### 技術細節
+
+1. **含 padding 的基準計算**：
+   - Stage 1 計算 `base_duration_i`（不含 padding）
+   - 計算 `base_with_padding_i = base_duration_i + 2 * SEGMENT_PADDING_SECONDS`
+   - Stage 2 使用 `total_base_with_padding` 計算比例
+
+2. **二次正規化流程**：
+   - 識別被鎖定為 MIN 的事件（`clip_duration_i <= MIN_SEGMENT_DURATION + 0.001`）
+   - 計算鎖定事件的總時長（含 padding）：`locked_total`
+   - 計算剩餘時間：`remaining_duration = max_duration - locked_total`
+   - 對未鎖定事件重新計算 scale 和 clip_duration
+
+3. **日誌增強**：
+   - 輸出 max_duration 的 raw 值和 final 值
+   - 輸出 settings 的所有 keys
+   - 輸出 Stage 1 的基準時長（含/不含 padding）
+   - 輸出 Stage 2 的初始縮放比例、鎖定事件數、重新分配比例、最終總長
+
+### 驗證標準
+
+1. ✅ max_duration 能正確從 settings 讀取（通過日誌確認）
+2. ✅ Stage 2 使用含 padding 的基準計算比例
+3. ✅ 二次正規化確保總時長不超過 max_duration
+4. ✅ 所有事件都能出現在 vlog 中（不因時長不足被跳過）
+
+### 效果
+
+- ✅ max_duration 正確傳入和讀取
+- ✅ 總時長精確控制在 max_duration 內（含 padding）
+- ✅ 時長分配更公平，不會因 padding 導致超標
+- ✅ 所有事件都能出現在 vlog 中，不會因二次正規化被跳過

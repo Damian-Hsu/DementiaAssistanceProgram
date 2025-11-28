@@ -352,6 +352,8 @@ class UserService:
                 current_settings.diary_auto_refresh_enabled = update_data["diary_auto_refresh_enabled"]
             if "diary_auto_refresh_interval_minutes" in update_data:
                 current_settings.diary_auto_refresh_interval_minutes = update_data["diary_auto_refresh_interval_minutes"]
+            if "default_stream_ttl" in update_data:
+                current_settings.default_stream_ttl = update_data["default_stream_ttl"]
             
             # 更新 LLM 供應商設定
             # 支持兩種格式：llm_providers 或 llm_model_api.providers
@@ -435,6 +437,19 @@ class UserService:
             raise HTTPException(status_code=500, detail="更新設定失敗，請稍後再試")
     
     # 獲取使用者時區
+    def get_user_stream_ttl(self, current_user: users.Table) -> int:
+        """獲取使用者預設串流 TTL（秒）"""
+        try:
+            if current_user.settings:
+                settings = UserSettings.model_validate(current_user.settings)
+                return settings.default_stream_ttl
+            else:
+                default_settings = get_default_user_settings()
+                return default_settings.default_stream_ttl
+        except Exception:
+            default_settings = get_default_user_settings()
+            return default_settings.default_stream_ttl
+    
     def get_user_timezone(self, current_user: users.Table) -> str:
         """獲取使用者時區"""
         try:
