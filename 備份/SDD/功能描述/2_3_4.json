@@ -1,0 +1,79 @@
+{
+  "功能編號": "2-3-4",
+  "功能名稱": "下載影片",
+  "功能說明": "使用者下載影片時，前端向後端取得帶有 Content-Disposition=attachment 的 presigned URL，瀏覽器將以下載方式取得檔案；可指定 filename 以控制下載檔名。",
+  "程式名稱": "services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Recordings/service.py",
+  "輸入": [
+    "recording_id",
+    "ttl",
+    "disposition=attachment",
+    "filename（可選）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "RecordingUrlResp.url（下載 URL）",
+    "瀏覽器下載檔案"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "（可擴充 UI）點擊下載按鈕"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "取得下載連結",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /api/v1/recordings/{id}?disposition=attachment&filename=..."
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "下載觸發",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端以 window.open 或建立 <a download> 導向 presigned URL 觸發下載"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "下載結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "瀏覽器下載影片檔"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "recordings",
+    "columns": [
+      {
+        "欄位": "s3_key",
+        "中文": "影片S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "用於生成下載 URL"
+      }
+    ]
+  }
+}

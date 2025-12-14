@@ -60,7 +60,7 @@ async def generate_diary_embeddings(
 
     # Check if already processed
     stmt_chunks = select(diary_chunks.Table).where(
-        diary_chunks.Table.daily_summary_id == diary_entry.id
+        diary_chunks.Table.diary_id == diary_entry.id
     )
     res_chunks = await db.execute(stmt_chunks)
     existing_chunks = res_chunks.scalars().all()
@@ -73,9 +73,33 @@ async def generate_diary_embeddings(
     
     # Call Celery task for embedding generation
     try:
+        # 任務管理追蹤：建立 inference_jobs（diary_embeddings）
+        from ...DataAccess.tables import inference_jobs
+        from ...DataAccess.tables.__Enumeration import JobStatus
+        job = inference_jobs.Table(
+            type="diary_embeddings",
+            status=JobStatus.pending,
+            input_type="diary",
+            input_url=str(diary_entry.id),
+            output_url=None,
+            trace_id=f"diary-emb-{current_user.id}-{date_str}",
+            params={
+                "user_id": int(current_user.id),
+                "diary_id": str(diary_entry.id),
+                "chunks_count": int(len(chunks)),
+                "progress": 0.0,
+            },
+            metrics=None,
+        )
+        db.add(job)
+        await db.commit()
+        await db.refresh(job)
+
         task_result = enqueue("tasks.generate_diary_embeddings", {
             "diary_id": str(diary_entry.id),
-            "chunks": chunks
+            "chunks": chunks,
+            "job_id": str(job.id),
+            "user_id": int(current_user.id),
         })
         
         # Wait for result (blocking for now, should use async in production)
@@ -118,7 +142,7 @@ async def delete_diary_embeddings(
     # Delete chunks
     await db.execute(
         delete(diary_chunks.Table).where(
-            diary_chunks.Table.daily_summary_id == diary_entry.id
+            diary_chunks.Table.diary_id == diary_entry.id
         )
     )
     

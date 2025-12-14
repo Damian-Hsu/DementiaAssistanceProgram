@@ -25,6 +25,8 @@ from .DTO import (
 # Router
 # ------------------------------------------------------------
 recordings_router = APIRouter(prefix="/recordings", tags=["recordings"])
+# 機器對機器（Compute/Streaming）用：用 X-API-Key 授權，不走一般使用者 JWT
+recordings_m2m_router = APIRouter(prefix="/m2m/recordings", tags=["m2m"])
 
 # ------------------------------------------------------------
 # User Service 實例
@@ -38,8 +40,35 @@ user_service = UserService()
 INTERNAL_MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
 
 # 外部可達的 endpoint（瀏覽器訪問）
-# 注意：docker-compose.yml 中 MinIO 的端口映射是 30300:9000
-PUBLIC_MINIO_ENDPOINT = os.getenv("PUBLIC_MINIO_ENDPOINT", "http://localhost:30300")
+# 優先使用新的環境變數配置，否則使用舊的 PUBLIC_MINIO_ENDPOINT
+def _get_public_minio_endpoint() -> str:
+    """獲取 MinIO 公開端點，用於生成 presigned URL"""
+    minio_domain = os.getenv("MINIO_PUBLIC_DOMAIN", "").strip()
+    if minio_domain:
+        scheme = os.getenv("MINIO_PUBLIC_SCHEME", "http").strip()
+        port_str = os.getenv("MINIO_PUBLIC_PORT", "").strip()
+        
+        if port_str:
+            try:
+                port = int(port_str)
+                if (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
+                    return f"{scheme}://{minio_domain}"
+                return f"{scheme}://{minio_domain}:{port}"
+            except ValueError:
+                pass
+        
+        return f"{scheme}://{minio_domain}"
+    
+    # 向後兼容：使用舊的環境變數
+    old_endpoint = os.getenv("PUBLIC_MINIO_ENDPOINT", "")
+    if old_endpoint:
+        return old_endpoint
+    
+    # 如果完全沒有設定，返回空字串（會在使用時觸發錯誤，提醒設定環境變數）
+    # 注意：生產環境應該在 .env 中明確設定 MINIO_PUBLIC_DOMAIN 或 PUBLIC_MINIO_ENDPOINT
+    return ""
+
+PUBLIC_MINIO_ENDPOINT = _get_public_minio_endpoint()
 
 # S3 客戶端使用內部 endpoint（服務器端訪問）
 S3_ENDPOINT   = INTERNAL_MINIO_ENDPOINT
@@ -62,19 +91,24 @@ _s3 = boto3.client(
 )
 
 def _normalize_key(key: str) -> str:
-    """
-    正規化 S3 key，確保格式正確且不包含不支援的字符。
+    """正規化 S3 key，移除 s3:// 前綴和 bucket 名稱。
     
-    處理的情況：
-    1. s3://bucket/key 格式
-    2. bucket/key 格式
-    3. 直接 key 格式
-    4. 清理多餘的斜線和空格
+    處理各種格式的 S3 key，確保返回乾淨的 key 路徑。
+    支援 s3://bucket/key、bucket/key 和直接 key 格式。
+    
+    Args:
+        key: 原始 S3 key（可能包含 s3:// 前綴和 bucket 名稱）
+        
+    Returns:
+        str: 正規化後的 key
+        
+    Raises:
+        ValueError: 當 key 為空或正規化後為空時
     """
     if not key:
         raise ValueError("S3 key cannot be empty")
     
-    # 1) 去掉 s3://bucket/... 前綴
+    # 移除 s3://bucket/... 前綴
     if key.startswith("s3://"):
         without_scheme = key.split("://", 1)[1]
         # 去掉前面的 bucket 名（不管它是 videos 還是 media-bucket）
@@ -82,13 +116,13 @@ def _normalize_key(key: str) -> str:
             without_scheme = without_scheme.split("/", 1)[1]
         key = without_scheme
 
-    # 2) 若 key 仍以任一 bucket 名開頭（videos/ 或 media-bucket/），去掉之
+    # 若 key 仍以任一 bucket 名開頭（videos/ 或 media-bucket/），移除之
     for b in (os.getenv("S3_BUCKET", ""), "videos", "media-bucket"):
         if b and key.startswith(f"{b}/"):
             key = key[len(b) + 1 :]
             break
 
-    # 3) 清理多餘的斜線和空格，確保格式正確
+    # 清理多餘的斜線和空格，確保格式正確
     # 移除開頭和結尾的斜線
     key = key.strip("/")
     # 將多個連續斜線替換為單個斜線
@@ -97,13 +131,20 @@ def _normalize_key(key: str) -> str:
     # 移除開頭和結尾的空格
     key = key.strip()
     
-    # 4) 驗證 key 不為空（這裡 key 已經被處理過，如果為空說明原始 key 有問題）
+    # 驗證 key 不為空（如果為空說明原始 key 有問題）
     if not key:
         raise ValueError("Normalized S3 key is empty after processing")
     
     return key
 
-def _presign_get(key: str, ttl: int, *, disposition: Optional[str], filename: Optional[str], content_type: Optional[str] = None) -> str:
+def _presign_get(
+    key: str,
+    ttl: int,
+    *,
+    disposition: Optional[str] = None,
+    filename: Optional[str] = None,
+    content_type: Optional[str] = None,
+) -> str:
     key = _normalize_key(key)  # 如果你有這支，保留
     params = {"Bucket": S3_BUCKET, "Key": key}
 
@@ -124,7 +165,7 @@ def _presign_get(key: str, ttl: int, *, disposition: Optional[str], filename: Op
 
     # 如果內部和外部的 endpoint 不同，需要創建外部客戶端來生成預簽名 URL
     # 因為預簽名 URL 的簽名是基於 host 的，不能直接替換 host
-    if INTERNAL_MINIO_ENDPOINT != PUBLIC_MINIO_ENDPOINT:
+    if PUBLIC_MINIO_ENDPOINT and INTERNAL_MINIO_ENDPOINT != PUBLIC_MINIO_ENDPOINT:
         # 創建外部 S3 客戶端（用於生成瀏覽器可訪問的預簽名 URL）
         _s3_public = boto3.client(
             "s3",
@@ -139,6 +180,9 @@ def _presign_get(key: str, ttl: int, *, disposition: Optional[str], filename: Op
         )
         presigned_url = _s3_public.generate_presigned_url("get_object", Params=params, ExpiresIn=int(ttl))
     else:
+        # 如果公開端點未設定，記錄警告但繼續使用內部端點
+        if not PUBLIC_MINIO_ENDPOINT:
+            print("[WARNING] PUBLIC_MINIO_ENDPOINT not set, using internal endpoint. External access may fail.")
         # 如果內部外部相同，直接使用內部客戶端
         presigned_url = _s3.generate_presigned_url("get_object", Params=params, ExpiresIn=int(ttl))
     
@@ -250,6 +294,7 @@ async def get_recording_url(
     ttl: int = Query(900, ge=30, le=7*24*3600, description="URL 有效秒數（預設 900，最大 7 天）"),
     disposition: Optional[str] = Query(None, regex="^(inline|attachment)$", description="瀏覽器呈現方式：inline 或 attachment"),
     filename: Optional[str] = Query(None, description="下載檔名；未提供則使用 s3_key 的檔名"),
+    asset_type: Optional[str] = Query(None, regex="^(video|thumbnail)$", description="回傳 video 或 thumbnail 的 URL"),
     db: AsyncSession = Depends(get_session),
 ):
     """
@@ -281,21 +326,52 @@ async def get_recording_url(
     if current_user.role != Role.admin and rec.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="沒有權限訪問此錄影")
 
-    # 根據 type 參數決定使用哪個 s3_key
-    if type == "thumbnail" and rec.thumbnail_s3_key:
-        s3_key = rec.thumbnail_s3_key
-        url = _presign_get(s3_key, ttl, disposition=disposition, filename=filename, content_type="image/jpeg")
-        now = int(datetime.now(timezone.utc).timestamp())
-        return RecordingUrlResp(url=url, ttl=ttl, expires_at=now + ttl)
-    else:
+    # 根據 asset_type 參數決定使用哪個 s3_key
+    try:
+        if asset_type == "thumbnail":
+            # 需要縮圖但 DB 沒有 key
+            if not rec.thumbnail_s3_key:
+                raise HTTPException(status_code=404, detail="thumbnail not found")
+            s3_key = rec.thumbnail_s3_key
+            url = _presign_get(s3_key, ttl, disposition=disposition, filename=filename, content_type="image/jpeg")
+            now = int(datetime.now(timezone.utc).timestamp())
+            return RecordingUrlResp(url=url, ttl=ttl, expires_at=now + ttl)
+
+        # 預設回影片（asset_type 未指定或為 video）
+        if not rec.s3_key:
+            # 錄影資料存在但缺少 key，屬於資料不完整（通常是寫入流程中斷）
+            raise HTTPException(status_code=409, detail="recording is not ready (missing s3_key)")
+
         s3_key = rec.s3_key
         url = _presign_get(s3_key, ttl, disposition=disposition, filename=filename, content_type="video/mp4")
         now = int(datetime.now(timezone.utc).timestamp())
-        # 如果有縮圖，同時返回縮圖 URL
+
+        # 如果有縮圖，同時返回縮圖 URL（縮圖失敗不應讓影片 URL 也失敗）
         thumbnail_url = None
         if rec.thumbnail_s3_key:
-            thumbnail_url = _presign_get(rec.thumbnail_s3_key, ttl, disposition="inline", content_type="image/jpeg")
+            try:
+                thumbnail_url = _presign_get(rec.thumbnail_s3_key, ttl, disposition="inline", filename=None, content_type="image/jpeg")
+            except Exception as thumb_err:
+                print(f"[recordings.get_url] thumbnail presign failed: recording_id={recording_id} err={thumb_err}")
+
         return RecordingUrlResp(url=url, ttl=ttl, expires_at=now + ttl, thumbnail_url=thumbnail_url)
+    except ValueError as e:
+        # key 正規化錯誤（通常是 DB 的 s3_key 格式不正確）
+        raise HTTPException(status_code=400, detail=f"Invalid S3 key format: {e}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        # boto3 / config / 其他未預期錯誤：回傳 502 並在 server 端印出細節
+        # 注意：不要把敏感資訊（access_key/secret）吐回前端
+        print(
+            "[recordings.get_url] presign failed:",
+            f"recording_id={recording_id}",
+            f"bucket={S3_BUCKET}",
+            f"internal_endpoint={S3_ENDPOINT}",
+            f"public_endpoint={PUBLIC_MINIO_ENDPOINT or '(unset)'}",
+            f"err={e}",
+        )
+        raise HTTPException(status_code=502, detail="Failed to generate presigned URL")
 
 
 @recordings_router.delete("/{recording_id}", response_model=OkResp, status_code=status.HTTP_200_OK)
@@ -488,16 +564,14 @@ async def list_recordings(
     return RecordingListResp(items=items_with_summary, total=total)
 
 
-@recordings_router.patch("/{recording_id}/thumbnail")
-async def update_recording_thumbnail(
+@recordings_m2m_router.patch("/{recording_id}/thumbnail")
+async def update_recording_thumbnail_m2m(
     recording_id: uuid.UUID = Path(..., description="錄影 ID"),
     thumbnail_s3_key: str = Query(..., description="縮圖 S3 路徑"),
     db: AsyncSession = Depends(get_session),
-    api_client = Depends(lambda: None)  # 內部 API，暫時不驗證
 ):
     """
-    [內部] 更新錄影的縮圖路徑
-    供 Compute Server 調用
+    [M2M] 更新錄影的縮圖路徑（供 ComputeServer 回寫）。
     """
     stmt = select(recordings_table.Table).where(recordings_table.Table.id == recording_id)
     result = await db.execute(stmt)

@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # MinIO 配置
-_raw_minio_endpoint = os.getenv("MINIO_ENDPOINT", "localhost:30300")
+# 內部連接使用 Docker 服務名稱
+_raw_minio_endpoint = os.getenv("MINIO_ENDPOINT", "minio:9000")
 if "://" in _raw_minio_endpoint:
     _scheme, _endpoint = _raw_minio_endpoint.split("://", 1)
     MINIO_ENDPOINT = _endpoint

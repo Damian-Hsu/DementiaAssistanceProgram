@@ -1,0 +1,87 @@
+{
+  "功能編號": "2-3-3",
+  "功能名稱": "播放影片",
+  "功能說明": "使用者點選錄影清單項目後，前端向後端取得該錄影的 presigned URL，並指派給 video 元素播放；同時載入影片資訊與影片內事件列表，若載入失敗則清除播放器並顯示提示。",
+  "程式名稱": "services/WebUIServer/app/static/js/recordings.js; services/WebUIServer/app/template/recordings.html; services/APIServer/app/router/Recordings/service.py",
+  "輸入": [
+    "recording_id",
+    "ttl（預設 3600）",
+    "disposition=inline",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "RecordingUrlResp.url（影片播放 URL）",
+    "video 播放畫面",
+    "影片內事件列表"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點選影片列表中的錄影項目"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /api/v1/recordings/{recording_id}?ttl=...&disposition=inline 取得播放 URL"
+          },
+          {
+            "sub_no": "②",
+            "item": "呼叫 GET /api/v1/recordings/{recording_id}/events 取得影片內事件"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "播放處理",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "設定 videoPlayer.src=url 並顯示播放器；隱藏 placeholder"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 video 觸發 error：清空 src、回復 placeholder、取消當前選擇"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示影片播放畫面與影片詳細資訊"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "recordings",
+    "columns": [
+      {
+        "欄位": "s3_key",
+        "中文": "影片S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "用於生成 presigned URL"
+      }
+    ]
+  }
+}

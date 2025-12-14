@@ -3,9 +3,8 @@
   {% include './partials/header.html'%}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/camera.css') }}">
   
-  <div class="page-content">
-      <!-- 主內容：YouTube 風格布局 -->
-      <main class="camera-main-layout">
+  <!-- 主內容：YouTube 風格布局 -->
+  <main class="camera-main-layout">
         <!-- 左側：預覽畫面 -->
         <section class="preview-section">
           <div class="preview-container">
@@ -64,7 +63,8 @@
         <form id="cameraForm" class="form-grid" autocomplete="off">
           <div class="form-row">
                 <label for="camera_name">鏡頭名稱</label>
-            <input id="camera_name" name="camera_name" type="text" placeholder="例如：實驗室入口"/>
+            <input id="camera_name" name="camera_name" type="text" placeholder="例如：我的鏡頭"/>
+            <div id="camera_name_error" class="form-error" style="display: none;"></div>
           </div>
               <div class="form-row">
                 <button type="submit" class="btn primary">建立鏡頭</button>
@@ -73,7 +73,6 @@
           </div>
       </section>
     </main>
-  </div>
 
   {% include './partials/stop_stream_confirm_dialog.html' %}
   

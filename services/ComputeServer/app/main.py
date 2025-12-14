@@ -28,8 +28,9 @@ app.conf.update(
     broker_transport_options={
         "visibility_timeout": int(os.getenv("CELERY_VISIBILITY_TIMEOUT", "300"))
     },
-    task_time_limit=int(os.getenv("CELERY_TIME_LIMIT", "300")),
-    task_soft_time_limit=int(os.getenv("CELERY_SOFT_TIME_LIMIT", "280")),
+    # 預設提高到 1200s，避免 Vlog / 影片處理類任務被 300s 硬殺（可由環境變數覆蓋）
+    task_time_limit=int(os.getenv("CELERY_TIME_LIMIT", "1200")),
+    task_soft_time_limit=int(os.getenv("CELERY_SOFT_TIME_LIMIT", "1100")),
 )
 
 # 自動載入 tasks 套件

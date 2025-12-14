@@ -1,0 +1,282 @@
+{
+  "功能編號": "2-1-2",
+  "功能名稱": "顯示日記內容",
+  "功能說明": "首頁於指定日期載入時，前端呼叫後端取得該日期日記摘要並顯示於日記區塊；同時查詢當日事件列表並計算事件哈希，供後續自動刷新判斷是否需要更新日記。若該日無事件則顯示提示訊息。",
+  "程式名稱": "services/WebUIServer/app/template/home.html; services/WebUIServer/app/static/js/diary.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Chat/service.py; services/APIServer/app/DataAccess/tables/diary.py; services/APIServer/app/DataAccess/tables/events.py",
+  "輸入": [
+    "date（YYYY-MM-DD；由日期選擇器或 URL 參數取得）",
+    "Bearer JWT（localStorage.jwt）"
+  ],
+  "輸出": [
+    "日記內容（diary.content）",
+    "事件數量（events_count）",
+    "日記區塊畫面（內容/無事件提示/錯誤提示）",
+    "lastEventsHash[date]（前端快取）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "進入首頁或切換日期後，取得目標日期 date"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端以 Bearer JWT 呼叫 GET /api/v1/chat/diary/{date} 取得 DiarySummaryResponse（不刷新）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端以同一日期條件呼叫 GET /api/v1/events（start_time=end_time=date）取得當日事件列表"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端將事件列表整理為固定欄位並排序後計算哈希，寫入 lastEventsHash[date]"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "畫面渲染",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若 events_count=0：顯示「本日無事件，無法提供日記喔~」"
+          },
+          {
+            "sub_no": "②",
+            "item": "若有 content：以換行分段方式渲染為多個 <p> 段落"
+          },
+          {
+            "sub_no": "③",
+            "item": "若 content 為空：顯示「這一天還沒有日記內容」"
+          }
+        ]
+      },
+      {
+        "step_no": 4,
+        "title": "例外處理",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若 API 回應錯誤（含配額/429 等），顯示「載入失敗，請稍後再試」或顯示後端 detail"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "日記區塊顯示該日期日記內容或空狀態訊息"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "儲存結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端更新 lastEventsHash[date]，供自動刷新比對使用"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "diary; events",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "日記ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "diary.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "diary.user_id；ForeignKey(users.id)；索引"
+      },
+      {
+        "欄位": "diary_date",
+        "中文": "日記日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "diary.diary_date；索引"
+      },
+      {
+        "欄位": "content",
+        "中文": "日記內容",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "diary.content"
+      },
+      {
+        "欄位": "events_hash",
+        "中文": "事件列表雜湊",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "是",
+        "預設值": null,
+        "備註": "diary.events_hash；索引"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "diary.created_at；TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "diary.updated_at；TimestampMixin；更新時由資料庫 onupdate"
+      },
+      {
+        "欄位": "id",
+        "中文": "事件ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "events.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "events.user_id；ForeignKey(users.id)；索引"
+      },
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.recording_id；ForeignKey(recordings.id)；索引"
+      },
+      {
+        "欄位": "action",
+        "中文": "活動",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.action"
+      },
+      {
+        "欄位": "scene",
+        "中文": "場景",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.scene"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.summary"
+      },
+      {
+        "欄位": "objects",
+        "中文": "物件清單",
+        "型態": "ARRAY(VARCHAR)",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.objects"
+      },
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.start_time"
+      },
+      {
+        "欄位": "duration",
+        "中文": "事件持續秒數",
+        "型態": "FLOAT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.duration"
+      },
+      {
+        "欄位": "embedding",
+        "中文": "事件向量",
+        "型態": "VECTOR",
+        "長度": 1024,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.embedding（pgvector）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "events.created_at；TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.updated_at；TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

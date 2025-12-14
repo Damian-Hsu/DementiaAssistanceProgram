@@ -15,23 +15,26 @@ const state = {
 const showError = (msg) => {
   if (typeof window !== 'undefined' && typeof window.showError === 'function') {
     window.showError(msg);
-  } else if (typeof alert === 'function') {
-    alert(msg || '發生錯誤');
+  } else {
+    console.error(msg || '發生錯誤');
   }
 };
 
 const showSuccess = (msg) => {
   if (typeof window !== 'undefined' && typeof window.showSuccess === 'function') {
     window.showSuccess(msg);
-  } else if (typeof alert === 'function') {
-    alert(msg || '完成');
+  } else {
+    console.log(msg || '完成');
   }
 };
 
 (function () {
   function show(elId, msg) {
     var box = document.getElementById(elId);
-    if (!box) { alert(msg); return; }
+    if (!box) {
+      console.warn('[admin_settings] 找不到訊息框：', elId, msg);
+      return;
+    }
 
     // 清空另一個框
     var other = (elId === 'errorMessage')
@@ -63,6 +66,41 @@ const showSuccess = (msg) => {
   window.showSuccess = function (msg) { show('successMessage', msg); };
   window.showError   = function (msg) { show('errorMessage',   msg); };
 })();
+
+/**
+ * 可靠複製到剪貼簿（避免原生 alert/prompt）
+ */
+async function copyToClipboard(text) {
+  const value = (text ?? '').toString();
+  if (!value) return false;
+
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch (e) {
+    console.warn('[admin_settings] navigator.clipboard 失敗，嘗試 fallback：', e);
+  }
+
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = value;
+    ta.setAttribute('readonly', 'true');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return !!ok;
+  } catch (e) {
+    console.warn('[admin_settings] execCommand(copy) 失敗：', e);
+    return false;
+  }
+}
 
 function parseJwt(token) {
   try {
@@ -417,48 +455,17 @@ async function saveAppSettings() {
 // ========== 模型設定相關函數 ==========
 async function loadModelSettings() {
   try {
-    if (!ApiClient || !ApiClient.settings) {
-      console.error('[admin_settings] ApiClient.settings 未定義');
+    if (!ApiClient || !ApiClient.admin || !ApiClient.admin.settings) {
+      console.error('[admin_settings] ApiClient.admin.settings 未定義');
       showError && showError('API 客戶端未正確初始化');
       return;
     }
 
-    const response = await ApiClient.settings.get();
-    const settings = response.settings || response;
-    
-    if (!settings) {
-      console.warn('[admin_settings] 未找到設定資料');
-      return;
-    }
-    
-    if (settings.default_llm_provider) {
-      const providerSelect = document.getElementById('setting_llm_provider');
-      if (providerSelect) providerSelect.value = settings.default_llm_provider;
-    }
-    
-    if (settings.default_llm_model) {
-      const modelInput = document.getElementById('setting_llm_model');
-      if (modelInput) modelInput.value = settings.default_llm_model;
-    }
-    
-    const llmProviders = settings.llm_model_api?.providers || settings.llm_providers;
-    if (llmProviders && typeof llmProviders === 'object') {
-      Object.keys(llmProviders).forEach(providerKey => {
-        const provider = llmProviders[providerKey];
-        if (provider && provider.api_key) {
-          const keyInput = document.getElementById(`provider_${providerKey}_api_key`);
-          if (keyInput) {
-            keyInput.value = provider.api_key;
-          }
-        }
-      });
-      
-      // 只支援 Google
-      if (llmProviders.google?.api_key) {
-        const googleKeyInput = document.getElementById('provider_google_api_key');
-        if (googleKeyInput) googleKeyInput.value = llmProviders.google.api_key;
-      }
-    }
+    const sys = await ApiClient.admin.settings.getDefaultLLM();
+    const providerSelect = document.getElementById('setting_llm_provider');
+    const modelInput = document.getElementById('setting_llm_model');
+    if (providerSelect && sys?.default_llm_provider) providerSelect.value = sys.default_llm_provider;
+    if (modelInput && sys?.default_llm_model) modelInput.value = sys.default_llm_model;
   } catch (e) {
     console.error('[admin_settings] 載入模型設定失敗：', e);
     showError && showError('載入模型設定失敗：' + (e?.message || ''));
@@ -468,35 +475,66 @@ async function loadModelSettings() {
 async function saveModelSettings() {
   const btn = document.getElementById('btnSaveModelSettings');
   try {
-    if (!ApiClient || !ApiClient.settings) {
+    if (!ApiClient || !ApiClient.admin || !ApiClient.admin.settings) {
       showError('API 客戶端未正確初始化');
       return;
     }
 
     setBtnLoading(btn, true);
 
-    const updateData = {
-      default_llm_provider: document.getElementById('setting_llm_provider')?.value || undefined,
-      default_llm_model: document.getElementById('setting_llm_model')?.value || undefined,
-    };
+    const default_llm_provider = document.getElementById('setting_llm_provider')?.value;
+    const default_llm_model = document.getElementById('setting_llm_model')?.value;
+    if (!default_llm_provider || !default_llm_model) {
+      throw new Error('請填寫預設 LLM 供應商與模型');
+    }
 
-    // 構建 LLM 供應商配置（只支援 Google）
-    const llmProviders = {};
-    const googleKey = (document.getElementById('provider_google_api_key')?.value || '').trim();
-
-    // 只發送 Google 的設定
-    llmProviders.google = { api_key: googleKey, model_names: [] };
-
-    updateData.llm_providers = llmProviders;
-
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] === undefined) delete updateData[key];
-    });
-
-    await ApiClient.settings.update(updateData);
-    showSuccess('模型設定已更新');
+    await ApiClient.admin.settings.setDefaultLLM({ default_llm_provider, default_llm_model });
+    showSuccess('系統預設模型設定已更新');
   } catch (e) {
     showError(e?.message || '更新模型設定失敗');
+  } finally {
+    setBtnLoading(btn, false);
+  }
+}
+
+// ========== 影片參數設定（切片長度等） ==========
+async function loadVideoParams() {
+  const messageEl = document.getElementById('videoParamsMessage');
+  try {
+    if (!ApiClient || !ApiClient.admin || !ApiClient.admin.settings) {
+      showError('API 客戶端未正確初始化');
+      return;
+    }
+    const data = await ApiClient.admin.settings.getVideoParams();
+    const segInput = document.getElementById('setting_segment_seconds');
+    if (segInput) {
+      if (data?.segment_seconds != null) segInput.value = String(data.segment_seconds);
+      else if (!segInput.value) segInput.value = '30';
+    }
+    if (messageEl) showHint(messageEl, '已載入影片參數設定', 'success');
+  } catch (e) {
+    console.error('[admin_settings] 載入影片參數設定失敗：', e);
+    if (messageEl) showHint(messageEl, `載入失敗：${e?.message || ''}`, 'error');
+  }
+}
+
+async function saveVideoParams() {
+  const btn = document.getElementById('btnSaveVideoParams');
+  const messageEl = document.getElementById('videoParamsMessage');
+  try {
+    if (!ApiClient || !ApiClient.admin || !ApiClient.admin.settings) {
+      showError('API 客戶端未正確初始化');
+      return;
+    }
+    setBtnLoading(btn, true);
+    const segRaw = document.getElementById('setting_segment_seconds')?.value;
+    const segment_seconds = parseInt(segRaw, 10);
+    if (!Number.isFinite(segment_seconds)) throw new Error('請輸入切片長度（秒）');
+    if (segment_seconds < 1 || segment_seconds > 600) throw new Error('切片長度範圍需為 1-600 秒');
+    await ApiClient.admin.settings.setVideoParams({ segment_seconds });
+    if (messageEl) showHint(messageEl, '影片參數設定已更新', 'success');
+  } catch (e) {
+    if (messageEl) showHint(messageEl, e?.message || '更新影片參數設定失敗', 'error');
   } finally {
     setBtnLoading(btn, false);
   }
@@ -525,13 +563,16 @@ function renderApiKeyTable() {
   if (!state.apiKeys.length) {
     const emptyRow = document.createElement('tr');
     emptyRow.className = 'empty-row';
-    emptyRow.innerHTML = `<td colspan="8">尚無 API Key，請建立新的 Key。</td>`;
+    emptyRow.innerHTML = `<td colspan="7" class="text-center">尚無 API Key，請建立新的 Key。</td>`;
     apiKeyTableBody.appendChild(emptyRow);
     return;
   }
 
   state.apiKeys.forEach((key) => {
     const tr = document.createElement('tr');
+    tr.className = 'api-key-row';
+    tr.style.cursor = 'pointer';
+    tr.dataset.keyId = key.id;
     const statusClass = key.active ? 'status-active' : 'status-inactive';
     const statusLabel = key.active ? '啟用' : '停用';
     const scopes = (key.scopes || []).join(', ') || '-';
@@ -543,41 +584,38 @@ function renderApiKeyTable() {
       <td>${formatNumber(key.rate_limit_per_min)}</td>
       <td>${formatNumber(key.quota_per_day)}</td>
       <td>${formatDate(key.created_at)}</td>
-      <td>
-        <div class="table-actions">
-          <button type="button" class="btn-tertiary" data-action="edit" data-key="${key.id}">編輯</button>
-          <button type="button" class="btn-tertiary" data-action="rotate" data-key="${key.id}">旋轉</button>
-          <button type="button" class="btn-secondary" data-action="toggle" data-key="${key.id}">
-            ${key.active ? '停用' : '啟用'}
-          </button>
-        </div>
-      </td>
     `;
     apiKeyTableBody.appendChild(tr);
   });
 
-  apiKeyTableBody.querySelectorAll('button[data-action="edit"]').forEach((btn) => {
-    btn.addEventListener('click', () => editApiKey(btn.dataset.key));
-  });
-  apiKeyTableBody.querySelectorAll('button[data-action="rotate"]').forEach((btn) => {
-    btn.addEventListener('click', () => rotateApiKey(btn.dataset.key));
-  });
-  apiKeyTableBody.querySelectorAll('button[data-action="toggle"]').forEach((btn) => {
-    btn.addEventListener('click', () => toggleApiKey(btn.dataset.key));
+  // 綁定行點擊事件
+  apiKeyTableBody.querySelectorAll('tr.api-key-row').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      // 如果點擊的是按鈕或其他互動元素，不觸發編輯
+      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+        return;
+      }
+      const keyId = row.dataset.keyId;
+      if (keyId) {
+        editApiKey(keyId);
+      }
+    });
   });
 }
 
 function getSelectedScopes(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return [];
-  const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+  // 使用 Bootstrap form-check-input 選擇器（向後兼容舊的選擇器）
+  const checkboxes = container.querySelectorAll('.form-check-input[type="checkbox"]:checked, input[type="checkbox"]:checked');
   return Array.from(checkboxes).map(cb => cb.value);
 }
 
 function setSelectedScopes(containerId, scopes) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+  // 使用 Bootstrap form-check-input 選擇器（向後兼容舊的選擇器）
+  const checkboxes = container.querySelectorAll('.form-check-input[type="checkbox"], input[type="checkbox"]');
   checkboxes.forEach(cb => {
     cb.checked = (scopes || []).includes(cb.value);
   });
@@ -622,12 +660,19 @@ async function handleApiKeyCreate(event) {
     renderApiKeyTable();
     document.getElementById('apiKeyForm').reset();
     setSelectedScopes('apiKeyScopes', []);
-    if (state.currentUser?.id) {
+    // 預設擁有者 ID 為當前使用者
+    if (state.currentUser?.id && !apiKeyOwner.value) {
       apiKeyOwner.value = state.currentUser.id;
     }
     if (result.token) {
       state.lastRotatedToken = result.token;
-      showHint(apiKeyTokenMessage, `建立成功！請妥善保存新 Token：${result.token}`, 'success');
+      const copied = await copyToClipboard(result.token);
+      showHint(
+        apiKeyTokenMessage,
+        `Token：${result.token}${copied ? '（已複製到剪貼簿）' : '（無法自動複製，請手動複製）'}`,
+        'success'
+      );
+      showSuccess(copied ? '已建立並複製 Token' : '已建立 Token（請手動複製）');
     } else {
       showHint(apiKeyTokenMessage, '建立成功。', 'success');
     }
@@ -640,20 +685,77 @@ async function handleApiKeyCreate(event) {
 async function rotateApiKey(keyId) {
   if (!keyId) return;
   if (!confirm('確認要旋轉此 API Key 嗎？舊金鑰將立即失效。')) return;
+  
+  const btn = document.getElementById('btnRotateApiKey');
   try {
+    if (btn) setBtnLoading(btn, true);
+    
     const result = await ApiClient.admin.apiKeys.rotate(keyId);
-    const index = state.apiKeys.findIndex((k) => k.id === keyId);
+    const index = state.apiKeys.findIndex((k) => String(k.id) === String(keyId));
     if (index >= 0) {
       state.apiKeys[index] = result;
       renderApiKeyTable();
     }
     if (result.token) {
       state.lastRotatedToken = result.token;
-      alert(`新的 API Token：\n${result.token}\n請立即保存，此對話框關閉後將無法再次取得。`);
+      const apiKeyTokenMessage = document.getElementById('apiKeyTokenMessage');
+      const copied = await copyToClipboard(result.token);
+      showHint(
+        apiKeyTokenMessage,
+        `Token：${result.token}${copied ? '（已複製到剪貼簿）' : '（無法自動複製，請手動複製）'}`,
+        'success'
+      );
+      showSuccess(copied ? '已旋轉並複製 Token' : '已旋轉 Token（請手動複製）');
+    } else {
+      showSuccess('API Key 已成功旋轉');
     }
+    
+    // 關閉對話框
+    const dialog = document.getElementById('editApiKeyDialog');
+    if (dialog) dialog.classList.remove('show');
   } catch (error) {
     console.error('[admin_settings] 旋轉 API Key 失敗', error);
-    alert('旋轉失敗，請稍後再試。');
+    showError(error?.message || '旋轉失敗，請稍後再試。');
+  } finally {
+    if (btn) setBtnLoading(btn, false);
+  }
+}
+
+async function deleteApiKey(keyId) {
+  if (!keyId) return;
+  const target = state.apiKeys.find((k) => String(k.id) === String(keyId));
+  if (!target) {
+    showError('找不到指定的 API Key');
+    return;
+  }
+  
+  const confirmMsg = `確認要刪除此 API Key "${target.name}" 嗎？\n\n此操作將停用該 API Key，使其無法再使用。\n此操作無法復原。`;
+  if (!confirm(confirmMsg)) return;
+  
+  const btn = document.getElementById('btnDeleteApiKey');
+  try {
+    if (btn) setBtnLoading(btn, true);
+    
+    // 使用停用功能作為刪除（因為後端可能沒有真正的刪除端點）
+    await ApiClient.admin.apiKeys.update(keyId, { active: false });
+    
+    // 更新本地狀態
+    const index = state.apiKeys.findIndex((k) => String(k.id) === String(keyId));
+    if (index >= 0) {
+      state.apiKeys[index].active = false;
+      renderApiKeyTable();
+    }
+    
+    showSuccess('API Key 已停用');
+    
+    // 關閉對話框
+    const dialog = document.getElementById('editApiKeyDialog');
+    if (dialog) dialog.classList.remove('show');
+  } catch (error) {
+    console.error('[admin_settings] 停用 API Key 失敗', error);
+    showError(error?.message || '停用失敗，請稍後再試。');
+  } finally {
+    if (btn) setBtnLoading(btn, false);
   }
 }
 
@@ -667,26 +769,45 @@ async function toggleApiKey(keyId) {
     renderApiKeyTable();
   } catch (error) {
     console.error('[admin_settings] 切換 API Key 狀態失敗', error);
-    alert('更新狀態失敗，請稍後再試。');
+    showError('更新狀態失敗，請稍後再試。');
   }
 }
 
 function editApiKey(keyId) {
-  const target = state.apiKeys.find((k) => k.id === keyId);
-  if (!target) return;
+  // 確保 keyId 是字符串
+  const keyIdStr = String(keyId);
+  const target = state.apiKeys.find((k) => String(k.id) === keyIdStr);
+  if (!target) {
+    console.error('[admin_settings] 找不到 API Key:', keyIdStr);
+    showError('找不到指定的 API Key');
+    return;
+  }
 
   // 填充編輯表單
-  document.getElementById('editApiKeyName').value = target.name || '';
-  document.getElementById('editApiKeyRate').value = target.rate_limit_per_min || '';
-  document.getElementById('editApiKeyQuota').value = target.quota_per_day || '';
+  const nameInput = document.getElementById('editApiKeyName');
+  const rateInput = document.getElementById('editApiKeyRate');
+  const quotaInput = document.getElementById('editApiKeyQuota');
+  
+  if (nameInput) nameInput.value = target.name || '';
+  if (rateInput) rateInput.value = target.rate_limit_per_min || '';
+  if (quotaInput) quotaInput.value = target.quota_per_day || '';
   setSelectedScopes('editApiKeyScopes', target.scopes || []);
 
   // 儲存當前編輯的 key ID
   const editForm = document.getElementById('editApiKeyForm');
-  editForm.dataset.keyId = keyId;
+  if (editForm) {
+    editForm.dataset.keyId = keyIdStr;
+  }
 
-  // 顯示對話框
-  document.getElementById('editApiKeyDialog').showModal();
+  // 儲存 keyId 到對話框元素，供旋轉和刪除按鈕使用
+  const dialog = document.getElementById('editApiKeyDialog');
+  if (dialog) {
+    dialog.dataset.keyId = keyIdStr;
+    dialog.classList.add('show');
+  } else {
+    console.error('[admin_settings] 找不到編輯對話框元素');
+    showError('無法開啟編輯對話框');
+  }
 }
 
 async function handleApiKeyEdit(event) {
@@ -730,7 +851,8 @@ async function handleApiKeyEdit(event) {
     }
     
     renderApiKeyTable();
-    document.getElementById('editApiKeyDialog').close();
+    const dialog = document.getElementById('editApiKeyDialog');
+    if (dialog) dialog.classList.remove('show');
     showSuccess('API Key 已更新');
   } catch (error) {
     console.error('[admin_settings] 更新 API Key 失敗', error);
@@ -755,6 +877,10 @@ function bindEvents() {
   
   // 模型設定
   document.getElementById('btnSaveModelSettings')?.addEventListener('click', saveModelSettings);
+
+  // 影片參數設定
+  document.getElementById('btnLoadVideoParams')?.addEventListener('click', loadVideoParams);
+  document.getElementById('btnSaveVideoParams')?.addEventListener('click', saveVideoParams);
   
   // API Key 管理
   const apiKeyForm = document.getElementById('apiKeyForm');
@@ -765,6 +891,52 @@ function bindEvents() {
   const editApiKeyForm = document.getElementById('editApiKeyForm');
   if (editApiKeyForm) {
     editApiKeyForm.addEventListener('submit', handleApiKeyEdit);
+  }
+  
+  // 綁定旋轉和刪除按鈕
+  const btnRotate = document.getElementById('btnRotateApiKey');
+  if (btnRotate) {
+    btnRotate.addEventListener('click', () => {
+      const dialog = document.getElementById('editApiKeyDialog');
+      const keyId = dialog?.dataset.keyId;
+      if (keyId) {
+        rotateApiKey(keyId);
+      }
+    });
+  }
+  
+  const btnDelete = document.getElementById('btnDeleteApiKey');
+  if (btnDelete) {
+    btnDelete.addEventListener('click', () => {
+      const dialog = document.getElementById('editApiKeyDialog');
+      const keyId = dialog?.dataset.keyId;
+      if (keyId) {
+        deleteApiKey(keyId);
+      }
+    });
+  }
+  
+  // 綁定關閉按鈕
+  const closeBtn = document.getElementById('closeEditApiKeyDialog');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const dialog = document.getElementById('editApiKeyDialog');
+      if (dialog) {
+        dialog.classList.remove('show');
+      }
+    });
+  }
+  
+  // 點擊背景關閉對話框
+  const dialog = document.getElementById('editApiKeyDialog');
+  if (dialog) {
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        dialog.classList.remove('show');
+      }
+    });
   }
 }
 
@@ -781,7 +953,7 @@ async function boot() {
     const response = window.__CURRENT_USER || await ApiClient.getCurrentUser();
     const currentUser = response?.user || response;
     if (!currentUser || currentUser.role !== 'admin') {
-      alert('此頁面僅限管理員使用，將返回首頁。');
+      showError('此頁面僅限管理員使用，將返回首頁。');
       window.location.href = '/home';
       return;
     }
@@ -795,14 +967,235 @@ async function boot() {
   
   bindEvents();
   await Promise.all([
-    loadMe(),
-    loadAppSettings(),
     loadModelSettings(),
-    loadApiKeys()
+    loadDefaultApiKey(),
+    loadDefaultAiKeyLimits(),
+    loadVideoParams(),
+    loadApiKeys(),
+    loadBlacklist()
   ]);
+  
+  // 綁定新功能的事件
+  bindNewFeatureEvents();
   
   const existing = localStorage.getItem('jwt');
   if (existing) renderJwtRemaining(existing);
+}
+
+// ========== 預設 Google API Key 管理 ==========
+async function loadDefaultApiKey() {
+  const apiKeyInput = document.getElementById('default_google_api_key');
+  if (!apiKeyInput) return;
+  
+  try {
+    const data = await ApiClient.admin.settings.getDefaultGoogleApiKey();
+    if (data && data.api_key) {
+      // 顯示遮罩後的 API Key
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = data.api_key || '未設定';
+    } else {
+      apiKeyInput.placeholder = '未設定預設 API Key';
+    }
+  } catch (error) {
+    console.error('[admin_settings] 載入預設 API Key 失敗', error);
+  }
+}
+
+async function saveDefaultApiKey() {
+  const apiKeyInput = document.getElementById('default_google_api_key');
+  const messageEl = document.getElementById('modelSettingsMessage');
+  if (!apiKeyInput) return;
+  
+  const apiKey = apiKeyInput.value.trim();
+  // 如果輸入框為空，不更新（保留現有設定）
+  if (!apiKey) {
+    return;
+  }
+  
+  try {
+    if (messageEl) {
+      showHint(messageEl, '儲存中...', 'info');
+    }
+    await ApiClient.admin.settings.setDefaultGoogleApiKey(apiKey);
+    // 清空輸入框（安全考量）
+    apiKeyInput.value = '';
+    apiKeyInput.placeholder = '已儲存（輸入後會遮罩顯示）';
+  } catch (error) {
+    console.error('[admin_settings] 儲存預設 API Key 失敗', error);
+    if (messageEl) {
+      showHint(messageEl, `儲存失敗：${error.message}`, 'error');
+    }
+    throw error;
+  }
+}
+
+// ========== 系統預設 AI API Key 用量限制（RPM/RPD） ==========
+async function loadDefaultAiKeyLimits() {
+  const rpmEl = document.getElementById('default_ai_key_rpm');
+  const rpdEl = document.getElementById('default_ai_key_rpd');
+  if (!rpmEl || !rpdEl) return;
+
+  try {
+    const data = await ApiClient.admin.settings.getDefaultAiKeyLimits();
+    if (data && data.rpm != null) rpmEl.value = String(data.rpm);
+    if (data && data.rpd != null) rpdEl.value = String(data.rpd);
+  } catch (e) {
+    console.error('[admin_settings] 載入預設 AI key 限制失敗：', e);
+  }
+}
+
+async function saveDefaultAiKeyLimits() {
+  const rpmEl = document.getElementById('default_ai_key_rpm');
+  const rpdEl = document.getElementById('default_ai_key_rpd');
+  if (!rpmEl || !rpdEl) return;
+
+  const rpm = parseInt((rpmEl.value || '').trim(), 10);
+  const rpd = parseInt((rpdEl.value || '').trim(), 10);
+
+  // 空值就不更新（保留既有設定）
+  if (!Number.isFinite(rpm) || !Number.isFinite(rpd)) return;
+
+  if (rpm < 1 || rpm > 300) throw new Error('RPM 範圍需為 1-300');
+  if (rpd < 1 || rpd > 10000) throw new Error('RPD 範圍需為 1-10000');
+
+  await ApiClient.admin.settings.setDefaultAiKeyLimits({ rpm, rpd });
+}
+
+// ========== 黑名單管理 ==========
+async function loadBlacklist() {
+  const tableBody = document.querySelector('#blacklistTable tbody');
+  if (!tableBody) return;
+  
+  try {
+    const data = await ApiClient.admin.blacklist.list();
+    renderBlacklistTable(data || []);
+  } catch (error) {
+    console.error('[admin_settings] 載入黑名單失敗', error);
+    if (tableBody) {
+      tableBody.innerHTML = '<tr><td colspan="6">載入失敗，請稍後重試</td></tr>';
+    }
+  }
+}
+
+function renderBlacklistTable(entries) {
+  const tableBody = document.querySelector('#blacklistTable tbody');
+  if (!tableBody) return;
+  
+  if (!entries.length) {
+    tableBody.innerHTML = '<tr><td colspan="6" class="text-center">黑名單為空</td></tr>';
+    return;
+  }
+  
+  tableBody.innerHTML = entries.map(entry => `
+    <tr>
+      <td>${entry.user_id}</td>
+      <td>${entry.user_account}</td>
+      <td>${entry.user_name}</td>
+      <td>${entry.reason || '-'}</td>
+      <td>${formatDate ? formatDate(entry.created_at) : entry.created_at}</td>
+      <td>
+        <button type="button" class="btn-tertiary" data-user-id="${entry.user_id}" data-action="remove">移除</button>
+      </td>
+    </tr>
+  `).join('');
+  
+  // 綁定移除按鈕事件
+  tableBody.querySelectorAll('button[data-action="remove"]').forEach(btn => {
+    btn.addEventListener('click', () => removeFromBlacklist(btn.dataset.userId));
+  });
+}
+
+async function addToBlacklist() {
+  const userIdInput = document.getElementById('blacklistUserId');
+  const reasonInput = document.getElementById('blacklistReason');
+  const messageEl = document.getElementById('blacklistMessage');
+  
+  if (!userIdInput) return;
+  
+  const userId = parseInt(userIdInput.value.trim());
+  if (!userId || userId < 1) {
+    if (messageEl) {
+      showHint(messageEl, '請輸入有效的使用者 ID', 'error');
+    }
+    return;
+  }
+  
+  try {
+    if (messageEl) {
+      showHint(messageEl, '處理中...', 'info');
+    }
+    await ApiClient.admin.blacklist.add(userId, reasonInput?.value.trim() || null);
+    if (messageEl) {
+      showHint(messageEl, '已添加到黑名單', 'success');
+    }
+    // 清空輸入框
+    userIdInput.value = '';
+    if (reasonInput) reasonInput.value = '';
+    // 重新載入黑名單
+    await loadBlacklist();
+  } catch (error) {
+    console.error('[admin_settings] 添加到黑名單失敗', error);
+    if (messageEl) {
+      showHint(messageEl, `操作失敗：${error.message}`, 'error');
+    }
+  }
+}
+
+async function removeFromBlacklist(userId) {
+  if (!confirm('確定要將此使用者從黑名單中移除嗎？')) return;
+  
+  const messageEl = document.getElementById('blacklistMessage');
+  try {
+    if (messageEl) {
+      showHint(messageEl, '處理中...', 'info');
+    }
+    await ApiClient.admin.blacklist.remove(userId);
+    if (messageEl) {
+      showHint(messageEl, '已從黑名單移除', 'success');
+    }
+    // 重新載入黑名單
+    await loadBlacklist();
+  } catch (error) {
+    console.error('[admin_settings] 從黑名單移除失敗', error);
+    if (messageEl) {
+      showHint(messageEl, `操作失敗：${error.message}`, 'error');
+    }
+  }
+}
+
+function bindNewFeatureEvents() {
+  // 預設 API Key 相關按鈕
+  const btnLoadDefaultApiKey = document.getElementById('btnLoadDefaultApiKey');
+  if (btnLoadDefaultApiKey) {
+    btnLoadDefaultApiKey.addEventListener('click', loadDefaultApiKey);
+  }
+  
+  // 儲存模型設定時同時儲存預設 API Key
+  const btnSaveModelSettings = document.getElementById('btnSaveModelSettings');
+  if (btnSaveModelSettings) {
+    btnSaveModelSettings.addEventListener('click', async () => {
+      try {
+        await saveModelSettings();
+        await saveDefaultApiKey();
+        await saveDefaultAiKeyLimits();
+        const messageEl = document.getElementById('modelSettingsMessage');
+        if (messageEl) {
+          showHint(messageEl, '設定已儲存', 'success');
+        }
+      } catch (error) {
+        const messageEl = document.getElementById('modelSettingsMessage');
+        if (messageEl) {
+          showHint(messageEl, `儲存失敗：${error.message}`, 'error');
+        }
+      }
+    });
+  }
+  
+  // 黑名單相關按鈕
+  const btnAddToBlacklist = document.getElementById('btnAddToBlacklist');
+  if (btnAddToBlacklist) {
+    btnAddToBlacklist.addEventListener('click', addToBlacklist);
+  }
 }
 
 window.__bootAdminSettings = boot;

@@ -3,29 +3,15 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import String, DateTime, Text, Float, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from pgvector.sqlalchemy import Vector
 
-from . import ORMBase, TimestampMixin, TimestampSchema
+from . import ORMBase, TimestampMixin
 from .__Function import create_uuid7
 
-__all__ = ["Schema", "Table"]
-
-
-class Schema(BaseModel):
-    """events 的基礎 I/O 欄位（不含 id/時間戳）。"""
-    recording_id: uuid.UUID | None = None
-    action: str | None = Field(default=None, max_length=128)
-    scene:  str | None = Field(default=None, max_length=128)
-    summary: str | None = None
-    objects: list[str] | None = None
-    start_time: datetime | None = None
-    duration: float | None = Field(default=None, ge=0)
-
-    model_config = ConfigDict(from_attributes=True)
+__all__ = ["Table"]
 
 class EventsTable(ORMBase, TimestampMixin):
     __tablename__ = "events"

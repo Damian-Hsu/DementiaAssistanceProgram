@@ -1,0 +1,89 @@
+{
+  "功能編號": "2-4-2",
+  "功能名稱": "檢視單一事件內容",
+  "功能說明": "使用者點擊事件列表的「詳情」後，前端呼叫取得單一事件 API 並以 dialog 顯示事件日期時間、行為、地點、物件與摘要；若事件包含 recording_id，提供連結跳轉至影片管理頁查看對應影片。",
+  "程式名稱": "services/WebUIServer/app/static/js/events.js; services/APIServer/app/router/Events/service.py",
+  "輸入": [
+    "event_id",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "EventRead",
+    "詳情 dialog"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊事件列表「詳情」按鈕（data-action=detail）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /api/v1/events/{event_id} 取得 EventRead"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "畫面渲染",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "將欄位渲染到 dialog（日期/時間/行為/地點/物件/摘要）"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 recording_id 存在：提供跳轉連結到 /recordings?recording_id=..."
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示事件詳情對話框"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "events",
+    "columns": [
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "用於跳轉對應影片"
+      },
+      {
+        "欄位": "objects",
+        "中文": "物件清單",
+        "型態": "ARRAY(VARCHAR)",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "以標籤方式呈現"
+      }
+    ]
+  }
+}

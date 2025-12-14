@@ -111,8 +111,8 @@ function initAutoTokenRefresh() {
     console.log('[AutoTokenRefresh] 10分鐘計時器觸發，將 userActivityStatus 設為 false');
 
     // 檢查變數狀態並刷新 Token
-    // 如果變數在更新前是 false（表示10分鐘內沒有活動），刷新 Token
-    if (!hadActivity) {
+    // 如果變數在更新前是 true（表示10分鐘內有活動），刷新 Token（延長 session）
+    if (hadActivity) {
       async function refreshToken() {
         try {
           const token = localStorage.getItem('jwt');
@@ -121,7 +121,7 @@ function initAutoTokenRefresh() {
             return;
           }
 
-          console.log('[AutoTokenRefresh] 10分鐘內無活動，刷新 Token');
+          console.log('[AutoTokenRefresh] 10分鐘內有活動，刷新 Token');
           const data = await ApiClient.refreshUserToken();
           const newToken = data?.access_token || data?.token || data?.jwt;
           
@@ -155,7 +155,7 @@ function initAutoTokenRefresh() {
       // 執行刷新
       refreshToken();
     } else {
-      console.log('[AutoTokenRefresh] 10分鐘內有活動，不刷新 Token');
+      console.log('[AutoTokenRefresh] 10分鐘內無活動，不刷新 Token');
     }
   }
 
@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     
-    // 如果是 admin 但在非 admin 頁面（除了設定頁面），可以選擇導向 admin_home
+    // 如果是 admin 但在非 admin 頁面（除了設定頁面），可以選擇導向 admin_tasks
     // 這裡我們不強制導向，讓 admin 可以訪問所有頁面（如果需要限制，可以在後端處理）
   } catch (error) {
     console.error('[init_user] 初始化失敗:', error);

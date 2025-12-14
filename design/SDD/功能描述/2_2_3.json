@@ -1,0 +1,79 @@
+{
+  "功能編號": "2-2-3",
+  "功能名稱": "刪除鏡頭",
+  "功能說明": "使用者刪除鏡頭時，後端採邏輯刪除（將 camera.status 設為 deleted）；前端重新載入鏡頭清單並隱藏已刪除鏡頭，若無可用鏡頭則顯示新增鏡頭表單。",
+  "程式名稱": "services/WebUIServer/app/static/js/services/CameraService.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Camera/service.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "鏡頭介面",
+      "camera資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "鏡頭介面",
+      "camera資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "選擇",
+        "objects": [
+          "【deleted】"
+        ],
+        "text": "滑鼠選擇【deleted】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "送出刪除請求並將 camera.status 設為 deleted。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "camera資料表"
+        ],
+        "text": "標記鏡頭為deleted",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "camera",
+    "columns": [
+      {
+        "欄位": "status",
+        "中文": "鏡頭狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "inactive",
+        "備註": "刪除時設為 deleted"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      }
+    ]
+  },
+  "備註": ""
+}

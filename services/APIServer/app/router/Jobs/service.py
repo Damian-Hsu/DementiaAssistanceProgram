@@ -5,6 +5,7 @@
 from __future__ import annotations
 from typing import Optional
 import uuid
+import os
 from datetime import datetime, timedelta
 import uuid_utils as uuidu
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -20,8 +21,9 @@ from .DTO import (
     JobCompleteDTO, JobListRespDTO, OKRespDTO
 )
 from ...DataAccess.task_producer import enqueue
-from ...DataAccess.tables import inference_jobs, recordings, events
+from ...DataAccess.tables import inference_jobs, recordings, events, users
 from ...DataAccess.tables.__Enumeration import JobStatus, UploadStatus
+from ...router.User.service import UserService
 from ...config.path import (
     JOBS_PREFIX, JOBS_POST_CREATE_JOB, JOBS_GET_GET_JOB, JOBS_GET_GET_JOB_STATUS
 )
@@ -46,11 +48,66 @@ def _parse_iso_dt(s: str | None):
 
 @jobs_router.post(JOBS_POST_CREATE_JOB, response_model=JobCreatedRespDTO, status_code=status.HTTP_201_CREATED)
 async def create_job(body: JobCreateDTO, db: AsyncSession = Depends(get_session), api_key = Depends(get_uploader_api_client)):
+    """建立新的推論任務。
+    
+    為影片輸入建立 recording 記錄，建立 pending 狀態的 job，
+    並將任務投遞到 Celery 進行非同步處理。
+    
+    Args:
+        body: 任務建立請求資料
+        db: 資料庫會話
+        api_key: API Key 驗證（依賴注入）
+        
+    Returns:
+        JobCreatedRespDTO: 包含 job_id 和 trace_id
+        
+    Raises:
+        HTTPException: 當輸入類型為 video 但缺少 user_id 時
+    """
     trace_id: str = body.trace_id or str(create_uuid7())
     params_json = jsonable_encoder(body.params)
 
-    # 1) 建 recordings（僅 video）
+    # 注意：AsyncSession 預設 autobegin=True，任何 db.execute 都會自動開 transaction。
+    # 因此 create_job 的所有 DB 操作必須收斂到單一個 begin()，避免 nested begin 造成
+    # "A transaction is already begun on this Session."
     async with db.begin():
+        # 獲取使用者的 LLM API Key（僅對需要 LLM 處理的 job 類型）
+        # 目前只有 video_description_extraction 需要 LLM
+        requires_llm = body.type == "video_description_extraction"
+        
+        if requires_llm:
+            if not body.params.user_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="user_id 是必需的（用於確定使用的 LLM API Key）"
+                )
+            
+            user_service = UserService()
+            user_result = await db.execute(
+                select(users.Table).where(users.Table.id == body.params.user_id)
+            )
+            current_user = user_result.scalar_one_or_none()
+            
+            if not current_user:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"使用者 {body.params.user_id} 不存在"
+                )
+
+            llm_provider, llm_model, llm_api_key = await user_service.get_user_llm_config(db, current_user)
+            if llm_api_key is None:
+                llm_api_key = await user_service.get_default_google_api_key(db)
+
+            if llm_api_key:
+                params_json["google_api_key"] = llm_api_key
+                print(f"[Jobs] 已為使用者 {body.params.user_id} 設定 LLM API Key")
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"使用者 {body.params.user_id} 沒有可用的 LLM API Key（請設定自己的 API Key 或確保系統預設 API Key 已設定）"
+                )
+
+        # 建立 recordings（僅 video 輸入）
         recording_id: uuid.UUID | None = None
         if body.input_type == "video":
             # s3_key 去重
@@ -63,7 +120,6 @@ async def create_job(body: JobCreateDTO, db: AsyncSession = Depends(get_session)
                 recording_id = rec.id
             else:
                 if body.params.user_id is None:
-                    # 讓 FastAPI 處理這個 HTTP 例外，無需外層再捕捉一次
                     raise HTTPException(status_code=400, detail="params.user_id is required for video inputs")
 
                 rec = recordings.Table(
@@ -79,7 +135,7 @@ async def create_job(body: JobCreateDTO, db: AsyncSession = Depends(get_session)
             if not params_json.get("video_id"):
                 params_json["video_id"] = str(recording_id)
 
-        # 2) 建 job（pending）
+        # 建立 job（pending）
         job = inference_jobs.Table(
             type=body.type,
             input_type=body.input_type,
@@ -89,9 +145,9 @@ async def create_job(body: JobCreateDTO, db: AsyncSession = Depends(get_session)
             params=params_json,
         )
         db.add(job)
-        await db.flush()  # 拿到 job.id
+        await db.flush()  # 取得 job.id
 
-    # 3) 投遞 Celery（交易外）
+    # 投遞 Celery（交易外）
     task_name = {
         "video_description_extraction": "tasks.video_description_extraction",
     }.get(body.type)
@@ -314,18 +370,15 @@ async def complete_job(job_id: str, body: JobCompleteDTO, db: AsyncSession = Dep
     if jid_path != jid_body:
         raise HTTPException(status_code=400, detail="Path job_id and body.job_id mismatch")
 
-    # 轉 Enum 與時間
-    try:
-        new_status = JobStatus(body.status)
-    except Exception:
-        raise HTTPException(status_code=400, detail=f"Invalid status: {body.status}")
+    # 轉 Enum 與時間：直接使用 JobStatus enum 內的字（正規化已在 DTO 做 strip/lower）
+    new_status = body.status
 
     vstart = _parse_iso_dt(body.video_start_time)
     vend = _parse_iso_dt(body.video_end_time)
 
     async with db.begin():
-        # (1) 更新 job
-        await db.execute(
+        # (1) 更新 job（並確認 job 存在）
+        res_upd = await db.execute(
             update(inference_jobs.Table)
             .where(inference_jobs.Table.id == jid_body)
             .values(
@@ -335,7 +388,50 @@ async def complete_job(job_id: str, body: JobCompleteDTO, db: AsyncSession = Dep
                 duration=body.duration,
                 metrics=body.metrics,
             )
+            .returning(inference_jobs.Table.id)
         )
+        updated_id = res_upd.scalar_one_or_none()
+        if not updated_id:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        # (1.5) 寫入 Token 使用量（Compute 來源）
+        # 只要 metrics 帶有 LLM token 資訊，就會被統計進使用者的 Token 使用量
+        try:
+            res_params = await db.execute(
+                select(inference_jobs.Table.params, inference_jobs.Table.type).where(inference_jobs.Table.id == jid_body)
+            )
+            row = res_params.first()
+            job_params = (row[0] if row else None) or {}
+            job_type = (row[1] if row else None) or None
+            user_id = job_params.get("user_id")
+
+            metrics = body.metrics or {}
+            prompt_tokens = metrics.get("llm_prompt_tokens")
+            completion_tokens = metrics.get("llm_completion_tokens")
+            total_tokens = metrics.get("llm_total_tokens")
+
+            if user_id and (prompt_tokens is not None or completion_tokens is not None or total_tokens is not None):
+                from ...utils.llm_usage import log_llm_usage
+                usage = {
+                    "prompt_tokens": int(prompt_tokens or 0),
+                    "completion_tokens": int(completion_tokens or 0),
+                    "total_tokens": int(total_tokens or (int(prompt_tokens or 0) + int(completion_tokens or 0))),
+                }
+                provider = metrics.get("llm_provider")
+                model_name = metrics.get("llm_model") or metrics.get("llm_model_name")
+                await log_llm_usage(
+                    db,
+                    user_id=int(user_id),
+                    source="compute",
+                    provider=str(provider) if provider else None,
+                    model_name=str(model_name) if model_name else None,
+                    usage=usage,
+                    assistant_replies=0,
+                    trace_id=body.trace_id,
+                    meta={"job_id": str(jid_body), "job_type": job_type},
+                )
+        except Exception as e:
+            print(f"[Jobs] 記錄 compute token 使用量失敗: {e}")
 
         # (2) 若成功 → 更新 recordings 與事件表
         if new_status == JobStatus.success:
@@ -346,12 +442,31 @@ async def complete_job(job_id: str, body: JobCompleteDTO, db: AsyncSession = Dep
             job_params: Optional[dict] = res.scalar_one_or_none() or {}
             video_id = job_params.get("video_id")
             if not video_id:
-                raise HTTPException(status_code=400, detail="video_id not found in job params")
+                # 不讓 /complete 直接失敗：改成把 job 標記 failed，避免前端卡在 processing
+                await db.execute(
+                    update(inference_jobs.Table)
+                    .where(inference_jobs.Table.id == jid_body)
+                    .values(
+                        status=JobStatus.failed,
+                        error_code="MISSING_VIDEO_ID",
+                        error_message="video_id not found in job params (cannot update recordings/events)",
+                    )
+                )
+                return OKRespDTO()
 
             try:
                 vid = uuid.UUID(str(video_id))
             except Exception:
-                raise HTTPException(status_code=400, detail="Invalid video_id in job params")
+                await db.execute(
+                    update(inference_jobs.Table)
+                    .where(inference_jobs.Table.id == jid_body)
+                    .values(
+                        status=JobStatus.failed,
+                        error_code="INVALID_VIDEO_ID",
+                        error_message="Invalid video_id in job params (cannot update recordings/events)",
+                    )
+                )
+                return OKRespDTO()
 
             await db.execute(
                 update(recordings.Table)
@@ -411,15 +526,27 @@ async def complete_job(job_id: str, body: JobCompleteDTO, db: AsyncSession = Dep
                     ]
                 }
             """
+            # 取得 recording 的 user_id / s3_key（後續 events、縮圖都會用到）
+            res_rec = await db.execute(
+                select(recordings.Table.user_id, recordings.Table.s3_key).where(recordings.Table.id == vid)
+            )
+            rec_row = res_rec.first()
+            recording_user_id = rec_row[0] if rec_row else None
+            recording_s3_key = rec_row[1] if rec_row else None
+
             # start_time 儲存UTC時間
             if body.events:
-                # 取得 user_id（從 recordings 表）
-                res_user = await db.execute(
-                    select(recordings.Table.user_id).where(recordings.Table.id == vid)
-                )
-                recording_user_id = res_user.scalar_one_or_none()
                 if not recording_user_id:
-                    raise HTTPException(status_code=400, detail="recording user_id not found")
+                    await db.execute(
+                        update(inference_jobs.Table)
+                        .where(inference_jobs.Table.id == jid_body)
+                        .values(
+                            status=JobStatus.failed,
+                            error_code="RECORDING_USER_NOT_FOUND",
+                            error_message="recording user_id not found (cannot create events)",
+                        )
+                    )
+                    return OKRespDTO()
                 
                 for event in body.events:
                     ev = events.Table(
@@ -443,29 +570,35 @@ async def complete_job(job_id: str, body: JobCompleteDTO, db: AsyncSession = Dep
                 if not has_embedding:
                     try:
                         from ...DataAccess.task_producer import enqueue
+
+                        # 建立 inference_jobs 追蹤（embedding_generation）
+                        emb_job = inference_jobs.Table(
+                            type="embedding_generation",
+                            status=JobStatus.pending,
+                            input_type="recording",
+                            input_url=str(vid),
+                            output_url=None,
+                            trace_id=body.trace_id,
+                            params={
+                                "user_id": int(recording_user_id) if recording_user_id is not None else None,
+                                "recording_id": str(vid),
+                                "progress": 0.0,
+                            },
+                            metrics=None,
+                        )
+                        db.add(emb_job)
+                        await db.commit()
+                        await db.refresh(emb_job)
+
                         enqueue("tasks.generate_embeddings_for_recording", {
-                            "recording_id": str(vid)
+                            "recording_id": str(vid),
+                            "job_id": str(emb_job.id),
                         })
-                        print(f"[Job] 已觸發 embedding 生成任務: recording_id={vid}")
+                        print(f"[Job] 已觸發 embedding 生成任務: recording_id={vid} job_id={emb_job.id}")
                     except Exception as e:
                         print(f"[Job] 觸發 embedding 生成任務失敗: {e}")
                 
-                # 觸發縮圖生成任務
-                try:
-                    from ...DataAccess.task_producer import enqueue
-                    # 獲取錄影的 s3_key
-                    res_s3 = await db.execute(
-                        select(recordings.Table.s3_key).where(recordings.Table.id == vid)
-                    )
-                    s3_key = res_s3.scalar_one_or_none()
-                    if s3_key:
-                        enqueue("tasks.generate_video_thumbnail", {
-                            "recording_id": str(vid),
-                            "video_url": s3_key if s3_key.startswith("s3://") else f"s3://{os.getenv('MINIO_BUCKET', 'media-bucket')}/{s3_key}",
-                            "user_id": recording_user_id
-                        })
-                        print(f"[Job] 已觸發縮圖生成任務: recording_id={vid}")
-                except Exception as e:
-                    print(f"[Job] 觸發縮圖生成任務失敗: {e}")
+            # 縮圖生成已併入 ComputeServer 的 videosprocessing（同一支任務使用記憶體幀直接產生縮圖並回寫）
+            # 因此這裡不再 enqueue tasks.generate_video_thumbnail，避免重複工作與競態。
     
     return OKRespDTO()

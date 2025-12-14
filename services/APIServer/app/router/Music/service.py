@@ -30,7 +30,7 @@ from ...utils import (
     delete_object,
 )
 from ..Admin.service import ensure_admin  # re-use admin guard
-from .DTO import MusicRead, MusicListResponse, MusicUrlResponse, MusicAdminRead
+from .DTO import MusicRead, MusicListResponse, MusicUrlResponse, MusicAdminRead, MusicUpdate
 
 
 music_router = APIRouter(prefix="/music", tags=["music"])
@@ -217,6 +217,39 @@ async def upload_music(
     await db.refresh(record)
 
     uploader_name = getattr(current_user, "name", None)
+    return _build_music_read(record, uploader_name, include_s3=True)
+
+
+@admin_music_router.patch("/{music_id}", response_model=MusicAdminRead)
+async def update_music(
+    music_id: uuid.UUID = Path(..., description="音樂 ID"),
+    body: MusicUpdate = ...,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user),
+):
+    """[Admin] 更新音樂資訊"""
+    ensure_admin(current_user)
+    record = await _get_music_or_404(music_id, db)
+
+    if body.name is not None:
+        record.name = body.name
+    if body.composer is not None:
+        record.composer = body.composer
+    if body.description is not None:
+        record.description = body.description
+    if body.metadata is not None:
+        record.meta_data = body.metadata
+
+    record.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(record)
+
+    uploader_name = None
+    if record.uploader_user_id:
+        res = await db.execute(
+            select(users.Table.name).where(users.Table.id == record.uploader_user_id)
+        )
+        uploader_name = res.scalar_one_or_none()
     return _build_music_read(record, uploader_name, include_s3=True)
 
 

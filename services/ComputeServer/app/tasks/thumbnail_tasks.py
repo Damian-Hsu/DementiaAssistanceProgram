@@ -64,20 +64,40 @@ def _generate_thumbnail_from_url(video_url: str, thumbnail_path: str) -> bool:
         是否成功生成
     """
     try:
-        # 如果是 s3:// URL，需要轉換為 presigned URL
+        # 若是 s3://，優先用 MinIO 內網直接下載到本地再取幀（避免 presigned API/權限問題）
+        local_video_path = None
         if video_url.startswith("s3://"):
-            # 通過 API 獲取 presigned URL
             try:
-                response = requests.get(
-                    f"{API_BASE_URL}/recordings/url",
-                    params={"s3_key": video_url, "ttl": 3600},
-                    headers=API_HEADERS,
-                    timeout=10
+                from minio import Minio
+                from urllib.parse import urlparse
+                # s3://bucket/key
+                parsed = urlparse(video_url)
+                bucket = (parsed.netloc or "").strip()
+                key = (parsed.path or "").lstrip("/")
+                if not bucket or not key:
+                    raise ValueError(f"invalid s3 url: {video_url}")
+
+                client = Minio(
+                    MINIO_ENDPOINT,
+                    access_key=MINIO_ACCESS_KEY,
+                    secret_key=MINIO_SECRET_KEY,
+                    secure=MINIO_SECURE,
                 )
-                if response.status_code == 200:
-                    video_url = response.json().get("url", video_url)
+
+                local_video_path = os.path.join(os.path.dirname(thumbnail_path), "source.mp4")
+                resp = client.get_object(bucket, key)
+                try:
+                    with open(local_video_path, "wb") as f:
+                        for d in resp.stream(1024 * 1024):
+                            f.write(d)
+                finally:
+                    resp.close()
+                    resp.release_conn()
+
+                video_url = local_video_path
             except Exception as e:
-                logger.warning(f"獲取 presigned URL 失敗，嘗試直接使用: {e}")
+                logger.error(f"從 MinIO 下載影片失敗: {e}", exc_info=True)
+                return False
         
         # 使用 OpenCV 讀取視頻第一幀
         cap = cv2.VideoCapture(video_url)
@@ -140,7 +160,7 @@ def _update_recording_thumbnail(recording_id: str, thumbnail_s3_key: str):
     """通過 API 更新錄影的縮圖路徑"""
     try:
         response = requests.patch(
-            f"{API_BASE_URL}/recordings/{recording_id}/thumbnail",
+            f"{API_BASE_URL}/m2m/recordings/{recording_id}/thumbnail",
             params={"thumbnail_s3_key": thumbnail_s3_key},
             headers=API_HEADERS,
             timeout=10

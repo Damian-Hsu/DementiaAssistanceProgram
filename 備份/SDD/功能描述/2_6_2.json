@@ -1,0 +1,126 @@
+{
+  "功能編號": "2-6-2",
+  "功能名稱": "變更密碼",
+  "功能說明": "使用者可在設定頁開啟「修改密碼」對話框，輸入舊密碼與新密碼後送出；後端會驗證舊密碼是否正確，正確則更新 users.password_hash。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/css/user_profile.css; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/User/service.py; services/APIServer/app/router/User/DTO.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入": [
+    "old_password",
+    "new_password",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "PUT /users/me/password 回傳 msg",
+    "成功/失敗提示訊息",
+    "關閉對話框並清空欄位"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊【變更密碼】開啟 changepassworddialog"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊【確認變更】送出"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "輸入舊密碼（current_password）"
+          },
+          {
+            "sub_no": "②",
+            "item": "輸入新密碼（new_password）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 PUT /users/me/password，傳入 old_password/new_password"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端驗證 old_password：不正確回 422（舊密碼不正確）"
+          },
+          {
+            "sub_no": "③",
+            "item": "後端將 new_password 雜湊後寫入 users.password_hash 並 commit"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "前端收斂處理",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示成功訊息，清空輸入欄位並關閉 dialog"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示錯誤訊息（沿用後端 detail），並關閉 dialog"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示「密碼已成功更新」或錯誤訊息"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": "autoincrement",
+        "備註": "Primary Key"
+      },
+      {
+        "欄位": "password_hash",
+        "中文": "密碼雜湊",
+        "型態": "VARCHAR",
+        "長度": 256,
+        "空值": "否",
+        "預設值": null,
+        "備註": "變更密碼寫入欄位"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

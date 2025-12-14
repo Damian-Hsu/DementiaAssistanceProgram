@@ -1,0 +1,140 @@
+{
+  "功能編號": "3-2-4",
+  "功能名稱": "預設 API Key 黑名單管理",
+  "功能說明": "管理員可將使用者加入/移除「預設 API Key 黑名單」（api_key_blacklist），以禁止其使用系統預設 Google API Key。加入黑名單時可填寫原因，若已存在則視為更新原因（idempotent）；新增黑名單同時會將 users.settings.use_default_api_key 設為 false，避免使用者端仍勾選使用預設 key。前端在使用者詳情視窗以 checkbox + reason 欄位操作並儲存。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_users.js; services/WebUIServer/app/template/admin_users.html; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入": [
+    "user_id",
+    "reason（可選）",
+    "blacklist checkbox（加入/移除/更新原因）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "BlacklistEntryDTO（加入/更新回傳）",
+    "刪除回應（message）",
+    "使用者詳情視窗提示（已儲存/失敗）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "在使用者詳情視窗勾選/取消「黑名單」checkbox"
+          },
+          {
+            "sub_no": "②",
+            "item": "輸入黑名單原因（可選）"
+          },
+          {
+            "sub_no": "③",
+            "item": "點擊【儲存】"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "變更判斷",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端比較 originalBlacklist（is_blacklisted/reason）與目前勾選/原因；無變更則不呼叫 API"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "未在黑名單 → 勾選：呼叫 POST /api/v1/admin/blacklist（{user_id, reason}）新增"
+          },
+          {
+            "sub_no": "②",
+            "item": "已在黑名單 → 取消：呼叫 DELETE /api/v1/admin/blacklist/{user_id} 移除"
+          },
+          {
+            "sub_no": "③",
+            "item": "已在黑名單 → 仍勾選但原因變更：呼叫 POST /api/v1/admin/blacklist（視為更新原因）"
+          },
+          {
+            "sub_no": "④",
+            "item": "後端新增黑名單時同步把 users.settings.use_default_api_key 設為 false"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "前端同步顯示",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "儲存成功後更新列表中該使用者的 is_blacklisted 與 use_default_api_key 顯示"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示「已儲存」並關閉視窗"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示錯誤訊息（例如使用者不存在/權限不足）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "api_key_blacklist; users",
+    "columns": [
+      {
+        "欄位": "user_id",
+        "中文": "黑名單使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_key_blacklist.user_id；Primary Key；ForeignKey(users.id)"
+      },
+      {
+        "欄位": "reason",
+        "中文": "禁止原因",
+        "型態": "VARCHAR",
+        "長度": 500,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_key_blacklist.reason"
+      },
+      {
+        "欄位": "settings",
+        "中文": "使用者設定(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings.use_default_api_key（加入黑名單時會被改為 false）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      }
+    ]
+  }
+}

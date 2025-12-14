@@ -1,0 +1,188 @@
+{
+  "功能編號": "3-2",
+  "功能名稱": "使用者管理",
+  "功能說明": "管理員可查看一般使用者的統計資訊（Token 使用量、聊天訊息數、是否使用系統預設 API Key、黑名單狀態），並可點擊查看單一使用者詳情、啟用/停用帳號，以及管理「預設 API Key 黑名單」（禁止該使用者使用系統預設 Google API Key；加入黑名單時會同步把 users.settings.use_default_api_key 設為 false）。",
+  "程式名稱": "services/WebUIServer/app/template/admin_users.html; services/WebUIServer/app/static/js/admin_users.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/users.py; services/APIServer/app/DataAccess/tables/llm_usage_logs.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py",
+  "輸入": [
+    "GET /admin/users/stats",
+    "GET /admin/users/{user_id}",
+    "PATCH /admin/users/{user_id}（active）",
+    "POST /admin/blacklist（user_id/reason）",
+    "DELETE /admin/blacklist/{user_id}",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "UserStatsDTO[]（使用者統計列表）",
+    "UserDetailDTO（使用者詳情含 password_hash/settings/黑名單狀態）",
+    "BlacklistEntryDTO（加入/更新黑名單回應）",
+    "管理介面表格 + 使用者詳情 Modal"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員進入使用者管理頁（/admin/users），載入統計表格與分頁控制"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端檢查登入者 role=admin，否則導回首頁"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "使用者操作",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊使用者列開啟詳情視窗"
+          },
+          {
+            "sub_no": "②",
+            "item": "在詳情視窗切換帳號啟用狀態並儲存"
+          },
+          {
+            "sub_no": "③",
+            "item": "在詳情視窗勾選/取消黑名單並輸入原因（可選）後儲存"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "權限檢查",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端以 GET /users/me 確認 role=admin；後端所有 /admin/* 端點會 enforce admin"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "統計查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端查詢 users（role=user）取得所有一般使用者"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端聚合 llm_usage_logs：sum(total_tokens) 作為 total_token_usage；chat 的 assistant_replies 作為 total_chat_messages"
+          },
+          {
+            "sub_no": "③",
+            "item": "後端查詢 api_key_blacklist 取得黑名單集合；並從 users.settings 解析 use_default_api_key"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "啟用/停用：PATCH /admin/users/{user_id}（active）更新 users.active"
+          },
+          {
+            "sub_no": "②",
+            "item": "黑名單：POST /admin/blacklist（新增或更新 reason）；DELETE /admin/blacklist/{user_id}（移除）"
+          },
+          {
+            "sub_no": "③",
+            "item": "加入黑名單時：後端同步把 users.settings.use_default_api_key 設為 false（避免繼續使用預設 key）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示統計列表（Token/聊天數/是否用預設 key/黑名單狀態）"
+          },
+          {
+            "sub_no": "②",
+            "item": "顯示使用者詳情 Modal，並在儲存後更新列表對應列的狀態"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users; llm_usage_logs; api_key_blacklist",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": "autoincrement",
+        "備註": "users.id"
+      },
+      {
+        "欄位": "active",
+        "中文": "帳號啟用",
+        "型態": "BOOLEAN",
+        "長度": null,
+        "空值": "否",
+        "預設值": true,
+        "備註": "users.active（啟用/停用）"
+      },
+      {
+        "欄位": "settings",
+        "中文": "使用者設定(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings.use_default_api_key"
+      },
+      {
+        "欄位": "total_tokens",
+        "中文": "總 Token 數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.total_tokens（聚合 sum）"
+      },
+      {
+        "欄位": "assistant_replies",
+        "中文": "AI 助手回覆次數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.assistant_replies（聚合；聊天訊息數取 chat source）"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "黑名單使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_key_blacklist.user_id（Primary Key）"
+      },
+      {
+        "欄位": "reason",
+        "中文": "黑名單原因",
+        "型態": "VARCHAR",
+        "長度": 500,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_key_blacklist.reason"
+      }
+    ]
+  }
+}

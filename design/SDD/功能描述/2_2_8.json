@@ -1,0 +1,57 @@
+{
+  "功能編號": "2-2-8",
+  "功能名稱": "播放及時串流",
+  "功能說明": "當鏡頭串流狀態為 running 時，系統取得 WebRTC 播放 URL 並建立連線，成功後在播放器顯示即時畫面；若連線失敗則依策略重連。",
+  "程式名稱": "services/WebUIServer/app/template/camera.html; services/WebUIServer/app/static/js/camera.js; services/APIServer/app/router/Camera/service.py; services/APIServer/app/security/jwt_manager.py; deploy/mediamtx/mediamtx.yml",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統"
+    ],
+    "資源名詞": [
+      "鏡頭介面"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "即時預覽畫面"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "啟動",
+        "objects": [
+          "即時預覽"
+        ],
+        "text": "系統啟動即時預覽",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "取得 WebRTC 播放 URL 並建立連線，失敗則依策略重連。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "播放",
+        "objects": [
+          "即時預覽畫面"
+        ],
+        "text": "播放即時預覽畫面",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  },
+  "備註": ""
+}

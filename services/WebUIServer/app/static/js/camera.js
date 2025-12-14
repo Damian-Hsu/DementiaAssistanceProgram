@@ -43,8 +43,48 @@ function handleSuccess(msg) {
   alert(msg || "操作成功");
 }
 
-// 顯示成功複製提示
-function showCopySuccessToast(message = "成功複製") {
+/**
+ * 可靠複製到剪貼簿：
+ * - 優先使用 navigator.clipboard（需要 HTTPS 或 localhost 等安全環境）
+ * - 否則 fallback 到 execCommand('copy')
+ */
+async function copyToClipboard(text) {
+  const value = (text ?? '').toString();
+  if (!value) return false;
+
+  // 優先：Clipboard API
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch (e) {
+    // 交給 fallback
+    console.warn('[Camera] navigator.clipboard 失敗，嘗試 fallback：', e);
+  }
+
+  // fallback：execCommand
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = value;
+    ta.setAttribute('readonly', 'true');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return !!ok;
+  } catch (e) {
+    console.warn('[Camera] execCommand(copy) 失敗：', e);
+    return false;
+  }
+}
+
+// 顯示提示（避免使用原生 alert）
+function showToast(message = "完成", variant = "success") {
   // 移除已存在的提示框
   const existingToast = document.getElementById("copySuccessToast");
   if (existingToast) {
@@ -54,7 +94,7 @@ function showCopySuccessToast(message = "成功複製") {
   // 創建提示框
   const toast = document.createElement("div");
   toast.id = "copySuccessToast";
-  toast.className = "copy-success-toast";
+  toast.className = `copy-success-toast ${variant || "success"}`.trim();
   toast.textContent = message;
   
   // 添加到頁面
@@ -83,6 +123,58 @@ let webrtcReconnectTimer = null;
 let isPreviewActive = false;
 let lastStreamStatus = null; // 追蹤上次的串流狀態，用於檢測狀態變化
 let streamStatusInterval = null;
+let webrtcStatsTimer = null;
+
+function startWebRTCStats(pc, videoEl) {
+  // 每次重連都會重建 pc，所以這裡做「單一連線」的短期觀測即可
+  if (webrtcStatsTimer) {
+    clearInterval(webrtcStatsTimer);
+    webrtcStatsTimer = null;
+  }
+  const startedAt = Date.now();
+  webrtcStatsTimer = setInterval(async () => {
+    if (!pc || pc.connectionState === "closed" || !isPreviewActive) return;
+    try {
+      const stats = await pc.getStats();
+      let vIn = null;
+      let aIn = null;
+      let vCodec = null;
+      stats.forEach((r) => {
+        if (r.type === "inbound-rtp" && r.kind === "video") vIn = r;
+        if (r.type === "inbound-rtp" && r.kind === "audio") aIn = r;
+        if (r.type === "codec" && vIn && r.id === vIn.codecId) vCodec = r;
+      });
+      const since = Math.round((Date.now() - startedAt) / 1000);
+      console.log("[WebRTC][Stats]", {
+        t: `${since}s`,
+        pc_connectionState: pc.connectionState,
+        pc_iceConnectionState: pc.iceConnectionState,
+        video: {
+          packetsReceived: vIn?.packetsReceived ?? null,
+          bytesReceived: vIn?.bytesReceived ?? null,
+          framesDecoded: vIn?.framesDecoded ?? null,
+          framesReceived: vIn?.framesReceived ?? null,
+          keyFramesDecoded: vIn?.keyFramesDecoded ?? null,
+          frameWidth: vIn?.frameWidth ?? null,
+          frameHeight: vIn?.frameHeight ?? null,
+          codec: vCodec ? `${vCodec.mimeType || ""} ${vCodec.sdpFmtpLine || ""}`.trim() : null,
+        },
+        audio: {
+          packetsReceived: aIn?.packetsReceived ?? null,
+          bytesReceived: aIn?.bytesReceived ?? null,
+        },
+        videoEl: videoEl ? {
+          readyState: videoEl.readyState,
+          paused: videoEl.paused,
+          videoWidth: videoEl.videoWidth,
+          videoHeight: videoEl.videoHeight,
+        } : null,
+      });
+    } catch (e) {
+      console.warn("[WebRTC][Stats] getStats failed:", e);
+    }
+  }, 2000);
+}
 
 // ----------------------------------------------------
 // 權限檢查與初始化
@@ -118,18 +210,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // ----------------------------------------------------
 // TTL：從使用者設定讀取
-function getTTL() {
-  // 確保 TTL 在有效範圍內
-  if (userStreamTTL >= 30 && userStreamTTL <= 3600) {
-    return userStreamTTL;
-  }
+// - 串流連結 TTL（用於 connectStream / publish RTSP URL）：後端限制 300..21600
+// - WebRTC 播放 URL TTL：後端限制 30..10800（不要直接用串流連結 TTL，避免超出上限導致 422）
+function getStreamLinkTTL() {
+  if (userStreamTTL >= 300 && userStreamTTL <= 21600) return userStreamTTL;
   return 300; // 預設值
+}
+function getPlayTTL() {
+  return 180; // 後端預設值
 }
 
 // ----------------------------------------------------
 // WebRTC (WHEP)：以 WHEP Endpoint 建立下行播放
 async function fetchWhepUrl(id, ttl) {
-  const t = ttl ?? getTTL();
+  const t = ttl ?? getPlayTTL();
   const resp = await svc.getPlayWebrtcUrl?.(id, t);
   const url = resp?.play_webrtc_url || resp?.url;
   if (!url) throw new Error("未取得 WebRTC 播放網址");
@@ -486,8 +580,10 @@ async function playWebRTCWithWHEP(video, id, ttl) {
     const answerCandidates = (answerSdp.match(/a=candidate:/g) || []).length;
     console.log("[WebRTC] Answer contains", answerCandidates, "ICE candidates");
     
-    // 關鍵修復：如果 answer 中的 candidates 使用內部端口 8189，需要替換為外部端口 30205
-    // 因為瀏覽器無法直接連接到容器內部端口
+    // 相容性修復：
+    // - 舊部署可能會回傳容器內部 ICE candidate（127.0.0.1 / 172.18.x.x + 8189）
+    // - 新部署已改由 MediaMTX 直接監聽 30205，且只宣告可被前端連到的位址
+    // 這段保留為防禦性處理：若仍出現內部位址/端口，嘗試替換成目前頁面可連的 host/port。
     let modifiedAnswerSdp = answerSdp;
     
     // 檢查 answer 中是否包含 ICE candidates
@@ -510,7 +606,7 @@ async function playWebRTCWithWHEP(video, id, ttl) {
         }
       });
       
-      // 如果 answer 中包含內部端口 8189，替換為外部端口 30205
+      // (A) 若 answer 中包含內部端口 8189，替換為外部端口 30205
       // 檢查多種可能的格式：:8189、 8189、port 8189 等
       if (answerSdp.includes('8189')) {
         console.warn("[WebRTC] Answer contains internal port 8189, replacing with external port 30205");
@@ -538,11 +634,23 @@ async function playWebRTCWithWHEP(video, id, ttl) {
           console.error("[WebRTC] WARNING: Some port 8189 instances were not replaced!");
         }
       }
+
+      // (B) 若 answer candidate 使用 localhost / 127.0.0.1 / Docker 內網 IP，替換成目前頁面 host
+      // 注意：這只是相容性補救；理想狀態是由 MediaMTX 正確回傳可達的候選位址。
+      const publicHost = window.location.hostname;
+      if (publicHost && (answerSdp.includes("127.0.0.1") || answerSdp.includes("localhost") || /\\b172\\.(1[6-9]|2\\d|3[0-1])\\./.test(answerSdp))) {
+        console.warn("[WebRTC] Answer contains internal ICE host, replacing with public host:", publicHost);
+        modifiedAnswerSdp = modifiedAnswerSdp
+          .replace(/\\b127\\.0\\.0\\.1\\b/g, publicHost)
+          .replace(/\\blocalhost\\b/g, publicHost)
+          .replace(/\\b172\\.(1[6-9]|2\\d|3[0-1])\\.[0-9]{1,3}\\.[0-9]{1,3}\\b/g, publicHost);
+      }
     }
     
     console.log("[WebRTC] Setting remote description");
     // 使用修改後的 SDP（如果端口被替換）
     await pc.setRemoteDescription({ type: "answer", sdp: modifiedAnswerSdp });
+    startWebRTCStats(pc, video);
     
     // 參考 view.html：在設置 remote description 後，確保視頻播放
     // 添加一個短延遲，確保 track 事件已經觸發
@@ -608,6 +716,27 @@ function scheduleWebRTCReconnect(video, id, ttl) {
 }
 
 // ----------------------------------------------------
+// 顯示表單錯誤訊息
+function showFormError(inputId, message) {
+  const errorDiv = document.getElementById(`${inputId}_error`);
+  const input = document.getElementById(inputId);
+  
+  if (errorDiv) {
+    errorDiv.textContent = message || '';
+    errorDiv.style.display = message ? 'block' : 'none';
+  }
+  
+  // 添加錯誤樣式到 input
+  if (input) {
+    if (message) {
+      input.classList.add('error');
+    } else {
+      input.classList.remove('error');
+    }
+  }
+}
+
+// ----------------------------------------------------
 // 綁定：新增鏡頭表單
 function bindForm() {
   const form = $("#cameraForm");
@@ -616,22 +745,60 @@ function bindForm() {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = form.querySelector('button[type="submit"]');
-    const name = $("#camera_name")?.value?.trim();
+    const nameInput = $("#camera_name");
+    const name = nameInput?.value?.trim();
 
-    if (!name) return handleError(new Error("請輸入鏡頭名稱"));
+    // 清除之前的錯誤
+    showFormError("camera_name", "");
+
+    if (!name) {
+      showFormError("camera_name", "請輸入鏡頭名稱");
+      return;
+    }
 
     btn.disabled = true;
     try {
       await svc.create({ name });
-      handleSuccess("已新增鏡頭");
+      // 成功時不顯示提示，直接重置表單並重新載入
       form.reset();
+      showFormError("camera_name", ""); // 清除錯誤訊息
       await loadCamera();
     } catch (err) {
-      handleError(err);
+      // 失敗時在 input 框下顯示錯誤原因
+      let errorMessage = "建立鏡頭失敗，請稍後再試";
+      
+      if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (err?.response?.data) {
+        const data = err.response.data;
+        if (typeof data.detail === 'string') {
+          errorMessage = data.detail;
+        } else if (Array.isArray(data.detail)) {
+          errorMessage = data.detail.map(e => e.msg || e.message || String(e)).join(', ');
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+      } else if (err?.detail) {
+        errorMessage = typeof err.detail === 'string' ? err.detail : String(err.detail);
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      showFormError("camera_name", errorMessage);
     } finally {
       btn.disabled = false;
     }
   });
+  
+  // 當用戶開始輸入時，清除錯誤訊息
+  const nameInput = $("#camera_name");
+  if (nameInput) {
+    nameInput.addEventListener("input", () => {
+      showFormError("camera_name", "");
+    });
+  }
 }
 
 // ----------------------------------------------------
@@ -873,7 +1040,7 @@ async function handleStartStream() {
   btn.disabled = true;
   
   try {
-    const ttl = getTTL();
+    const ttl = getStreamLinkTTL();
     let resp;
     try {
       resp = await svc.connect(currentCamera.id, { ttl });
@@ -886,9 +1053,12 @@ async function handleStartStream() {
       const pub = await svc.getPublishRtspUrl?.(currentCamera.id, ttl);
       const rtsp = pub?.publish_rtsp_url || pub?.rtsp_url || pub?.url || null;
       if (rtsp) {
-        await navigator.clipboard?.writeText?.(rtsp).catch(() => {});
-        // 使用 toast 提示而不是 alert
-        showCopySuccessToast(`已複製 RTSP URL\n請到攝影機/OBS 開始推流`);
+        const copied = await copyToClipboard(rtsp);
+        if (copied) {
+          showToast(`已複製串流連結\n請到攝影機/OBS 開始推流`, "success");
+        } else {
+          showToast(`無法自動複製，請手動複製串流連結`, "error");
+        }
         console.log("[Start Stream] RTSP URL copied to clipboard:", rtsp);
       }
     } catch (e) {
@@ -933,7 +1103,7 @@ async function performStopStream() {
   try {
     await svc.stop(currentCamera.id);
     // 不顯示 alert，只使用 toast 提示
-    showCopySuccessToast("串流已停止");
+    showToast("串流已停止", "success");
     console.log("[Stop Stream] Stream stopped successfully");
     
     // 更新串流狀態（會自動停止預覽，如果狀態變為 stopped）
@@ -986,7 +1156,7 @@ async function startPreview() {
   if (!currentCamera) return;
   
   try {
-    const ttl = getTTL();
+    const ttl = getPlayTTL();
     const video = $("#previewVideo");
     const placeholder = $("#previewPlaceholder");
     
@@ -1065,6 +1235,10 @@ function stopPreview() {
     clearTimeout(webrtcReconnectTimer);
     webrtcReconnectTimer = null;
   }
+  if (webrtcStatsTimer) {
+    clearInterval(webrtcStatsTimer);
+    webrtcStatsTimer = null;
+  }
   
   // 關閉連接
   if (window.__hls) { 
@@ -1098,19 +1272,22 @@ async function handlePublishUrl() {
   btn.disabled = true;
   
   try {
-    const ttl = getTTL();
+    const ttl = getStreamLinkTTL();
     const resp = await svc.getPublishRtspUrl?.(currentCamera.id, ttl);
     const url = resp?.publish_rtsp_url || resp?.rtsp_url || resp?.url || null;
     
     if (url) {
       // 複製到剪貼簿
       try {
-        await navigator.clipboard?.writeText?.(url);
-        // 顯示成功複製提示
-        showCopySuccessToast("成功複製");
+        const copied = await copyToClipboard(url);
+        if (copied) {
+          showToast("已複製串流連結", "success");
+        } else {
+          showToast("無法自動複製，請手動複製串流連結", "error");
+        }
       } catch (clipboardErr) {
         console.error("複製失敗：", clipboardErr);
-        handleError(new Error("複製到剪貼簿失敗，請手動複製"));
+        showToast("複製到剪貼簿失敗，請手動複製", "error");
       }
     } else {
       handleError(new Error("無法取得串流連結"));

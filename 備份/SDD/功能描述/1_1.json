@@ -1,0 +1,291 @@
+{
+  "功能編號": "1-1",
+  "功能名稱": "權限控管",
+  "功能說明": "提供系統的登入與註冊入口，使用者於登入/註冊頁輸入必要資料後送出，由後端驗證與建立/查詢使用者資料；成功後簽發 JWT 存取權杖並由前端保存於 localStorage，接著取得目前使用者角色並導向一般使用者或管理員介面。",
+  "程式名稱": "services/WebUIServer/app/template/auth.html; services/WebUIServer/app/static/js/sign_login.js; services/WebUIServer/app/static/js/APIClient.js; services/WebUIServer/app/static/js/AuthService.js; services/APIServer/app/router/Authentication/service.py; services/APIServer/app/router/Authentication/DTO.py; services/APIServer/app/router/User/service.py; services/APIServer/app/security/jwt_manager.py",
+  "輸入": [
+    "滑鼠",
+    "鍵盤",
+    "auth.html頁面",
+    "users資料表"
+  ],
+  "輸出": [
+    "螢幕",
+    "users資料表"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "於登入/註冊頁面選擇要進行「登入」或「註冊」"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若選擇登入：輸入帳號 username 與密碼 password"
+          },
+          {
+            "sub_no": "②",
+            "item": "若選擇註冊：輸入 account、password、確認密碼、姓名、性別、生日、手機、Email"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點選登入頁「Log in」或註冊頁「下一步 Next」送出"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料驗證",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端依規則驗證帳號與密碼格式（長度/允許字元/不可含空白）"
+          },
+          {
+            "sub_no": "②",
+            "item": "若為註冊：前端驗證兩次密碼一致、Email 格式與手機格式（09 開頭 10 碼）"
+          },
+          {
+            "sub_no": "③",
+            "item": "後端以 DTO（SignupRequestDTO/LoginRequestDTO）進行欄位驗證；登入使用 OAuth2PasswordRequestForm 解析 username/password"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若為登入：前端以 x-www-form-urlencoded 呼叫 POST /api/v1/auth/login"
+          },
+          {
+            "sub_no": "②",
+            "item": "若為註冊：前端以 JSON 呼叫 POST /api/v1/auth/signup（建立 users 並自動登入）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端登入：依 users.account 查詢使用者"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端註冊：檢查 users.account / users.email / users.phone 是否已存在"
+          }
+        ]
+      },
+      {
+        "step_no": 4,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若為註冊且檢查通過：後端 hash 密碼並 INSERT users（含預設 settings）"
+          }
+        ]
+      },
+      {
+        "step_no": 5,
+        "title": "權限檢查",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "登入時若 users.active=false：回傳 401（detail=「帳號已停用」）"
+          },
+          {
+            "sub_no": "②",
+            "item": "登入時若帳號不存在或密碼不正確：回傳 401（detail=「帳號或密碼錯誤」）"
+          }
+        ]
+      },
+      {
+        "step_no": 6,
+        "title": "權杖簽發",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端建立 JWT（sub=user.id；payload 包含 account、role；有效期限預設 60 分鐘）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端回傳 LoginResponseDTO（access_token、token_type=bearer）"
+          }
+        ]
+      },
+      {
+        "step_no": 7,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端將 access_token 寫入 localStorage（key=jwt）"
+          }
+        ]
+      },
+      {
+        "step_no": 8,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端以 Bearer JWT 呼叫 GET /api/v1/users/me 取得目前使用者資訊（包含 role）"
+          }
+        ]
+      },
+      {
+        "step_no": 9,
+        "title": "導頁",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若 role=admin：導向 /admin/tasks"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 role=user（或其他非 admin）：導向 /home"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "API 回應",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：回傳 JSON（access_token、token_type）"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：回傳錯誤（401/400/422/500 等）與 detail" 
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：頁面導向對應主頁或管理頁"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：於登入區塊顯示 loginError 或於註冊區塊顯示 signupError"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "儲存結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：localStorage.jwt 保存 access_token"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": "autoincrement",
+        "備註": "Primary Key"
+      },
+      {
+        "欄位": "account",
+        "中文": "帳號",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": null,
+        "備註": "唯一；索引"
+      },
+      {
+        "欄位": "password_hash",
+        "中文": "密碼雜湊",
+        "型態": "VARCHAR",
+        "長度": 256,
+        "空值": "否",
+        "預設值": null,
+        "備註": "bcrypt hash"
+      },
+      {
+        "欄位": "role",
+        "中文": "角色",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "user",
+        "備註": "RoleEnum（user/admin）"
+      },
+      {
+        "欄位": "active",
+        "中文": "帳號啟用狀態",
+        "型態": "BOOLEAN",
+        "長度": null,
+        "空值": "否",
+        "預設值": true,
+        "備註": null
+      },
+      {
+        "欄位": "settings",
+        "中文": "使用者設定",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

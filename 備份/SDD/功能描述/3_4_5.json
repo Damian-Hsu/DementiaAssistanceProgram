@@ -1,0 +1,277 @@
+{
+  "功能編號": "3-4-5",
+  "功能名稱": "M2M API Key 管理",
+  "功能說明": "管理員可於系統設定頁建立、查看、更新、旋轉（重新產生）與停用 M2M API Key，用於服務間（機器對機器）呼叫 API。建立/旋轉時後端只會回傳一次明碼 token，前端會提示並嘗試複製到剪貼簿；列表與更新則不會回傳 token。API Key 的 scopes 用於限制可呼叫的 M2M/內部端點（如 uploader/compute/mediamtx/streaming）。",
+  "程式名稱": "services/WebUIServer/app/template/admin_settings.html; services/WebUIServer/app/static/js/admin_settings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/security/api_key_manager.py; services/APIServer/app/DataAccess/tables/api_keys.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入": [
+    "name（API Key 名稱）",
+    "owner_id（擁有者使用者 ID）",
+    "scopes[]（uploader/compute/mediamtx/streaming）",
+    "rate_limit_per_min（選填）",
+    "quota_per_day（選填）",
+    "key_id（編輯/旋轉/停用）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "ApiKeyOutDTO（列表/更新）",
+    "ApiKeySecretOutDTO（建立/旋轉，含 token 只回傳一次）",
+    "API Key 列表表格",
+    "編輯 API Key 對話框（儲存/旋轉/刪除=停用）",
+    "成功/失敗提示訊息"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員進入 /admin/settings，前端載入 API Key 列表並渲染表格"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "建立：輸入 API Key 名稱、擁有者 ID、速率限制/每日配額（選填）"
+          },
+          {
+            "sub_no": "②",
+            "item": "編輯：在編輯對話框修改名稱、速率限制/每日配額，並勾選 scopes"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "建立：勾選至少一個 scope，點擊【建立 API Key】送出"
+          },
+          {
+            "sub_no": "②",
+            "item": "編輯：點擊列表任一列開啟「編輯 API Key」對話框"
+          },
+          {
+            "sub_no": "③",
+            "item": "編輯：在對話框點擊【儲存變更】送出更新"
+          },
+          {
+            "sub_no": "④",
+            "item": "旋轉：在對話框點擊【旋轉】並於確認視窗選擇【確認】或【取消】"
+          },
+          {
+            "sub_no": "⑤",
+            "item": "停用：在對話框點擊【刪除】（實作為停用 active=false）並於確認視窗選擇【確認】或【取消】"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "列表：GET /api/v1/admin/api-keys（可選 owner_id query）取得 ApiKeyOutDTO[]"
+          },
+          {
+            "sub_no": "②",
+            "item": "建立：POST /api/v1/admin/api-keys（name/owner_id/scopes/rate_limit_per_min/quota_per_day）回傳 ApiKeySecretOutDTO（含 token）"
+          },
+          {
+            "sub_no": "③",
+            "item": "更新：PATCH /api/v1/admin/api-keys/{key_id}（name/scopes/rate_limit_per_min/quota_per_day/active）回傳 ApiKeyOutDTO"
+          },
+          {
+            "sub_no": "④",
+            "item": "旋轉：POST /api/v1/admin/api-keys/{key_id}/rotate 回傳 ApiKeySecretOutDTO（含新 token，舊 token 立即失效）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料驗證與寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "建立時後端檢查 owner_id 對應 users.id 是否存在；不存在回 404"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端使用 APIKeyManager 產生 token，寫入 api_keys.token_hash（sha256）並回傳一次明碼 token"
+          },
+          {
+            "sub_no": "③",
+            "item": "更新時後端依 PATCH 內容更新欄位；若僅更新 active 則走 set_active；更新 scopes 則走 set_scopes"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "畫面顯示",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "列表：表格顯示名稱/擁有者/狀態/Scopes/速率限制/每日配額/建立時間"
+          },
+          {
+            "sub_no": "②",
+            "item": "建立成功：提示 token 並嘗試複製到剪貼簿；若複製失敗則提示手動複製"
+          },
+          {
+            "sub_no": "③",
+            "item": "旋轉分支：確認→取得新 token 並提示；取消→不呼叫 API 且不變更"
+          },
+          {
+            "sub_no": "④",
+            "item": "停用分支：確認→更新 active=false 並提示「已停用」；取消→不呼叫 API 且不變更"
+          },
+          {
+            "sub_no": "⑤",
+            "item": "失敗：顯示錯誤提示（未授權/驗證失敗/伺服器錯誤）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "api_keys; users",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "API Key ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "api_keys.id；Primary Key"
+      },
+      {
+        "欄位": "name",
+        "中文": "API Key 名稱",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_keys.name"
+      },
+      {
+        "欄位": "token_hash",
+        "中文": "Token 雜湊(sha256)",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_keys.token_hash；unique；實際 token 只在建立/旋轉時回傳一次"
+      },
+      {
+        "欄位": "owner_id",
+        "中文": "擁有者使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_keys.owner_id；ForeignKey(users.id)"
+      },
+      {
+        "欄位": "active",
+        "中文": "是否啟用",
+        "型態": "BOOLEAN",
+        "長度": null,
+        "空值": "否",
+        "預設值": "true",
+        "備註": "api_keys.active；停用等同刪除"
+      },
+      {
+        "欄位": "scopes",
+        "中文": "作用域清單",
+        "型態": "ARRAY(VARCHAR)",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_keys.scopes；例：[uploader, compute]"
+      },
+      {
+        "欄位": "rate_limit_per_min",
+        "中文": "每分鐘速率限制",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_keys.rate_limit_per_min"
+      },
+      {
+        "欄位": "quota_per_day",
+        "中文": "每日配額",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_keys.quota_per_day"
+      },
+      {
+        "欄位": "last_used_at",
+        "中文": "最後使用時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_keys.last_used_at"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "api_keys.created_at；TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_keys.updated_at；TimestampMixin；onupdate timezone('UTC', now())"
+      },
+      {
+        "欄位": "id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.id；Primary Key；對應 api_keys.owner_id"
+      },
+      {
+        "欄位": "account",
+        "中文": "帳號",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.account；unique；index"
+      },
+      {
+        "欄位": "role",
+        "中文": "角色",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "user",
+        "備註": "users.role；管理端需為 admin 才可操作"
+      }
+    ]
+  }
+}

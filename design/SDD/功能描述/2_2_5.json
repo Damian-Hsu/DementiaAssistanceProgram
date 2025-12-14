@@ -1,0 +1,95 @@
+{
+  "功能編號": "2-2-5",
+  "功能名稱": "開始串流",
+  "功能說明": "使用者點擊開始串流後，前端呼叫 connect 端點建立串流連線；後端簽發 StreamingServer 拉流用的 internal RTSP token 並呼叫 StreamingServer /streams/start 啟動錄影切片，前端同時取得 RTSP 推流 URL 並複製給使用者開始推流，並在串流狀態變為 running 時自動啟動 WebRTC 預覽。",
+  "程式名稱": "services/WebUIServer/app/static/js/camera.js; services/WebUIServer/app/static/js/services/CameraService.js; services/APIServer/app/router/Camera/service.py; services/StreamingServer/app/main.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "鏡頭介面"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "RTSP推流URL",
+      "即時預覽畫面"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【開始串流】"
+        ],
+        "text": "滑鼠點選【開始串流】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "建立串流連線並啟動錄影切片，取得推流 URL 並進入狀態輪詢。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "提示",
+        "objects": [
+          "推流資訊"
+        ],
+        "text": "提示開始推流並顯示預覽狀態",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "camera; settings",
+    "columns": [
+      {
+        "欄位": "status",
+        "中文": "鏡頭狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "inactive",
+        "備註": "僅 active 可 connect"
+      },
+      {
+        "欄位": "token_version",
+        "中文": "Token版本",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "簽 internal read token"
+      },
+      {
+        "欄位": "key",
+        "中文": "設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key（video_segment_seconds）"
+      },
+      {
+        "欄位": "value",
+        "中文": "設定值",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value（JSON 字串）"
+      }
+    ]
+  },
+  "備註": ""
+}

@@ -1,0 +1,95 @@
+{
+  "功能編號": "2-3-2",
+  "功能名稱": "事件關鍵字搜尋",
+  "功能說明": "使用者於影片管理頁輸入關鍵字後，後端以 exists 子查詢在 events.action/scene/summary/objects 等欄位比對關鍵字，過濾出「包含相關事件」的錄影清單並回傳；前端將結果渲染在影片列表。",
+  "程式名稱": "services/WebUIServer/app/static/js/recordings.js; services/APIServer/app/router/Recordings/service.py",
+  "輸入": [
+    "keywords",
+    "sr（可選：action/scene/summary/objects；未提供預設查 summary）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "包含關鍵字事件的錄影清單",
+    "影片列表 UI"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "在搜尋欄輸入 keywords"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /api/v1/recordings?keywords=...&sr=..."
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端在 events 欄位比對關鍵字，使用 exists 子查詢過濾 recordings"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "更新影片列表為搜尋結果"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "recordings; events",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "recordings.id"
+      },
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.recording_id（關聯到 recordings.id）"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.summary"
+      }
+    ]
+  }
+}

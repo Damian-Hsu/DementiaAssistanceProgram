@@ -1,0 +1,80 @@
+{
+  "功能編號": "2-2-7",
+  "功能名稱": "顯示串流狀態",
+  "功能說明": "鏡頭頁會定期向後端查詢串流狀態並更新狀態指示器；狀態由 StreamingServer 回報（starting/running/reconnecting/stopped/error），前端完全依賴後端狀態決定顯示文字與是否自動啟動/停止預覽。",
+  "程式名稱": "services/WebUIServer/app/static/js/camera.js; services/WebUIServer/app/static/js/services/CameraService.js; services/APIServer/app/router/Camera/service.py; services/StreamingServer/app/main.py",
+  "輸入": [
+    "camera_id",
+    "輪詢週期（3 秒）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "StreamStatusResp（is_streaming/status/stream_info/error_message）",
+    "狀態指示器 UI（status-dot + 文字）",
+    "自動啟動/停止預覽"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "系統定時",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "每 3 秒執行一次串流狀態查詢"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 GET /api/v1/camera/{id}/stream/status"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端向 StreamingServer GET /streams 查詢並回傳匹配 camera_id 的狀態"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "畫面渲染",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "status=running：顯示「串流中」並在預覽未啟動時自動 startPreview()"
+          },
+          {
+            "sub_no": "②",
+            "item": "status=reconnecting：顯示「重連中...」"
+          },
+          {
+            "sub_no": "③",
+            "item": "status=stopped/error：顯示「未串流」並在預覽啟動時自動 stopPreview()"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "串流狀態指示器即時更新"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  }
+}

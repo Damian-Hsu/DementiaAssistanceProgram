@@ -1,0 +1,87 @@
+{
+  "功能編號": "2-5-2",
+  "功能名稱": "指定查詢日期範圍",
+  "功能說明": "使用者在 AI 助手工具面板設定開始/結束日期後，系統將日期範圍一併送入聊天請求，供後端查詢關聯資料時縮小範圍。",
+  "程式名稱": "services/WebUIServer/app/template/chat.html; services/WebUIServer/app/static/js/chat.js; services/APIServer/app/router/Chat/service.py; services/APIServer/app/router/Chat/DTO.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "AI助手介面"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "系統"
+    ],
+    "資源名詞": [
+      "查詢條件"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【工具】"
+        ],
+        "text": "滑鼠點選【工具】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "展開",
+        "objects": [
+          "工具面板"
+        ],
+        "text": "展開工具面板",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【開始日期】",
+          "【結束日期】"
+        ],
+        "text": "鍵盤輸入【開始日期】、【結束日期】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "送出聊天請求時一併帶入 date_from/date_to。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "系統",
+        "verb": "套用",
+        "objects": [
+          "查詢條件"
+        ],
+        "text": "套用日期範圍查詢條件",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  },
+  "備註": ""
+}

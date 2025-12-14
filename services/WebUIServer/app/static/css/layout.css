@@ -3,8 +3,9 @@
    ============================== */
 .layout-container {
   display: flex;
+  /* 以動態 viewport 單位優先，避免手機瀏覽器位址列/工具列造成 100vh 超出可視區 */
   height: 100vh;
-  height: calc(100vh - env(safe-area-inset-bottom)); /* 修復 iPad Pro 底部白邊 */
+  height: 100dvh;
   background-color: var(--bg-main);
   padding: var(--spacing-md);
   padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom)); /* 考慮安全區域 */
@@ -27,8 +28,9 @@
     padding: var(--spacing-sm);
     gap: var(--spacing-sm);
     height: 100vh;
+    height: 100dvh;
     min-height: 100vh;
-    max-height: 100vh;
+    max-height: 100dvh;
     overflow: hidden;
   }
 }
@@ -208,9 +210,19 @@
   overflow: hidden;
   box-shadow: var(--shadow-md);
   min-width: 0; /* 防止 flex 子元素溢出 */
+  padding: 0 12px 12px 12px; /* 改為 0 12px 12px 12px */
+  overflow-y: auto; /* 允許垂直滾動 */
+  overflow-x: hidden; /* 防止水平滾動 */
+  -webkit-overflow-scrolling: touch; /* iOS 平滑滾動 */
 }
 
 /* 響應式設計 */
+@media (max-width: 1024px) {
+  .main-content {
+    padding: 0 12px 12px 12px; /* 改為 0 12px 12px 12px */
+  }
+}
+
 @media (max-width: 768px) {
   .main-content {
     border-radius: var(--radius-lg);
@@ -219,13 +231,15 @@
     flex: 1;
     min-height: 0;
     margin-bottom: 0;
+    padding: 0 12px calc(12px + var(--mobile-nav-total-height, 65px) + var(--mobile-bottom-extra, 35px)) 12px; /* 底部保留導覽列空間（含安全區）+ 額外 20px */
   }
 }
 
 /* Header 標題區 - 增強視覺層次 */
 .header {
   background-color: var(--bg-header);
-  padding: var(--spacing-lg) var(--spacing-xl);
+  padding: var(--spacing-md, 16px) var(--spacing-lg, 24px); /* 減少 padding */
+  margin-bottom: var(--spacing-md, 16px); /* 新增 margin-bottom，避免與下方物件黏在一起 */
   border-bottom: 2px solid var(--color-border);
 }
 
@@ -247,7 +261,8 @@
 /* 響應式設計 */
 @media (max-width: 768px) {
   .header {
-    padding: var(--spacing-md) var(--spacing-lg);
+    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px); /* 減少 padding */
+    margin-bottom: var(--spacing-sm, 8px); /* 新增 margin-bottom */
   }
   
   .header-title {
@@ -255,31 +270,6 @@
   }
 }
 
-/* 主內容內層 - 優化間距與滾動 */
-.page-content {
-  padding: var(--spacing-lg, 24px);
-  background: var(--bg-main, #F5EBDD);
-  flex: 1;
-  overflow-y: auto; /* 允許垂直滾動 */
-  overflow-x: hidden; /* 防止水平滾動 */
-  min-height: 0; /* 允許 flex 子元素收縮 */
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch; /* iOS 平滑滾動 */
-}
-
-/* 響應式設計 */
-@media (max-width: 1024px) {
-  .page-content {
-    padding: var(--spacing-md, 16px);
-  }
-}
-
-@media (max-width: 768px) {
-  .page-content {
-    padding: var(--spacing-sm, 8px);
-    padding-bottom: calc(var(--spacing-sm, 8px) + 80px); /* 為底部導覽留出空間 */
-  }
-}
 /* 隱藏所有 ul/li 的預設樣式 */
 .nav-list {
   display:flex;
@@ -299,6 +289,7 @@
   padding: var(--spacing-md, 16px) var(--spacing-lg, 24px);
   background: var(--bg-main, #F5EBDD);
   border-bottom: 2px solid var(--color-border, #D3C0A8);
+  margin-bottom: 12px;
   flex-shrink: 0;
 }
 
@@ -325,6 +316,7 @@
 @media (max-width: 768px) {
   .page-header {
     padding: var(--spacing-sm, 8px) var(--spacing-sm, 8px);
+    margin-bottom: 8px;
   }
   
   .page-title {

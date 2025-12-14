@@ -1,0 +1,145 @@
+{
+  "功能編號": "3-1-1",
+  "功能名稱": "任務列表",
+  "功能說明": "任務列表以表格呈現整合後的任務資訊，支援分頁與自動刷新。前端透過 GET /admin/tasks 取得 TaskListRespDTO，將 items 渲染成可點擊列，並顯示 item_total/page_now/page_total/page_size 等分頁資訊。",
+  "程式名稱": "services/WebUIServer/app/template/admin_tasks.html; services/WebUIServer/app/static/js/admin_tasks.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py",
+  "輸入": [
+    "page",
+    "size",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "TaskListRespDTO.items[]",
+    "表格列（task_id/task_type/status/user_id/camera_id/progress/created_at）",
+    "分頁 UI（pageInput/pageTotal/totalCount/pageSize）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "預設 page=1、size=20 進行載入"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊上一頁/下一頁"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "在 pageInput 輸入頁碼並 Enter"
+          },
+          {
+            "sub_no": "②",
+            "item": "在 pageSize 輸入每頁筆數並 Enter"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 GET /api/v1/admin/tasks?page={page}&size={size}"
+          },
+          {
+            "sub_no": "②",
+            "item": "成功：更新 state.tasks 與分頁狀態（pageNow/pageSize/pageTotal/totalCount）"
+          },
+          {
+            "sub_no": "③",
+            "item": "失敗：表格顯示「載入任務列表失敗，請稍後再試」"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料呈現",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "將 task_id 顯示為縮短字串（前 12 字 + ...），並以 title 顯示完整 task_id"
+          },
+          {
+            "sub_no": "②",
+            "item": "將 status/type 映射為中文標籤與 badge 樣式"
+          },
+          {
+            "sub_no": "③",
+            "item": "將 progress 以百分比顯示（小數 1 位），無則顯示 -"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示列表",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示任務列表與分頁控制（禁用 prev/next 以避免超出頁數）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "inference_jobs",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "任務ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "Compute 任務來源（inference_jobs.id）"
+      },
+      {
+        "欄位": "status",
+        "中文": "任務狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "Compute 任務來源（inference_jobs.status）"
+      },
+      {
+        "欄位": "params",
+        "中文": "任務參數(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "params.user_id / params.camera_id / params.progress"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      }
+    ]
+  }
+}

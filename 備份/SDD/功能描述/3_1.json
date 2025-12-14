@@ -1,0 +1,238 @@
+{
+  "功能編號": "3-1",
+  "功能名稱": "任務管理",
+  "功能說明": "管理員可在任務管理頁查看全系統背景任務狀態，包含 Compute 任務（來源 inference_jobs）與串流任務（來源 StreamingServer /streams）。支援依狀態/類型篩選、分頁、手動刷新與自動刷新（每 10 秒），並可點擊任務列查看詳情（錯誤訊息、參數/metrics/輸入輸出等）。",
+  "程式名稱": "services/WebUIServer/app/template/admin_tasks.html; services/WebUIServer/app/static/js/admin_tasks.js; services/WebUIServer/app/static/css/admin_tasks.css; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/inference_jobs.py; services/StreamingServer/app/main.py",
+  "輸入": [
+    "task_type（可選：video_description/vlog_generation/diary_generation/embedding_generation/diary_embeddings/rag_highlights/streaming）",
+    "status_filter（可選：pending/processing/success/failed/running/starting/stopped/error/reconnecting）",
+    "page/page_size",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "TaskListRespDTO（items/item_total/page_now/page_total/page_size）",
+    "任務列表表格 + 分頁",
+    "任務詳情 Modal（details/error_message）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員進入任務管理頁（/admin/tasks），載入篩選器、任務列表表格與分頁控制"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端初始化時讀取目前登入者（/users/me），確認 role=admin"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "使用者操作",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "選擇任務類型與狀態篩選"
+          },
+          {
+            "sub_no": "②",
+            "item": "操作分頁（上一頁/下一頁/頁碼/每頁筆數）"
+          },
+          {
+            "sub_no": "③",
+            "item": "點擊刷新按鈕手動刷新"
+          },
+          {
+            "sub_no": "④",
+            "item": "點擊任務列開啟詳情視窗"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "權限檢查",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端若檢測非 admin：提示並導回首頁"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端 /admin/tasks 會確保 current_user 為 admin，否則回 403"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料查詢與整合",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 GET /api/v1/admin/tasks（task_type/status_filter/page/size）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端查詢 inference_jobs 並依 task_type/status_filter 映射條件過濾（Compute 任務）"
+          },
+          {
+            "sub_no": "③",
+            "item": "後端呼叫 StreamingServer /streams 取得串流任務列表，並依 task_type/status_filter 過濾（Streaming 任務）"
+          },
+          {
+            "sub_no": "④",
+            "item": "後端合併兩來源任務後排序（依 created_at/updated_at），再做分頁回傳"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "自動刷新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端每 10 秒（頁面可見時）自動呼叫 loadTasks 重新拉取列表"
+          },
+          {
+            "sub_no": "②",
+            "item": "刷新前保存 scrollPosition，刷新後恢復滾動位置"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示任務列表（任務ID/類型/狀態/使用者ID/相機ID/進度/建立時間）與分頁資訊"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊列顯示任務詳情（details JSON、錯誤訊息）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "inference_jobs",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "任務ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "inference_jobs.id；Primary Key"
+      },
+      {
+        "欄位": "type",
+        "中文": "任務類型",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": "inference_jobs.type（會映射為 UI 的 task_type）"
+      },
+      {
+        "欄位": "status",
+        "中文": "狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "inference_jobs.status（JobStatusEnum）"
+      },
+      {
+        "欄位": "input_type",
+        "中文": "輸入類型",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": "inference_jobs.input_type"
+      },
+      {
+        "欄位": "input_url",
+        "中文": "輸入來源",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.input_url"
+      },
+      {
+        "欄位": "output_url",
+        "中文": "輸出來源",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.output_url"
+      },
+      {
+        "欄位": "trace_id",
+        "中文": "追蹤ID",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.trace_id；索引"
+      },
+      {
+        "欄位": "error_message",
+        "中文": "錯誤訊息",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.error_message"
+      },
+      {
+        "欄位": "params",
+        "中文": "參數(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.params（常見：user_id/camera_id/video_id/progress）"
+      },
+      {
+        "欄位": "metrics",
+        "中文": "度量(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.metrics（包含耗時/影片資訊/LLM token 等）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

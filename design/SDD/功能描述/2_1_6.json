@@ -1,0 +1,173 @@
+{
+  "功能編號": "2-1-6",
+  "功能名稱": "刪除當日 Vlog",
+  "功能說明": "當每日 Vlog 狀態為已完成或失敗時，首頁顯示「刪除 Vlog」按鈕；使用者確認後，前端呼叫後端刪除端點，後端刪除 vlogs 記錄並（best-effort）刪除 MinIO 影片物件，vlog_segments 由資料庫 CASCADE 一併刪除；刪除成功後首頁重新載入該日期 Vlog 狀態。",
+  "程式名稱": "services/WebUIServer/app/template/home.html; services/WebUIServer/app/static/js/vlog.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Vlogs/service.py; services/APIServer/app/DataAccess/tables/vlogs.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "Vlog介面",
+      "vlogs資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "Vlog介面",
+      "vlogs資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【刪除Vlog】"
+        ],
+        "text": "滑鼠點選【刪除Vlog】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【取消】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【確認】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "刪除確認視窗"
+        ],
+        "text": "跳出刪除確認視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-①",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【取消】"
+        ],
+        "text": "滑鼠點選【取消】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "刪除確認視窗"
+        ],
+        "text": "關閉刪除確認視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-②",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【確認】"
+        ],
+        "text": "滑鼠點選【確認】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "呼叫刪除 API 並移除 vlogs/vlog_segments 相關資料。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "刪除",
+        "objects": [
+          "vlogs資料表"
+        ],
+        "text": "刪除Vlog資料",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "vlogs; vlog_segments",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "VlogID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "vlogs.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlogs.user_id（權限驗證）"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "影片S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.s3_key（刪除 MinIO 物件）"
+      },
+      {
+        "欄位": "id",
+        "中文": "分鏡ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "vlog_segments.id；Primary Key"
+      },
+      {
+        "欄位": "vlog_id",
+        "中文": "VlogID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlog_segments.vlog_id；ForeignKey(vlogs.id)；CASCADE 刪除"
+      }
+    ]
+  },
+  "備註": ""
+}

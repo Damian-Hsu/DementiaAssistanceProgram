@@ -354,6 +354,23 @@ class UserService:
                 current_settings.diary_auto_refresh_interval_minutes = update_data["diary_auto_refresh_interval_minutes"]
             if "default_stream_ttl" in update_data:
                 current_settings.default_stream_ttl = update_data["default_stream_ttl"]
+            if "use_default_api_key" in update_data:
+                # 檢查是否在黑名單中
+                from ...DataAccess.tables import api_key_blacklist
+                stmt = select(api_key_blacklist.Table).where(
+                    api_key_blacklist.Table.user_id == current_user.id
+                )
+                result = await db.execute(stmt)
+                is_blacklisted = result.scalar_one_or_none() is not None
+                
+                # 如果在黑名單中，不能使用預設 API Key
+                if is_blacklisted and update_data["use_default_api_key"]:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="您已被禁止使用預設 API Key，請設定您自己的 API Key"
+                    )
+                
+                current_settings.use_default_api_key = update_data["use_default_api_key"]
             
             # 更新 LLM 供應商設定
             # 支持兩種格式：llm_providers 或 llm_model_api.providers
@@ -462,20 +479,147 @@ class UserService:
             return "Asia/Taipei"  # 預設時區
     
     # 獲取使用者 LLM 設定
-    def get_user_llm_config(self, current_user: users.Table) -> tuple[str, str, Optional[str]]:
-        """獲取使用者 LLM 設定 (provider, model, api_key)"""
+    async def get_user_llm_config(self, db: AsyncSession, current_user: users.Table) -> tuple[str, str, Optional[str]]:
+        """獲取使用者 LLM 設定 (provider, model, api_key)
+        
+        會檢查：
+        1. 使用者是否在黑名單中（禁止使用預設 API Key）
+        2. 使用者是否選擇使用預設 API Key
+        3. 如果使用預設 API Key，從系統設定中讀取
+        """
+        from ...DataAccess.tables import api_key_blacklist
+        
+        # 檢查是否在黑名單中
+        is_blacklisted = False
+        try:
+            stmt = select(api_key_blacklist.Table).where(
+                api_key_blacklist.Table.user_id == current_user.id
+            )
+            result = await db.execute(stmt)
+            blacklist_entry = result.scalar_one_or_none()
+            is_blacklisted = blacklist_entry is not None
+        except Exception as e:
+            print(f"[Error] 檢查黑名單失敗: {str(e)}")
+        
+        async def _get_system_default_llm() -> tuple[str, str]:
+            """從 settings 表取得全系統預設 LLM (provider, model)；若未設定則回傳系統內建預設。"""
+            from ...DataAccess.tables import settings as settings_table
+            import json
+            from .settings import get_default_user_settings
+
+            default_settings = get_default_user_settings()
+            provider = default_settings.default_llm_provider
+            model = default_settings.default_llm_model
+
+            try:
+                stmt = select(settings_table.Table).where(
+                    settings_table.Table.key.in_(["default_llm_provider", "default_llm_model"])
+                )
+                result = await db.execute(stmt)
+                rows = result.scalars().all()
+                settings_dict = {s.key: s.value for s in rows}
+
+                def _parse_value(raw: str | None) -> str | None:
+                    if raw is None:
+                        return None
+                    try:
+                        parsed = json.loads(raw)
+                        if isinstance(parsed, dict):
+                            return parsed.get("value") or parsed.get("provider") or parsed.get("model")
+                        if isinstance(parsed, str):
+                            return parsed
+                        return str(parsed)
+                    except Exception:
+                        return raw
+
+                provider_val = _parse_value(settings_dict.get("default_llm_provider"))
+                model_val = _parse_value(settings_dict.get("default_llm_model"))
+                if provider_val:
+                    provider = provider_val
+                if model_val:
+                    model = model_val
+            except Exception as e:
+                print(f"[Error] 讀取系統預設 LLM 失敗: {str(e)}")
+
+            return provider, model
+
+        # 獲取使用者設定
+        use_default_api_key = True
         try:
             if current_user.settings:
                 settings = UserSettings.model_validate(current_user.settings)
-                return settings.get_llm_config()
+                use_default_api_key = settings.use_default_api_key
+                
+                # 如果在黑名單中，強制取消使用預設 API Key
+                if is_blacklisted and use_default_api_key:
+                    # 更新使用者設定，取消勾選
+                    settings.use_default_api_key = False
+                    current_user.settings = settings.model_dump()
+                    try:
+                        await db.commit()
+                    except Exception as commit_error:
+                        print(f"[Error] 更新使用者設定失敗: {str(commit_error)}")
+                        await db.rollback()
+                    use_default_api_key = False
+                
+                # 若使用者勾選使用系統預設 API Key，則 provider/model 必須強制使用系統預設值
+                if use_default_api_key and not is_blacklisted:
+                    sys_provider, sys_model = await _get_system_default_llm()
+                    return sys_provider, sys_model, None
+
+                return settings.get_llm_config(
+                    use_default_api_key=use_default_api_key,
+                    is_blacklisted=is_blacklisted,
+                )
             else:
                 # 使用預設設定
                 default_settings = get_default_user_settings()
-                return default_settings.get_llm_config()
-        except Exception:
+                # 如果在黑名單中，不能使用預設 API Key
+                if is_blacklisted:
+                    default_settings.use_default_api_key = False
+                # 未登入者也同樣遵守系統預設 provider/model
+                if default_settings.use_default_api_key and not is_blacklisted:
+                    sys_provider, sys_model = await _get_system_default_llm()
+                    return sys_provider, sys_model, None
+
+                return default_settings.get_llm_config(
+                    use_default_api_key=default_settings.use_default_api_key,
+                    is_blacklisted=is_blacklisted,
+                )
+        except Exception as e:
+            print(f"[Error] 解析使用者設定失敗: {str(e)}")
             # 如果解析失敗，使用預設設定
             default_settings = get_default_user_settings()
-            return default_settings.get_llm_config()
+            if is_blacklisted:
+                default_settings.use_default_api_key = False
+            if default_settings.use_default_api_key and not is_blacklisted:
+                sys_provider, sys_model = await _get_system_default_llm()
+                return sys_provider, sys_model, None
+
+            return default_settings.get_llm_config(
+                use_default_api_key=default_settings.use_default_api_key,
+                is_blacklisted=is_blacklisted,
+            )
+    
+    async def get_default_google_api_key(self, db: AsyncSession) -> Optional[str]:
+        """從系統設定中獲取預設 Google API Key"""
+        from ...DataAccess.tables import settings as settings_table
+        
+        try:
+            stmt = select(settings_table.Table).where(
+                settings_table.Table.key == "default_google_api_key"
+            )
+            result = await db.execute(stmt)
+            setting = result.scalar_one_or_none()
+            if setting:
+                import json
+                value = json.loads(setting.value)
+                return value.get("api_key") if isinstance(value, dict) else value
+        except Exception as e:
+            print(f"[Error] 讀取預設 Google API Key 失敗: {str(e)}")
+        
+        # 資料庫中沒有就回傳 None（不再從環境變數讀取）
+        return None
 
     @staticmethod
     def _public_user(u: users.Table) -> dict:
@@ -610,3 +754,77 @@ async def get_available_timezones():
     except Exception as e:
         print(f"[Unexpected Error] get_available_timezones: {str(e)}")
         raise HTTPException(status_code=500, detail="獲取時區列表失敗")
+
+
+@user_router.get("/settings/system-default-llm")
+async def get_system_default_llm(
+    request: Request,
+    db: AsyncSession = Depends(get_session),
+):
+    """獲取系統預設的 LLM provider 和 model（供使用者查看）
+    
+    優先順序：
+    1. 從 settings 表獲取（如果管理員已設定）
+    2. 使用系統預設值
+    """
+    try:
+        from ...DataAccess.tables import settings as settings_table
+        from .settings import get_default_user_settings
+        
+        # 優先從 settings 表獲取系統預設值
+        stmt = select(settings_table.Table).where(
+            settings_table.Table.key.in_(["default_llm_provider", "default_llm_model"])
+        )
+        result = await db.execute(stmt)
+        settings_dict = {s.key: s.value for s in result.scalars().all()}
+        
+        default_settings = get_default_user_settings()
+        
+        # 解析 provider
+        provider = default_settings.default_llm_provider
+        if "default_llm_provider" in settings_dict:
+            import json
+            try:
+                value = settings_dict["default_llm_provider"]
+                if isinstance(value, str):
+                    parsed = json.loads(value)
+                    if isinstance(parsed, dict):
+                        provider = parsed.get("provider") or parsed.get("value") or provider
+                    else:
+                        provider = parsed
+                else:
+                    provider = value
+            except:
+                pass
+        
+        # 解析 model
+        model = default_settings.default_llm_model
+        if "default_llm_model" in settings_dict:
+            import json
+            try:
+                value = settings_dict["default_llm_model"]
+                if isinstance(value, str):
+                    parsed = json.loads(value)
+                    if isinstance(parsed, dict):
+                        model = parsed.get("model") or parsed.get("value") or model
+                    else:
+                        model = parsed
+                else:
+                    model = value
+            except:
+                pass
+
+        return {
+            "default_llm_provider": provider,
+            "default_llm_model": model
+        }
+    except Exception as e:
+        print(f"[Unexpected Error] get_system_default_llm: {str(e)}")
+        traceback.print_exc()
+        # 如果出錯，返回預設值
+        from .settings import get_default_user_settings
+        default_settings = get_default_user_settings()
+        return {
+            "default_llm_provider": default_settings.default_llm_provider,
+            "default_llm_model": default_settings.default_llm_model
+        }

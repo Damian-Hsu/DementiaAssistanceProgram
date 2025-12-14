@@ -1,0 +1,58 @@
+{
+  "功能編號": "2-2-7",
+  "功能名稱": "顯示串流狀態",
+  "功能說明": "鏡頭頁會定期查詢串流狀態並更新狀態指示器；狀態由後端彙整 StreamingServer 回報，前端依狀態決定顯示文字與是否啟動/停止預覽。",
+  "程式名稱": "services/WebUIServer/app/static/js/camera.js; services/WebUIServer/app/static/js/services/CameraService.js; services/APIServer/app/router/Camera/service.py; services/StreamingServer/app/main.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統"
+    ],
+    "資源名詞": [
+      "鏡頭介面"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "鏡頭介面",
+      "即時預覽畫面"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "定時查詢",
+        "objects": [
+          "串流狀態"
+        ],
+        "text": "系統定時查詢串流狀態",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "呼叫狀態查詢 API 並依回傳狀態更新 UI 與預覽行為。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [
+          "狀態指示器"
+        ],
+        "text": "更新串流狀態指示器",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  },
+  "備註": ""
+}

@@ -2,16 +2,15 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import String, DateTime, Text, Float, ForeignKey, Integer, Boolean
+from sqlalchemy import String, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import UUID, ARRAY, CIDR
+from sqlalchemy.dialects.postgresql import UUID
 
-from . import ORMBase, TimestampMixin, TimestampSchema
+from . import ORMBase, TimestampMixin
 from .__Function import create_uuid7
 from .__Enumeration import CameraStatus, CameraStatusEnum
 
-__all__ = ["Schema", "Table"]
+__all__ = ["Table"]
 
 class CameraTable(ORMBase, TimestampMixin):
     __tablename__ = "camera"

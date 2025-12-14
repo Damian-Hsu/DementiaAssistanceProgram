@@ -13,6 +13,7 @@ from ...DataAccess.Connect import get_session
 from ...DataAccess.tables import events as events_table
 from ...DataAccess.tables import diary as diary_table
 from ...DataAccess.tables import users
+from ...DataAccess.tables import settings as settings_table
 from ...DataAccess.tables.__Enumeration import Role
 from ...router.User.service import UserService
 
@@ -27,7 +28,7 @@ from .DTO import (
     DiarySummaryResponse
 )
 
-from .rate_limiter import get_rate_limiter, get_request_cache
+from .rate_limiter import get_rate_limiter
 from .llm_tools import user_llm_manager, process_chat_with_llm, search_events_by_time
 
 # ====== Router 初始化 ======
@@ -45,57 +46,83 @@ async def chat_with_memory_assistant(
     body: ChatRequest,
     db: AsyncSession = Depends(get_session),
 ):
-    """
-    對話式記憶助理（支持 Function Calling）
+    """與記憶助手進行對話。
     
-    **功能**：
-    - 自然語言對話查詢生活事件
-    - 支持多輪對話上下文
-    - 自動調用工具函數獲取數據
-    - 友善的對話式回覆
+    處理使用者訊息，檢查速率限制和緩存，調用 LLM 模型生成回應，
+    並執行工具調用來檢索相關事件、影片、日記和 Vlog。
     
-    **範例對話**：
-    ```
-    用戶: "我今天幾點吃早餐？"
-    AI: "根據記錄，您今天早上 8:30 在廚房吃早餐，大約持續了 15 分鐘。"
-    
-    用戶: "我吃了什麼？"
-    AI: "讓我查一下早餐的詳細資訊... [調用函數] 您吃了麵包和牛奶。"
-    ```
+    Args:
+        request: FastAPI Request 對象
+        body: 聊天請求資料
+        db: 資料庫會話
+        
+    Returns:
+        ChatResponse: 包含 LLM 回應、相關事件、影片、日記和 Vlog
+        
+    Raises:
+        HTTPException: 當速率限制超標、API Key 未配置或黑名單時
     """
     current_user = request.state.current_user
     
-    # 獲取速率限制器和緩存
+    # 獲取速率限制器（聊天回覆不做快取，避免錯誤回覆被重複命中）
     rate_limiter = get_rate_limiter()
-    cache = get_request_cache()
-    
-    # 1. 檢查速率限制（Admin 免限制）
-    is_admin = getattr(current_user, "role", None) == Role.admin
-    if not is_admin:
-        allowed, error_msg = rate_limiter.check_and_update(current_user.id)
-        if not allowed:
-            # 獲取統計資訊
-            stats = rate_limiter.get_stats()
-            detail = f"{error_msg} (已使用: {stats['daily_used']}/{stats['daily_limit']} 次，每分鐘: {stats['rpm_used']}/{stats['rpm_limit']} 次)"
-            raise HTTPException(
-                status_code=429,
-                detail=detail
-            )
-    
-    # 2. 檢查緩存（相同的查詢在 5 分鐘內返回緩存結果）
-    cache_key_params = {
-        "date_from": str(body.date_from) if body.date_from else None,
-        "date_to": str(body.date_to) if body.date_to else None,
-    }
-    cached_result = cache.get(current_user.id, body.message, **cache_key_params)
-    if cached_result:
-        print(f"[Cache Hit] user={current_user.id}, message={body.message[:50]}")
-        return cached_result
     
     try:
         # 獲取使用者設定
         user_timezone = user_service.get_user_timezone(current_user)
-        llm_provider, llm_model, llm_api_key = user_service.get_user_llm_config(current_user)
+        llm_provider, llm_model, llm_api_key = await user_service.get_user_llm_config(db, current_user)
+        
+        # ---- 僅針對「使用系統預設 API Key」做限流（每位使用者） ----
+        # Admin 免限制
+        is_admin = getattr(current_user, "role", None) == Role.admin
+        using_default_api_key = False
+
+        if llm_api_key is None:
+            # 沒有個人 key → 先檢查是否被禁止使用預設 key（黑名單）
+            from ...DataAccess.tables import api_key_blacklist
+
+            stmt = select(api_key_blacklist.Table).where(api_key_blacklist.Table.user_id == current_user.id)
+            result = await db.execute(stmt)
+            is_blacklisted = result.scalar_one_or_none() is not None
+            if is_blacklisted:
+                raise HTTPException(
+                    status_code=400,
+                    detail="您已被禁止使用系統預設 API Key，請在設定中配置您自己的 Google API Key"
+                )
+
+            # 取系統預設 key
+            llm_api_key = await user_service.get_default_google_api_key(db)
+            if not llm_api_key:
+                raise HTTPException(
+                    status_code=500,
+                    detail="系統未配置預設 Google API Key，請聯繫管理員"
+                )
+            using_default_api_key = True
+
+        if (not is_admin) and using_default_api_key:
+            # 讀 settings 取得 RPM/RPD
+            import json
+            rpm = 10
+            rpd = 20
+            stmt = select(settings_table.Table).where(settings_table.Table.key == "default_ai_key_limits")
+            res = await db.execute(stmt)
+            setting = res.scalar_one_or_none()
+            if setting:
+                try:
+                    val = json.loads(setting.value)
+                    if isinstance(val, dict):
+                        if val.get("rpm") is not None:
+                            rpm = int(val["rpm"])
+                        if val.get("rpd") is not None:
+                            rpd = int(val["rpd"])
+                except Exception:
+                    pass
+
+            allowed, error_msg = rate_limiter.check_and_update(current_user.id, rpm=rpm, rpd=rpd)
+            if not allowed:
+                stats = rate_limiter.get_stats(current_user.id, rpm=rpm, rpd=rpd)
+                detail = f"{error_msg} (已使用: {stats['daily_used']}/{stats['daily_limit']} 次，每分鐘: {stats['rpm_used']}/{stats['rpm_limit']} 次)"
+                raise HTTPException(status_code=429, detail=detail)
         
         # 獲取 LLM 模型（使用使用者 ID）
         model = user_llm_manager.get_model(
@@ -111,10 +138,22 @@ async def chat_with_memory_assistant(
         # 限制歷史訊息數量（最多保留最近 10 條）
         recent_history = body.history[-10:] if len(body.history) > 10 else body.history
         
+        def _normalize_gemini_role(role: str) -> str:
+            """將前端聊天角色正規化為 Gemini SDK 可接受的 role（user/model）。"""
+            if role == "assistant":
+                return "model"
+            # Gemini 舊 SDK 不接受 system/tool，因此 system 內容以 user 形式傳入
+            return "user"
+        
         for msg in recent_history:
+            normalized_role = _normalize_gemini_role(msg.role)
+            content = msg.content
+            if msg.role == "system":
+                # 保留系統訊息語意，但用 Gemini 可接受的 role 傳入
+                content = f"[系統訊息] {content}"
             history_messages.append({
-                "role": msg.role,
-                "parts": [msg.content],
+                "role": normalized_role,
+                "parts": [content],
             })
         
         # 添加當前用戶訊息
@@ -147,7 +186,7 @@ async def chat_with_memory_assistant(
         history_messages[-1]["parts"][0] += context_message
         
         # 使用新的 LLM 處理函數
-        final_message, function_calls_made, all_events, all_recordings, all_diaries, all_vlogs = await process_chat_with_llm(
+        final_message, function_calls_made, all_events, all_recordings, all_diaries, all_vlogs, usage_total = await process_chat_with_llm(
             model=model,
             history_messages=history_messages,
             user_message=body.message,
@@ -156,6 +195,29 @@ async def chat_with_memory_assistant(
             user_timezone=user_timezone,
             max_iterations=5
         )
+
+        # 記錄使用者統計（只計算 AI 助手回覆次數：每次成功回覆 +1）
+        try:
+            from ...utils.llm_usage import log_llm_usage
+            await log_llm_usage(
+                db,
+                user_id=current_user.id,
+                source="chat",
+                provider=llm_provider,
+                model_name=llm_model,
+                usage=usage_total,
+                assistant_replies=1,
+                # 僅記錄「成功回覆」；不再額外塞 user_messages，避免統計被加總成 2 倍
+                meta={"provider": llm_provider, "model": llm_model, "type": "assistant_reply"},
+            )
+            # 重要：本專案 AsyncSession 不會自動 commit；log_llm_usage 只 flush，
+            # 若不在這裡 commit，request 結束時可能 rollback，導致統計看起來「沒儲存」。
+            try:
+                await db.commit()
+            except Exception:
+                await db.rollback()
+        except Exception as e:
+            print(f"[Chat Stats] 記錄 LLM 使用量失敗: {e}")
         
         # 轉換事件為 EventSimple 格式（使用使用者時區）
         event_objects = []
@@ -241,10 +303,7 @@ async def chat_with_memory_assistant(
             total_diaries=len(diary_objects),
             total_vlogs=len(vlog_objects)
         )
-        
-        # 3. 將結果存入緩存
-        cache.set(current_user.id, body.message, result, **cache_key_params)
-        
+
         return result
     
     except HTTPException:
@@ -302,22 +361,50 @@ async def force_cleanup_user_model(
 
 
 @chat_router.get("/stats")
-async def get_llm_stats(request: Request):
+async def get_llm_stats(
+    request: Request,
+    db: AsyncSession = Depends(get_session),
+):
     """
     獲取 LLM API 使用統計
     
-    返回速率限制和緩存的統計資訊
+    返回速率限制與 LLM 管理器的統計資訊
     """
     rate_limiter = get_rate_limiter()
-    cache = get_request_cache()
     
-    # 獲取使用者設定
+    # 獲取使用者設定（用於顯示當前使用者的 LLM 配置摘要）
     current_user = request.state.current_user
-    llm_provider, llm_model, llm_api_key = user_service.get_user_llm_config(current_user)
     
+    llm_provider = None
+    llm_model = None
+    llm_api_key = None
+    try:
+        llm_provider, llm_model, llm_api_key = await user_service.get_user_llm_config(db, current_user)
+    except Exception as e:
+        # stats 端點不應因為取得 LLM 設定失敗而整個報錯
+        print(f"[Chat Stats] 讀取使用者 LLM 設定失敗: {e}")
+
+    # rate limit 設定：只針對使用預設 API key 的情況；此處僅回傳「目前設定值」與當前使用者用量
+    import json
+    rpm = 10
+    rpd = 20
+    stmt = select(settings_table.Table).where(settings_table.Table.key == "default_ai_key_limits")
+    res = await db.execute(stmt)
+    setting = res.scalar_one_or_none()
+    if setting:
+        try:
+            val = json.loads(setting.value)
+            if isinstance(val, dict):
+                if val.get("rpm") is not None:
+                    rpm = int(val["rpm"])
+                if val.get("rpd") is not None:
+                    rpd = int(val["rpd"])
+        except Exception:
+            pass
+
     return {
-        "rate_limit": rate_limiter.get_stats(),
-        "cache": cache.get_stats(),
+        "rate_limit": rate_limiter.get_stats(current_user.id, rpm=rpm, rpd=rpd),
+        "cache": {"enabled": False},
         "llm_manager": user_llm_manager.get_stats(),
         "api_info": {
             "provider": llm_provider,
@@ -328,8 +415,8 @@ async def get_llm_stats(request: Request):
                 "rpd": 25,
             },
             "configured_limits": {
-                "rpm": rate_limiter.rpm,
-                "rpd": rate_limiter.rpd,
+                "rpm": rpm,
+                "rpd": rpd,
             }
         }
     }
@@ -391,7 +478,11 @@ async def _generate_diary_summary(
     if not current_user:
         raise HTTPException(status_code=404, detail="使用者不存在")
     
-    llm_provider, llm_model, llm_api_key = user_service.get_user_llm_config(current_user)
+    llm_provider, llm_model, llm_api_key = await user_service.get_user_llm_config(db, current_user)
+    
+    # 如果使用預設 API Key，從系統設定中讀取
+    if llm_api_key is None:
+        llm_api_key = await user_service.get_default_google_api_key(db)
     # 日記摘要不需要 tools，創建一個不帶 tools 的模型實例以減少 token 使用
     model = user_llm_manager.get_model(
         user_id=user_id,
@@ -409,6 +500,23 @@ async def _generate_diary_summary(
         # 調用 LLM
         chat = model.start_chat(history=[])
         response = chat.send_message(user_message)
+        
+        # 記錄 token 使用量（日記生成不計入聊天回覆次數）
+        try:
+            from ...utils.llm_usage import extract_usage_from_response, log_llm_usage
+            u = extract_usage_from_response(response)
+            await log_llm_usage(
+                db,
+                user_id=user_id,
+                source="diary",
+                provider=llm_provider,
+                model_name=llm_model,
+                usage=u,
+                assistant_replies=0,
+                meta={"provider": llm_provider, "model": llm_model, "type": "diary_summary"},
+            )
+        except Exception as e:
+            print(f"[Diary Stats] 記錄 LLM 使用量失敗: {e}")
         
         # 提取回覆
         summary = ""
@@ -505,9 +613,32 @@ async def generate_diary_summary(
     existing_diary = result.scalar_one_or_none()
     
     is_refreshed = False
+    # ✅ 任務管理追蹤：日記生成（寫入 inference_jobs，讓 /admin/tasks 可追蹤）
+    diary_job = None
     
     # 檢查是否需要刷新
     if body.force_refresh or not existing_diary or existing_diary.events_hash != events_hash:
+        # 建立/標記任務為 processing
+        try:
+            from ...DataAccess.tables import inference_jobs
+            from ...DataAccess.tables.__Enumeration import JobStatus
+            diary_job = inference_jobs.Table(
+                type="diary_generation",
+                status=JobStatus.processing,
+                input_type="diary",
+                input_url=date_str,
+                output_url=None,
+                trace_id=f"diary-{current_user.id}-{date_str}",
+                params={"user_id": int(current_user.id), "diary_date": date_str, "progress": 0.0},
+                metrics=None,
+            )
+            db.add(diary_job)
+            await db.flush()
+            await db.refresh(diary_job)
+        except Exception as e:
+            diary_job = None
+            print(f"[Diary Task] 建立 inference_jobs 追蹤失敗: {e}")
+
         # 需要刷新
         if len(events) == 0:
             # 沒有事件，返回空內容
@@ -522,6 +653,16 @@ async def generate_diary_summary(
                     db=db
                 )
             except HTTPException:
+                # 若建立了任務，標記失敗（不吞例外）
+                if diary_job is not None:
+                    try:
+                        from ...DataAccess.tables.__Enumeration import JobStatus
+                        diary_job.status = JobStatus.failed
+                        diary_job.error_message = "HTTPException"
+                        db.add(diary_job)
+                        await db.commit()
+                    except Exception:
+                        await db.rollback()
                 # 如果是 HTTPException（如配額限制），直接重新拋出
                 raise
             except Exception as e:
@@ -550,6 +691,18 @@ async def generate_diary_summary(
                     events_hash=events_hash
                 )
                 db.add(new_diary)
+
+            # 任務狀態：成功
+            if diary_job is not None:
+                try:
+                    from ...DataAccess.tables.__Enumeration import JobStatus
+                    diary_job.status = JobStatus.success
+                    params = diary_job.params if isinstance(diary_job.params, dict) else {}
+                    params["progress"] = 100.0
+                    diary_job.params = params
+                    db.add(diary_job)
+                except Exception:
+                    pass
             
             await db.commit()
             is_refreshed = True

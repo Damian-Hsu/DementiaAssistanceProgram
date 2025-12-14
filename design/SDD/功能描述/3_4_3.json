@@ -1,0 +1,86 @@
+{
+  "功能編號": "3-4-3",
+  "功能名稱": "預設 AI key 用量限制",
+  "功能說明": "管理員設定使用系統預設 AI Key 的 RPM/RPD 限制，寫入 settings 供聊天限流使用。",
+  "程式名稱": "services/WebUIServer/app/template/admin_settings.html; services/WebUIServer/app/static/js/admin_settings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/settings.py; services/APIServer/app/router/Chat/rate_limiter.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "管理員系統設定介面",
+      "settings資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "資料庫"
+    ],
+    "資源名詞": [
+      "settings資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【RPM】",
+          "【RPD】"
+        ],
+        "text": "鍵盤輸入【RPM】、【RPD】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存設定】"
+        ],
+        "text": "滑鼠點選【儲存設定】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "寫入 settings（default_ai_key_limits）。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "settings資料表"
+        ],
+        "text": "更新AI key用量限制",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "settings",
+    "columns": []
+  },
+  "備註": ""
+}

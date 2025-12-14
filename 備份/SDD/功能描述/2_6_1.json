@@ -1,0 +1,213 @@
+{
+  "功能編號": "2-6-1",
+  "功能名稱": "使用者設定",
+  "功能說明": "使用者可在設定頁檢視並更新個人資料（姓名、性別、生日、電話、信箱、頭像 URL）。前端會先呼叫 GET /users/me 取得資料填入表單；按下儲存後以 PATCH /users/me 寫回資料庫並再次 GET /users/me 取得最新資料更新畫面。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/User/service.py; services/APIServer/app/router/User/DTO.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入": [
+    "name",
+    "gender（male/female）",
+    "birthday（date）",
+    "phone",
+    "email",
+    "headshot_url（可選）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "GET /users/me 回傳 user",
+    "PATCH /users/me 回傳 msg/user",
+    "成功/失敗提示訊息（showSuccess/showError）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入設定頁後呼叫 GET /users/me 取得個人資料並填入表單"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "編輯姓名/生日/電話/信箱/頭像 URL"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "選擇性別下拉選單"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊【儲存個人資料】"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "權限檢查",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端檢查 localStorage.jwt；無 token 則顯示提示並導回登入/首頁"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /users/me，成功則將 user.id 存入 localStorage.user_id"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 GET 失敗：顯示錯誤訊息（不強制導回登入，避免 bounce）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊儲存後組合 UpdateUserProfileDTO（排除 undefined）呼叫 PATCH /users/me"
+          },
+          {
+            "sub_no": "②",
+            "item": "成功：再次呼叫 GET /users/me 取得最新資料並回填"
+          },
+          {
+            "sub_no": "③",
+            "item": "失敗：顯示後端錯誤訊息（例如 Email 已被使用）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示「已更新使用者資料」並更新欄位內容"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示「更新使用者資料失敗」或後端 detail"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": "autoincrement",
+        "備註": "Primary Key"
+      },
+      {
+        "欄位": "account",
+        "中文": "帳號",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": null,
+        "備註": "unique/index"
+      },
+      {
+        "欄位": "name",
+        "中文": "姓名",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "gender",
+        "中文": "性別",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "GenderEnum"
+      },
+      {
+        "欄位": "birthday",
+        "中文": "生日",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "phone",
+        "中文": "電話",
+        "型態": "VARCHAR",
+        "長度": 20,
+        "空值": "否",
+        "預設值": null,
+        "備註": "unique/index"
+      },
+      {
+        "欄位": "email",
+        "中文": "信箱",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "unique/index"
+      },
+      {
+        "欄位": "headshot_url",
+        "中文": "頭像URL",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

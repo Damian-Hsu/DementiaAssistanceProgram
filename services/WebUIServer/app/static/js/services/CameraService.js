@@ -8,7 +8,7 @@ class AppError extends Error {
     this.cause = cause;
   }
 }
-function toTTL(input, dflt = 300, min = 30, max = 3600) {
+function toTTL(input, dflt = 300, min = 300, max = 21600) {
   const raw = (typeof input === 'object' && input !== null) ? input.ttl : input;
   const v = Number(raw);
   if (!Number.isFinite(v)) return dflt;
@@ -47,41 +47,21 @@ export class CameraService {
 
   async connect(id, arg) {
     // 僅轉呼叫 API；TTL 做安全轉換，避免 NaN/越界
-    const ttl = toTTL(arg, 300, 30, 3600);
+    const ttl = toTTL(arg, 300, 300, 21600);
     return this.api.connectStream(id, { ttl });
   }
 
   // 取清單（參數物件可省略）
   async list(arg = {}) {
-    const uidRaw = await this.getCurrentUserId();
-    const uid = Number(uidRaw);
-    if (!Number.isInteger(uid)) {
-      throw new AppError(
-        '使用者資訊異常，請重新登入後再試',
-        `Invalid user_id from getCurrentUserId(): ${uidRaw}`,
-        'E_USER_ID_INVALID'
-      );
-    }
-
     const { status, q, page = 1, size = 10 } = arg;
-
-    return this.api.getCameras(uid, status, q, page, size);
+    // 後端會用 JWT 的 current_user.id 決定可見範圍，因此前端不再強制帶 user_id，
+    // 避免因為快取/錯誤 user_id 導致 403。
+    return this.api.getCameras(null, status, q, page, size);
   }
 
   // 建立鏡頭
   async create(fields = {}) {
-    const uidRaw = await this.getCurrentUserId();
-    const uid = Number(uidRaw);
-    if (!Number.isInteger(uid)) {
-      throw new AppError(
-        '使用者資訊異常，請重新登入後再試',
-        `Invalid user_id from getCurrentUserId(): ${uidRaw}`,
-        'E_USER_ID_INVALID'
-      );
-    }
-
     const cameraData = {
-      user_id: uid,
       name: fields.name || "",
       max_publishers: fields.max_publishers || 1,
     };
@@ -123,7 +103,7 @@ export class CameraService {
 
 
 async connect(id, arg) {
-  const ttl = toTTL(arg, 300, 30, 3600);
+  const ttl = toTTL(arg, 300, 300, 21600);
   return this.api.connectStream(id, { ttl });
 }
 
@@ -132,15 +112,12 @@ async connect(id, arg) {
   }
 
   // 取得推流/播放 URL（若你在 UI 要用）
-  async getPublishRtspUrl(id, ttl = 300) {
+  async getPublishRtspUrl(id, ttl = 10800) {
   return this.api.getPublishRtspUrl(id, ttl);
 }
 
-async getPlayHlsUrl(id, ttl = 300) {
-  return this.api.getPlayHlsUrl(id, ttl);
-}
 
-async getPlayWebrtcUrl(id, ttl = 300) {
+async getPlayWebrtcUrl(id, ttl = 180) {
   return this.api.getPlayWebrtcUrl(id, ttl);
 }
 

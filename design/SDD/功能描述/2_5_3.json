@@ -1,0 +1,93 @@
+{
+  "功能編號": "2-5-3",
+  "功能名稱": "顯示回覆與關聯資料",
+  "功能說明": "系統在顯示 AI 回覆時，依回傳的關聯資料（事件/影片/日記/Vlog）呈現預覽清單或按鈕，並支援開啟清單視窗與播放視窗。",
+  "程式名稱": "services/WebUIServer/app/static/js/chat.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Chat/DTO.py; services/APIServer/app/router/Chat/service.py; services/APIServer/app/DataAccess/tables/events.py; services/APIServer/app/DataAccess/tables/recordings.py; services/APIServer/app/DataAccess/tables/diary.py; services/APIServer/app/DataAccess/tables/vlogs.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "AI助手介面",
+      "events資料表",
+      "recordings資料表",
+      "diary資料表",
+      "vlogs資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "關聯資料清單",
+      "播放視窗"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "接收",
+        "objects": [
+          "AI回覆",
+          "關聯資料"
+        ],
+        "text": "系統接收AI回覆與關聯資料",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "依資料筆數決定顯示方式（按鈕或預覽清單）。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "AI回覆",
+          "關聯資料清單"
+        ],
+        "text": "顯示AI回覆與關聯資料",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "關聯資料項目"
+        ],
+        "text": "滑鼠點選關聯資料項目",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "取得播放連結並開啟播放視窗。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "播放",
+        "objects": [
+          "播放視窗"
+        ],
+        "text": "播放影片或Vlog",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "events; recordings; diary; vlogs",
+    "columns": []
+  },
+  "備註": ""
+}

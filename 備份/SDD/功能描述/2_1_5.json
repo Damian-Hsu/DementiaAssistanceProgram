@@ -1,0 +1,362 @@
+{
+  "功能編號": "2-1-5",
+  "功能名稱": "生成 Vlog",
+  "功能說明": "使用者於首頁點擊「生成 Vlog」後，先在事件選擇視窗載入該日事件（可用 AI 推薦自動勾選），達到最少選取數量後進入 Vlog 設定視窗，選擇音樂片段與解析度並送出；後端驗證事件屬於使用者與日期一致後建立 vlogs 與 vlog_segments，建立 inference_jobs（vlog_generation）追蹤並派送 ComputeServer 生成任務，前端再輪詢顯示生成進度。",
+  "程式名稱": "services/WebUIServer/app/template/home.html; services/WebUIServer/app/static/js/vlog.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Vlogs/service.py; services/APIServer/app/DataAccess/tables/events.py; services/APIServer/app/DataAccess/tables/diary.py; services/APIServer/app/DataAccess/tables/vlogs.py; services/APIServer/app/DataAccess/tables/inference_jobs.py; services/APIServer/app/DataAccess/tables/music.py",
+  "輸入": [
+    "target_date（YYYY-MM-DD）",
+    "event_ids（至少 10 個，若當日事件不足則以當日事件總數為最少）",
+    "title（選填）",
+    "resolution（480p/720p/1080p）",
+    "music_id（必填）",
+    "music_start/music_end（音樂裁切區間，秒）",
+    "music_fade（是否淡入淡出）",
+    "music_volume（0~1）",
+    "Bearer JWT（localStorage.jwt）"
+  ],
+  "輸出": [
+    "建立 Vlog 任務（vlog_id + status=pending）",
+    "前端顯示 Vlog 進度並輪詢更新",
+    "錯誤訊息（事件無效/音樂不存在/任務派送失敗等）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊首頁「生成 Vlog」按鈕（id=generateVlogBtn）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "事件選擇",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "在事件選擇視窗手動勾選事件（checkbox event-<id>）"
+          },
+          {
+            "sub_no": "②",
+            "item": "或點擊「AI 推薦」自動勾選（可設定數量 aiSelectLimit）"
+          },
+          {
+            "sub_no": "③",
+            "item": "達到最少事件數量後，點擊「下一步」進入設定"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "參數設定",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "輸入 Vlog 標題（選填）"
+          },
+          {
+            "sub_no": "②",
+            "item": "選擇音樂（musicSelect）並拖曳波形選擇音樂片段區間"
+          },
+          {
+            "sub_no": "③",
+            "item": "選擇解析度（vlogResolution）與淡入淡出（musicFadeToggle）"
+          },
+          {
+            "sub_no": "④",
+            "item": "點擊「生成 Vlog」送出建立請求"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "事件選擇視窗：呼叫 GET /api/v1/vlogs/events/{target_date} 載入當日事件列表"
+          },
+          {
+            "sub_no": "②",
+            "item": "音樂清單：呼叫 GET /api/v1/music 取得可用音樂，並可呼叫 GET /api/v1/music/{music_id}/url 下載/預覽"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "AI 推薦",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊 AI 推薦：呼叫 POST /api/v1/vlogs/ai-select（date/limit/summary_text）取得 selected_event_ids"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端依 selected_event_ids 自動勾選事件 checkbox 並更新已選數量"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "資料驗證",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端檢查已選事件數量是否達到最少門檻；不足則停留並提示"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端限制：未選擇音樂時，設定視窗的「生成 Vlog」按鈕 disabled"
+          }
+        ]
+      },
+      {
+        "step_no": 4,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 POST /api/v1/vlogs 建立 Vlog（target_date/event_ids/max_duration/resolution/music 參數）"
+          }
+        ]
+      },
+      {
+        "step_no": 5,
+        "title": "後端處理",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端驗證 event_ids 皆屬於 current_user；並檢查事件日期是否跨日（跨日則回 400）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端驗證音樂 music_id 是否存在，並整理 music_settings 寫入 vlogs.settings"
+          },
+          {
+            "sub_no": "③",
+            "item": "後端 INSERT vlogs（pending）並 INSERT vlog_segments（依事件排序）"
+          },
+          {
+            "sub_no": "④",
+            "item": "後端建立 inference_jobs（type=vlog_generation）並將 job_id 存回 vlogs.settings"
+          },
+          {
+            "sub_no": "⑤",
+            "item": "後端 enqueue Compute 任務 tasks.generate_vlog（vlog_id/user_id/event_ids/settings）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "建立成功：關閉設定視窗並於首頁顯示 Vlog 狀態為等待中/生成中（開始輪詢）"
+          },
+          {
+            "sub_no": "②",
+            "item": "建立失敗：顯示錯誤提示並維持在設定視窗"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：資料庫新增 vlogs、vlog_segments，並新增 inference_jobs 追蹤"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "events; diary; vlogs; vlog_segments; music; inference_jobs",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "事件ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "events.id；用於 event_ids"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "events.user_id（權限驗證）"
+      },
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.start_time（排序/跨日檢查）"
+      },
+      {
+        "欄位": "duration",
+        "中文": "事件持續秒數",
+        "型態": "FLOAT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.duration"
+      },
+
+      {
+        "欄位": "id",
+        "中文": "VlogID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "vlogs.id"
+      },
+      {
+        "欄位": "target_date",
+        "中文": "目標日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlogs.target_date"
+      },
+      {
+        "欄位": "status",
+        "中文": "狀態",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "vlogs.status"
+      },
+      {
+        "欄位": "settings",
+        "中文": "設定",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.settings（max_duration/resolution/music/job_id）"
+      },
+
+      {
+        "欄位": "vlog_id",
+        "中文": "VlogID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlog_segments.vlog_id；ForeignKey(vlogs.id)"
+      },
+      {
+        "欄位": "event_id",
+        "中文": "事件ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlog_segments.event_id；ForeignKey(events.id)"
+      },
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlog_segments.recording_id；ForeignKey(recordings.id)"
+      },
+      {
+        "欄位": "sequence_order",
+        "中文": "排序",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlog_segments.sequence_order"
+      },
+
+      {
+        "欄位": "id",
+        "中文": "音樂ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "music.id"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "音樂S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "music.s3_key"
+      },
+      {
+        "欄位": "duration",
+        "中文": "音樂長度",
+        "型態": "FLOAT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.duration"
+      },
+
+      {
+        "欄位": "id",
+        "中文": "任務ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "inference_jobs.id（vlog_generation job）"
+      },
+      {
+        "欄位": "type",
+        "中文": "任務類型",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": "inference_jobs.type（vlog_generation）"
+      },
+      {
+        "欄位": "status",
+        "中文": "任務狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "inference_jobs.status"
+      },
+      {
+        "欄位": "params",
+        "中文": "任務參數",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.params（vlog_id/user_id/event_ids/progress）"
+      }
+    ]
+  }
+}

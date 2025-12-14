@@ -1,0 +1,112 @@
+{
+  "功能編號": "3-3-1",
+  "功能名稱": "音樂清單",
+  "功能說明": "管理員可查看音樂清單表格。前端呼叫 GET /admin/music 取得 MusicListResponse（依 created_at 倒序），並顯示名稱/製作者/時長/上傳者/建立時間；點擊列可開啟音樂詳情編輯視窗。",
+  "程式名稱": "services/WebUIServer/app/template/admin_music.html; services/WebUIServer/app/static/js/admin_music.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Music/service.py",
+  "輸入": [
+    "skip（預設 0）",
+    "limit（預設 100）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "MusicListResponse.items[]",
+    "音樂清單表格（music-row）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入頁面後呼叫 GET /api/v1/admin/music（skip/limit）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊音樂列開啟詳情/編輯視窗"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端 join users 取得 uploader_name，回傳 items 與 total"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端渲染表格；duration 以 mm:ss 顯示（無則 -）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示清單",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示音樂清單；若無資料顯示「尚未上傳任何音樂」"
+          },
+          {
+            "sub_no": "②",
+            "item": "若載入失敗顯示「載入音樂清單失敗」"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "music",
+    "columns": [
+      {
+        "欄位": "name",
+        "中文": "音樂名稱",
+        "型態": "VARCHAR",
+        "長度": 255,
+        "空值": "否",
+        "預設值": null,
+        "備註": "music.name"
+      },
+      {
+        "欄位": "composer",
+        "中文": "製作者",
+        "型態": "VARCHAR",
+        "長度": 255,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.composer"
+      },
+      {
+        "欄位": "duration",
+        "中文": "時長(秒)",
+        "型態": "FLOAT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.duration"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      }
+    ]
+  }
+}

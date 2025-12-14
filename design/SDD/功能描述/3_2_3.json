@@ -1,0 +1,95 @@
+{
+  "功能編號": "3-2-3",
+  "功能名稱": "啟用/停用使用者帳號",
+  "功能說明": "管理員在詳情視窗切換帳號啟用狀態並儲存後，系統更新 users.active。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_users.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/router/User/service.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "使用者詳情視窗",
+      "users資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "資料庫",
+      "螢幕"
+    ],
+    "資源名詞": [
+      "users資料表",
+      "使用者詳情視窗"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "選擇",
+        "objects": [
+          "【啟用狀態】"
+        ],
+        "text": "滑鼠選擇【啟用狀態】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【啟用】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【停用】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存】"
+        ],
+        "text": "滑鼠點選【儲存】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "更新 users.active。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "users資料表"
+        ],
+        "text": "更新帳號啟用狀態",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "users",
+    "columns": []
+  },
+  "備註": "停用後使用者登入會被拒絕。"
+}

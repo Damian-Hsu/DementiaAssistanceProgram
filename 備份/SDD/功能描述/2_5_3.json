@@ -1,0 +1,286 @@
+{
+  "功能編號": "2-5-3",
+  "功能名稱": "顯示回覆與關聯資料",
+  "功能說明": "後端聊天回覆除了 AI 文字外，還會回傳關聯資料（events/recordings/diaries/vlogs）。前端依回傳數量決定呈現方式：事件一律以「顯示事件」按鈕開啟清單視窗；影片與 Vlog 在筆數小於等於 3 時直接顯示預覽清單，超過 3 時顯示按鈕開啟清單視窗；點擊影片/Vlog 項目會再呼叫取得 presigned URL 並以彈窗播放器播放。",
+  "程式名稱": "services/WebUIServer/app/static/js/chat.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Chat/DTO.py; services/APIServer/app/router/Chat/service.py; services/APIServer/app/DataAccess/tables/events.py; services/APIServer/app/DataAccess/tables/recordings.py; services/APIServer/app/DataAccess/tables/diary.py; services/APIServer/app/DataAccess/tables/vlogs.py",
+  "輸入": [
+    "ChatResponse.message",
+    "ChatResponse.events[]",
+    "ChatResponse.recordings[]",
+    "ChatResponse.diaries[]",
+    "ChatResponse.vlogs[]",
+    "recording_id / vlog_id（播放用）",
+    "ttl（取得 presigned URL 用，預設 3600）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "AI 回覆訊息泡泡",
+    "事件清單視窗（modal）",
+    "影片清單視窗（modal）與影片播放視窗（video）",
+    "Vlog 清單視窗（modal）與 Vlog 播放視窗（video）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "資料接收",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端接收 ChatResponse，取得 message/events/recordings/diaries/vlogs"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊「顯示事件」按鈕開啟事件清單視窗"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊「顯示影片」按鈕或影片預覽項目"
+          },
+          {
+            "sub_no": "③",
+            "item": "點擊「顯示 Vlog」按鈕或 Vlog 預覽項目"
+          },
+          {
+            "sub_no": "④",
+            "item": "在彈窗中點擊關閉（×）或點擊背景關閉"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "渲染回覆",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "將 message 以換行轉 <br> 顯示為 AI 訊息泡泡"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 events.length>0：附加「顯示事件(N)」按鈕並綁定開啟事件清單視窗"
+          },
+          {
+            "sub_no": "③",
+            "item": "若 recordings.length>0：<=3 直接渲染預覽清單；>3 顯示「顯示影片(N)」按鈕"
+          },
+          {
+            "sub_no": "④",
+            "item": "若 diaries.length>0：逐筆顯示日記內容或刷新結果（成功/失敗樣式）"
+          },
+          {
+            "sub_no": "⑤",
+            "item": "若 vlogs.length>0：<=3 直接渲染預覽清單；>3 顯示「顯示 Vlog(N)」按鈕"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "播放處理",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊影片項目：呼叫 GET /api/v1/recordings/{recording_id}?ttl=3600 取得 url，開啟影片播放視窗並設定 video.src"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊 Vlog 項目：呼叫 GET /api/v1/vlogs/{vlog_id}/url?ttl=3600 取得 url，開啟 Vlog 播放視窗並設定 video.src"
+          },
+          {
+            "sub_no": "③",
+            "item": "關閉播放視窗時停止播放並清空 video.src"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示關聯資料",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "事件：以清單視窗顯示時間/摘要/地點/動作/物件標籤"
+          },
+          {
+            "sub_no": "②",
+            "item": "影片：以預覽清單或清單視窗顯示時間/時長/摘要，並可點擊播放"
+          },
+          {
+            "sub_no": "③",
+            "item": "日記：顯示指定日期的日記內容或刷新結果訊息"
+          },
+          {
+            "sub_no": "④",
+            "item": "Vlog：以預覽清單或清單視窗顯示日期/標題/狀態/時長，並可點擊播放"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "events; recordings; diary; vlogs",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "事件ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "events.id"
+      },
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.start_time"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.summary（顯示於事件清單）"
+      },
+      {
+        "欄位": "action",
+        "中文": "行為",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.action"
+      },
+      {
+        "欄位": "scene",
+        "中文": "地點",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.scene"
+      },
+      {
+        "欄位": "objects",
+        "中文": "物件清單",
+        "型態": "ARRAY(VARCHAR)",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.objects"
+      },
+      {
+        "欄位": "id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "recordings.id"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "影片S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "recordings.s3_key（取得 presigned URL 的來源）"
+      },
+      {
+        "欄位": "thumbnail_s3_key",
+        "中文": "縮圖S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "recordings.thumbnail_s3_key"
+      },
+      {
+        "欄位": "duration",
+        "中文": "影片時長",
+        "型態": "FLOAT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "recordings.duration"
+      },
+      {
+        "欄位": "diary_date",
+        "中文": "日記日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "diary.diary_date"
+      },
+      {
+        "欄位": "content",
+        "中文": "日記內容",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "diary.content"
+      },
+      {
+        "欄位": "id",
+        "中文": "VlogID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "vlogs.id"
+      },
+      {
+        "欄位": "title",
+        "中文": "標題",
+        "型態": "VARCHAR",
+        "長度": 255,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.title"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "Vlog S3 路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.s3_key（取得 presigned URL 的來源）"
+      },
+      {
+        "欄位": "status",
+        "中文": "狀態",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "vlogs.status"
+      },
+      {
+        "欄位": "target_date",
+        "中文": "目標日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlogs.target_date"
+      }
+    ]
+  }
+}

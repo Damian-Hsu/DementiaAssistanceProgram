@@ -1,0 +1,217 @@
+{
+  "功能編號": "2-4",
+  "功能名稱": "事件檢視（Events）",
+  "功能說明": "事件檢視頁提供事件列表查詢（日期範圍/關鍵字/排序/分頁），並可針對單一事件查看詳情、編輯事件內容（行為/地點/物件/摘要）與刪除事件；資料來源為 events 表，並可透過 recording_id 連結回影片管理頁查看對應影片。",
+  "程式名稱": "services/WebUIServer/app/template/events.html; services/WebUIServer/app/static/js/events.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Events/service.py; services/APIServer/app/router/Events/DTO.py; services/APIServer/app/DataAccess/tables/events.py",
+  "輸入": [
+    "keywords（可選）",
+    "sr（可選：action/scene/summary/objects）",
+    "start_time/end_time（可選，YYYY-MM-DD）",
+    "sort（+start_time/-start_time 等）",
+    "page/page_size",
+    "event_id（詳情/編輯/刪除）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "EventListResp（items/item_total/page_now/page_total）",
+    "EventRead（單筆事件詳情）",
+    "OkResp（編輯/刪除結果）",
+    "事件列表 UI + 詳情/編輯 Dialog"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "進入事件檢視頁（/events），預設載入事件列表"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "使用者操作",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "輸入關鍵字/日期範圍並點擊篩選"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊列表中的「詳情/編輯/刪除」按鈕"
+          },
+          {
+            "sub_no": "③",
+            "item": "點擊表格欄位標題切換排序"
+          },
+          {
+            "sub_no": "④",
+            "item": "操作分頁（上一頁/下一頁/頁碼/每頁筆數）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "權限檢查",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端檢查 localStorage.jwt 與 GET /users/me；失敗導向 /auth"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "列表：呼叫 GET /api/v1/events（keywords/sr/start_time/end_time/sort/page/size）"
+          },
+          {
+            "sub_no": "②",
+            "item": "詳情：呼叫 GET /api/v1/events/{event_id}"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "編輯：PATCH /api/v1/events/{event_id}（部分欄位）"
+          },
+          {
+            "sub_no": "②",
+            "item": "刪除：DELETE /api/v1/events/{event_id}"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示事件列表（桌面表格/手機卡片）與分頁資訊"
+          },
+          {
+            "sub_no": "②",
+            "item": "顯示詳情/編輯對話框，並在完成後刷新列表"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "events",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "事件ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "ForeignKey(users.id)；索引"
+      },
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "ForeignKey(recordings.id)；索引"
+      },
+      {
+        "欄位": "action",
+        "中文": "行為",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "scene",
+        "中文": "地點",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "objects",
+        "中文": "物件清單",
+        "型態": "ARRAY(VARCHAR)",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "排序/日期範圍查詢"
+      },
+      {
+        "欄位": "duration",
+        "中文": "持續秒數",
+        "型態": "FLOAT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "功能編號": "3-2-2",
+  "功能名稱": "檢視單一使用者詳情",
+  "功能說明": "管理員點擊統計列表列後，前端呼叫 GET /admin/users/{user_id} 取得使用者詳情，並在彈出視窗顯示帳號/姓名/角色/性別/生日/電話/Email、password_hash、settings 以及黑名單狀態與原因。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_users.js; services/WebUIServer/app/template/admin_users.html; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/users.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py",
+  "輸入": [
+    "user_id",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "UserDetailDTO（含 password_hash/settings/is_blacklisted/blacklist_reason）",
+    "使用者詳情 Modal"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊使用者統計列（tr.user-row）"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊 × / 取消 / 背景關閉視窗"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端顯示「載入中...」，呼叫 GET /api/v1/admin/users/{user_id}"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端查詢 users 與 api_key_blacklist，組合 UserDetailDTO 回傳"
+          },
+          {
+            "sub_no": "③",
+            "item": "失敗：前端 alert 顯示錯誤訊息"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "畫面呈現",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "將可編輯欄位（active、黑名單勾選、黑名單原因）以表單呈現，其餘欄位為唯讀"
+          },
+          {
+            "sub_no": "②",
+            "item": "依黑名單勾選狀態更新文字提示（已加入/未加入）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示詳情",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "開啟 userDetailModal 並填入 UserDetailDTO"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users; api_key_blacklist",
+    "columns": [
+      {
+        "欄位": "password_hash",
+        "中文": "密碼雜湊",
+        "型態": "VARCHAR",
+        "長度": 256,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.password_hash（僅 Admin 詳情顯示）"
+      },
+      {
+        "欄位": "settings",
+        "中文": "使用者設定(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings（可檢視使用預設 key 等設定）"
+      },
+      {
+        "欄位": "reason",
+        "中文": "黑名單原因",
+        "型態": "VARCHAR",
+        "長度": 500,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_key_blacklist.reason"
+      }
+    ]
+  }
+}

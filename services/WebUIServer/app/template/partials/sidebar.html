@@ -41,8 +41,8 @@
 </li>
 
 <!-- 6. 管理儀表板 (管理員專用) -->
-<li class="nav-item {{ 'active' if active_page == 'admin_dashboard' else '' }} hidden" data-requires-admin>
-<a class="nav-link" href="{{ url_for('admin_dashboard') }}" aria-label="管理儀表板">
+<li class="nav-item {{ 'active' if active_page == 'admin_tasks' else '' }} hidden" data-requires-admin>
+<a class="nav-link" href="{{ url_for('admin_tasks') }}" aria-label="任務管理">
 <img class="nav-icon" src="{{ url_for('static', filename='icons/dashboard.svg') }}" alt="管理儀表板" />
 <span class="nav-label">管理</span>
 </a>

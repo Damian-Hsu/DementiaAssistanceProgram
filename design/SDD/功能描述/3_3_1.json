@@ -1,0 +1,58 @@
+{
+  "功能編號": "3-3-1",
+  "功能名稱": "音樂清單",
+  "功能說明": "管理員載入音樂庫管理頁時查詢音樂清單並顯示表格。",
+  "程式名稱": "services/WebUIServer/app/template/admin_music.html; services/WebUIServer/app/static/js/admin_music.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Music/service.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統"
+    ],
+    "資源名詞": [
+      "管理員音樂庫管理介面",
+      "music資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "音樂清單"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "音樂清單"
+        ],
+        "text": "系統載入音樂清單",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "查詢 music 資料表並渲染清單表格。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "音樂清單"
+        ],
+        "text": "顯示音樂清單",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "music",
+    "columns": []
+  },
+  "備註": ""
+}

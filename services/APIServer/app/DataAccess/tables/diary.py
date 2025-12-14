@@ -1,27 +1,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 
-from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import String, Date, Text, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 
-from . import ORMBase, TimestampMixin, TimestampSchema
+from . import ORMBase, TimestampMixin
 from .__Function import create_uuid7
 
-__all__ = ["Schema", "Table"]
-
-
-class Schema(BaseModel):
-    """diary 的基礎 I/O 欄位（不含 id/時間戳）。"""
-    user_id: int
-    diary_date: date
-    content: str | None = Field(default=None, max_length=1000)
-    events_hash: str | None = Field(default=None, max_length=64)
-
-    model_config = ConfigDict(from_attributes=True)
+__all__ = ["Table"]
 
 
 class DiaryTable(ORMBase, TimestampMixin):

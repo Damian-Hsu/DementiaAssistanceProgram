@@ -209,6 +209,10 @@
   pointer-events: none;
 }
 
+.copy-success-toast.error {
+  background-color: var(--color-danger, #C45B5B);
+}
+
 .copy-success-toast.show {
   opacity: 1;
   transform: translateY(0);
@@ -324,6 +328,22 @@
   outline: none;
   border-color: var(--color-accent, #6B4F4F);
   box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+}
+
+.form-row input.error {
+  border-color: var(--color-danger, #C45B5B);
+}
+
+.form-row input.error:focus {
+  border-color: var(--color-danger, #C45B5B);
+  box-shadow: 0 0 0 3px rgba(196, 91, 91, 0.15);
+}
+
+.form-error {
+  color: var(--color-danger, #C45B5B);
+  font-size: var(--font-size-sm, 14px);
+  margin-top: var(--spacing-xs, 4px);
+  line-height: 1.5;
 }
 
 /* 響應式設計 - 手機模式（上下排列） */

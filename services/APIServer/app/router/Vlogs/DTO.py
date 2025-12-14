@@ -112,6 +112,7 @@ class DailyVlogResponse(BaseModel):
     thumbnail_s3_key: str | None = None
     progress: float | None = None
     status_message: str | None = None
+    error_message: str | None = None
     settings: dict | None = None
     created_at: datetime
     updated_at: datetime | None = None
@@ -145,6 +146,7 @@ class VlogStatusUpdate(BaseModel):
     error_message: str | None = None
     progress: float | None = Field(default=None, ge=0.0, le=100.0)
     status_message: str | None = None
+    job_id: str | None = None  # 用於同步更新 inference_jobs
 
 class VlogStatusUpdateResponse(BaseModel):
     vlog_id: str

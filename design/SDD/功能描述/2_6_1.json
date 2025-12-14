@@ -1,0 +1,120 @@
+{
+  "功能編號": "2-6-1",
+  "功能名稱": "使用者設定",
+  "功能說明": "使用者可在設定頁檢視並更新個人資料。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/User/service.py; services/APIServer/app/router/User/DTO.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統",
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "使用者設定介面",
+      "users資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "使用者設定介面",
+      "users資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "使用者設定介面"
+        ],
+        "text": "系統載入使用者設定介面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "查詢 users 資料表並填入個人資料表單。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "個人資料表單"
+        ],
+        "text": "顯示個人資料表單",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【姓名】",
+          "【生日】",
+          "【電話】",
+          "【信箱】",
+          "【頭像URL】"
+        ],
+        "text": "鍵盤輸入【姓名】、【生日】、【電話】、【信箱】、【頭像URL】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存個人資料】"
+        ],
+        "text": "滑鼠點選【儲存個人資料】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "送出更新請求並更新 users 資料表。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "users資料表"
+        ],
+        "text": "更新使用者資料",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "users",
+    "columns": []
+  },
+  "備註": ""
+}

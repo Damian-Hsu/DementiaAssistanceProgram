@@ -321,14 +321,30 @@ async function calculateEventsHash(events) {
   // 計算 SHA256 哈希（使用 Web Crypto API，與後端算法一致）
   const eventsJson = JSON.stringify(eventData, null, 0);
   
+  // 檢查是否支持 Web Crypto API（HTTPS 環境才有，HTTP 下會是 undefined）
+  if (window.crypto && window.crypto.subtle && window.crypto.subtle.digest) {
+    try {
   // 使用 Web Crypto API 計算 SHA256
   const encoder = new TextEncoder();
   const data = encoder.encode(eventsJson);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  
   return hashHex;
+    } catch (err) {
+      console.warn('[diary] Web Crypto API 失敗，使用簡易雜湊:', err);
+    }
+  }
+  
+  // 後備方案：使用簡易字串雜湊（HTTP 環境或不支援 Web Crypto API 時）
+  // 注意：這只是用於快速比對是否有變化，不需要密碼學強度
+  let hash = 0;
+  for (let i = 0; i < eventsJson.length; i++) {
+    const char = eventsJson.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16).padStart(8, '0');
 }
 
 // ====== 載入用戶設定 ======

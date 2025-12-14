@@ -21,13 +21,13 @@
     border-top: 2px solid var(--color-border, #D3C0A8);
     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
     padding: 0;
-    /* 修復 iPad Pro 底部白邊 - 確保貼齊底部 */
+    /* iOS 安全區：保留底部 Home indicator 空間 */
     padding-bottom: env(safe-area-inset-bottom, 0px);
     margin: 0;
     box-sizing: border-box;
-    /* 確保貼齊最底端 */
-    height: 65px;
-    min-height: 65px;
+    /* 總高度 = 視覺高度 + 安全區；避免「內容區被 padding 擠小」 */
+    height: var(--mobile-nav-total-height, 65px);
+    min-height: var(--mobile-nav-total-height, 65px);
   }
 
   /* 手機模式下隱藏登出按鈕（登出功能在設定頁面） */

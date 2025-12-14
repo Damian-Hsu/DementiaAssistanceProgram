@@ -3,7 +3,7 @@ from ..DTO import *
 import cv2
 import numpy as np
 import gc
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Literal
 from PIL import Image
 import torch
 from transformers import BlipProcessor, BlipForConditionalGeneration
@@ -20,6 +20,8 @@ import re
 import boto3
 from botocore.config import Config
 from urllib.parse import quote
+from urllib.parse import urlparse
+from pydantic import BaseModel, Field
 dotenv.load_dotenv()
 
 # 以此檔案為錨點，而非 CWD
@@ -28,7 +30,7 @@ ROOT = HERE.parent                               # 專案根（含 prompts、tas
 PROMPTS_DIR = ROOT / "prompts"
 _JSON_FENCE_RE = re.compile(r"```(?:json|JSON)?\s*([\s\S]*?)\s*```", re.MULTILINE)
 SYSTEM_PROMPT_PATH = PROMPTS_DIR / "system_prompt.md"
-MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:30300")
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
 MINIO_ROOT_USER = os.getenv("MINIO_ROOT_USER", "minioadmin")
 MINIO_ROOT_PASSWORD = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
 PRESIGN_EXPIRES = int(os.getenv("PRESIGN_EXPIRES", "3600"))  # 秒
@@ -177,6 +179,96 @@ def _upload_thumbnail_to_s3(thumbnail_path: str, s3_key: str) -> bool:
         
     except Exception as e:
         _dbg(f"上傳縮圖到 S3 失敗: {e}")
+        return False
+
+def _build_thumbnail_object_key(user_id: int, input_url: str, recording_id: str) -> str:
+    """
+    產生 recordings 縮圖的 object key（不含 bucket）。
+    盡量沿用原影片檔名；若無法解析，則退回 recording_id.jpg
+    """
+    filename = None
+    try:
+        if isinstance(input_url, str) and input_url.startswith("s3://"):
+            # s3://bucket/key
+            m = _S3_URL_RE.match(input_url)
+            if m:
+                key = m.group("key")
+                filename = os.path.basename(key)
+        elif isinstance(input_url, str) and input_url:
+            # http(s)://.../xxx.mp4?...
+            p = urlparse(input_url)
+            filename = os.path.basename(p.path) if p and p.path else None
+    except Exception:
+        filename = None
+
+    if not filename:
+        filename = f"{recording_id}.mp4"
+
+    # .mp4/.MP4 -> .jpg（其他副檔名一律改成 .jpg）
+    base, ext = os.path.splitext(filename)
+    if not base:
+        base = str(recording_id)
+    thumb_name = f"{base}.jpg"
+    return f"{int(user_id)}/video_thumbnails/{thumb_name}"
+
+def _frame_to_thumbnail_jpeg_bytes(frame_bgr: np.ndarray, *, target_width: int = 320, quality: int = 85) -> Optional[bytes]:
+    """把記憶體中的 OpenCV BGR frame 轉成縮圖 JPEG bytes（不落地檔案）。"""
+    try:
+        if frame_bgr is None:
+            return None
+        h, w = frame_bgr.shape[:2]
+        if h <= 0 or w <= 0:
+            return None
+
+        new_w = int(target_width)
+        if new_w <= 0:
+            new_w = 320
+        new_h = max(1, int(h * (new_w / w)))
+        resized = cv2.resize(frame_bgr, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+        ok, buf = cv2.imencode(".jpg", resized, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
+        if not ok:
+            return None
+        return buf.tobytes()
+    except Exception as e:
+        _dbg(f"_frame_to_thumbnail_jpeg_bytes failed: {e}")
+        return None
+
+def _upload_thumbnail_bytes_to_s3(jpeg_bytes: bytes, object_key: str) -> bool:
+    """上傳縮圖 bytes 到 S3/MinIO（使用預設 bucket）。"""
+    try:
+        if not jpeg_bytes:
+            return False
+        s3 = _get_s3_client()
+        bucket = os.getenv("MINIO_BUCKET", "media-bucket")
+        s3.put_object(
+            Bucket=bucket,
+            Key=object_key,
+            Body=jpeg_bytes,
+            ContentType="image/jpeg",
+        )
+        _dbg(f"縮圖 bytes 已上傳到 S3: s3://{bucket}/{object_key}")
+        return True
+    except Exception as e:
+        _dbg(f"上傳縮圖 bytes 到 S3 失敗: {e}")
+        return False
+
+def _update_recording_thumbnail_via_api(recording_id: str, thumbnail_s3_key: str) -> bool:
+    """透過 API Server 回寫 recordings.thumbnail_s3_key。"""
+    try:
+        if not recording_id or not thumbnail_s3_key:
+            return False
+        resp = requests.patch(
+            f"{API_SERVER_URL}/m2m/recordings/{recording_id}/thumbnail",
+            params={"thumbnail_s3_key": thumbnail_s3_key},
+            headers=headers,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        _dbg(f"錄影縮圖路徑已更新: recording_id={recording_id} -> {thumbnail_s3_key}")
+        return True
+    except Exception as e:
+        _dbg(f"更新錄影縮圖路徑失敗: {e}")
         return False
 
 # SSIM 需用 skimage；只有在 module="SSIM" 時才會用到
@@ -573,10 +665,35 @@ def img_captioning(frames_dicts: List[Dict[str, Any]]):
     
     return frames_dicts
 
-from ..libs.ModelLoad import llm_core
-LLM_CORE = llm_core(supplier="google",
-                    model_name="gemini-2.0-flash",
-                    api_key=os.getenv("GOOGLE_API_KEY") )
+# ====== LLM Schema 定義 ======
+
+class LLMEvent(BaseModel):
+    """LLM 返回的單一事件結構"""
+    start_index: int = Field(description="事件起始索引值，對應 describe.frames[i].index")
+    end_index: int = Field(description="事件結束索引值")
+    summary: str = Field(description="事件內的場景描述以及使用者正在做的事")
+    objects: List[str] = Field(default_factory=list, description="事件中出現的物件")
+    scene: Optional[str] = Field(None, description="推測的場景（從場景集合中擇一）")
+    action: Optional[str] = Field(None, description="推測目前發生行為")
+
+
+class LLMRound(BaseModel):
+    """LLM 推理輪次"""
+    thought: Optional[str] = Field(None, description="推理與思考過程")
+    reflection: Optional[str] = Field(None, description="反思標籤")
+    events: List[LLMEvent] = Field(default_factory=list, description="事件的切分陣列")
+
+
+class LLMFinalAnswer(BaseModel):
+    """LLM 最終答案"""
+    events: List[LLMEvent] = Field(default_factory=list, description="最終的事件陣列")
+
+
+class LLMResponse(BaseModel):
+    """LLM 完整回應結構"""
+    rounds: List[LLMRound] = Field(default_factory=list, description="推理區域")
+    final_answer: LLMFinalAnswer = Field(description="最終的答案")
+
 
 def _extract_first_json_substring(s: str) -> Optional[str]:
     """
@@ -640,25 +757,25 @@ def clean_model_output(model_output: Any) -> Optional[Any]:
 
     candidates: list[str] = []
 
-    # 1) 先試 fenced blocks（可能有多段，逐一嘗試）
+    # 先嘗試 fenced blocks（可能有多段，逐一嘗試）
     fences = _JSON_FENCE_RE.findall(s)
     for block in fences:
         block = block.strip()
         if block:
             candidates.append(block)
 
-    # 2) 整段原文也加入候選
+    # 整段原文也加入候選
     candidates.append(s)
 
     # 逐一嘗試解析
     for cand in candidates:
-        # 2.1 直接 parse
+        # 直接解析 JSON
         try:
             return json.loads(cand)
         except Exception:
             pass
 
-        # 2.2 從候選中抽第一個平衡 JSON 子字串
+        # 從候選中抽取第一個平衡 JSON 子字串
         sub = _extract_first_json_substring(cand)
         if sub:
             try:
@@ -670,9 +787,29 @@ def clean_model_output(model_output: Any) -> Optional[Any]:
     return None
 @timer
 def llm_processing(frames_dicts: List[Dict[str, Any]],
-                   number_of_trys: int = 3):
+                   number_of_trys: int = 3,
+                   api_key: Optional[str] = None):
+    """使用 LLM 處理視頻幀，生成事件描述。
+    
+    使用 Google Gemini API 和 Pydantic Schema 規範輸出格式，
+    確保返回結構化的事件列表。
+    
+    Args:
+        frames_dicts: 視頻幀列表，每個包含 caption, stamp 等資訊
+        number_of_trys: 重試次數，預設 3
+        api_key: Google API Key（必填，必須由 job params 傳入）
+        
+    Returns:
+        Tuple[dict, List[Dict[str, Any]], dict]: (LLM 結果字典, frames_summary, usage)
+        
+    Raises:
+        ValueError: 當輸入參數無效時
+        FileNotFoundError: 當 system_prompt.md 不存在時
+        RuntimeError: 當所有重試都失敗時
+    """
     _dbg(f"llm_processing() called with {_frames_dicts_summary(frames_dicts)}，number_of_trys={number_of_trys}")
-    #錯誤檢查
+    
+    # 錯誤檢查
     if not frames_dicts or not isinstance(frames_dicts, list):
         raise ValueError("frames_dicts 必須是非空的列表")
     if number_of_trys < 1:
@@ -687,7 +824,7 @@ def llm_processing(frames_dicts: List[Dict[str, Any]],
 
     # 先處理 frames_dicts，確保每個幀都有 caption
     del_list = ["frame", "is_not_blurry", "is_significant", "variance", "ssim_value", "mse_value"]
-    # 跳過is_not_blurry與is_significant
+    # 跳過 is_not_blurry 與 is_significant 為 False 的幀
     new_frames_dicts = []
     for item in frames_dicts:
         if item["is_not_blurry"] and item["is_significant"]:
@@ -709,30 +846,126 @@ def llm_processing(frames_dicts: List[Dict[str, Any]],
             "caption": fr.get("caption", "")
         }
         for i, fr in enumerate(cleaned_frames)
-        ]
+    ]
     _dbg(f"Frames prepared for LLM: {len(frames_summary)} frames.")
+    
     # 準備 prompt
-    prompt = {
-        "system_prompt": str(system_prompt),
-        "describe": str(frames_summary)
-    }
+    prompt_text = json.dumps({
+        "system_prompt": system_prompt,
+        "describe": {
+            "frames": frames_summary
+        }
+    }, ensure_ascii=False, indent=2)
 
+    # 使用新的 Google Gemini API（google-genai）和 Schema
+    # 注意：google-generativeai 舊 SDK 的 import 是 google.generativeai；本專案使用 google-genai。
+    import google.genai as genai
+    from google.genai import types
+    
+    # 獲取 API Key（必須從 job params 中提供，不允許從環境變數讀取）
+    if not api_key:
+        raise ValueError("GOOGLE_API_KEY 未設定（請在建立 job 時提供 google_api_key 參數）")
+    
+    client = genai.Client(api_key=api_key)
+    
+    # 定義 Safety Settings（關閉安全檢查）
+    safety_settings = [
+        types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
+        types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
+        types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
+        types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF"),
+    ]
+    
+    # 使用 Schema 規範輸出
+    model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
+    max_output_tokens = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "65535"))
+    
+    # 構建 GenerateContentConfig，使用 Schema
+    generate_content_config = types.GenerateContentConfig(
+        temperature=0.0,
+        system_instruction=system_prompt,
+        max_output_tokens=max_output_tokens,
+        response_modalities=["TEXT"],
+        response_mime_type="application/json",
+        response_schema=LLMResponse.model_json_schema(),
+        safety_settings=safety_settings
+    )
+    
     # 如果輸出失敗，或者無法轉換成 JSON，則重試 number_of_trys 次
     output_num = number_of_trys
-    while number_of_trys != 0:
-        result = LLM_CORE.invoke(text = str(prompt))
-        _dbg(f"{output_num-number_of_trys+1} of try. LLM raw output: {result}")
-        # 清理模型輸出
-        result = clean_model_output(result)
-        _dbg(f"{output_num-number_of_trys+1} of try. LLM cleaned output: {result}")
-        if result:
-            break
-        number_of_trys -= 1
-    else:
+    result = None
+    usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+    def _extract_usage(resp: Any) -> dict:
+        """從 google.genai 回應萃取 token 使用量（盡量相容不同 SDK）。"""
+        u = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        if resp is None:
+            return u
+        meta = getattr(resp, "usage_metadata", None) or getattr(resp, "usage", None)
+        if meta is None and isinstance(resp, dict):
+            meta = resp.get("usage_metadata") or resp.get("usage")
+
+        def _get(obj: Any, key: str) -> int:
+            if obj is None:
+                return 0
+            try:
+                if isinstance(obj, dict):
+                    v = obj.get(key)
+                else:
+                    v = getattr(obj, key, None)
+                return int(v) if v is not None else 0
+            except Exception:
+                return 0
+
+        prompt = _get(meta, "prompt_token_count") or _get(meta, "prompt_tokens")
+        completion = _get(meta, "candidates_token_count") or _get(meta, "completion_tokens")
+        total = _get(meta, "total_token_count") or _get(meta, "total_tokens")
+        if not total and (prompt or completion):
+            total = prompt + completion
+
+        u["prompt_tokens"] = max(0, int(prompt))
+        u["completion_tokens"] = max(0, int(completion))
+        u["total_tokens"] = max(0, int(total))
+        return u
+    
+    while number_of_trys > 0:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[prompt_text],
+                config=generate_content_config,
+            )
+            usage = _extract_usage(response)
+            
+            # 解析 JSON 回應
+            response_text = response.text
+            _dbg(f"{output_num-number_of_trys+1} of try. LLM raw output: {response_text[:200]}...")
+            
+            # 驗證並解析回應
+            parsed_result = json.loads(response_text)
+            
+            # 使用 Pydantic 驗證結構
+            validated_result = LLMResponse.model_validate(parsed_result)
+            
+            # 轉換回字典格式（保持向後兼容）
+            result = validated_result.model_dump()
+            _dbg(f"{output_num-number_of_trys+1} of try. LLM validated output: {len(result.get('final_answer', {}).get('events', []))} events")
+            
+            if result:
+                break
+                
+        except json.JSONDecodeError as e:
+            _dbg(f"{output_num-number_of_trys+1} of try. JSON 解析失敗: {e}")
+            number_of_trys -= 1
+        except Exception as e:
+            _dbg(f"{output_num-number_of_trys+1} of try. LLM 調用失敗: {e}")
+            number_of_trys -= 1
+    
+    if not result:
         raise RuntimeError(f"模型嘗試超過規定{output_num}次錯誤，請檢查模型輸出或重試。")
 
-    # 拼裝回原始格式
-    return result, frames_summary
+    # 返回結果和 frames_summary
+    return result, frames_summary, usage
 # ---- 工具：解析 ISO 時間（允許 None） ----
 def _parse_iso_dt(s: Optional[str]) -> Optional[datetime]:
     if not s:
@@ -953,7 +1186,7 @@ def video_description_extraction_main(job: dict):
     step 6 : 透過 MDL.BLIPImageCaptioner載入Captioner Model
     step 7 : 將剩餘的幀送入Captioner Model，取得每一幀的描述
     step 8 : 將每一幀的描述與時間戳放入prompt中，組成完整的prompt
-    step 9 : 將prompt送入MDL.llm_core，取得最終的描述
+    step 9 : 將prompt送入 LLM（使用 Schema 規範輸出），取得最終的描述
     step 10: 將結果整理成對應格式，呼叫API Server，讓結果存入資料庫
     (感覺缺了一個模型存活時間控管的模塊，需要研究如何讓有任務的狀態下不重複載入模型，直到所有任務做完後1分鐘再釋放模型記憶體)
 
@@ -986,7 +1219,9 @@ def video_description_extraction_main(job: dict):
         reply = img_captioning(reply)
 
         # === Step 8~9: LLM ===
-        llm_result, frames_summary = llm_processing(reply)
+        # 從 job params 中獲取 Google API Key（如果有的話）
+        google_api_key = job.get("params", {}).get("google_api_key")
+        llm_result, frames_summary, llm_usage = llm_processing(reply, api_key=google_api_key)
 
         # 安全檢查：frames_summary 必須存在且非空，否則無法做 index→秒
         if not isinstance(frames_summary, list) or len(frames_summary) == 0:
@@ -1028,6 +1263,33 @@ def video_description_extraction_main(job: dict):
         # 補回夾限統計
         if isinstance(jr.get("metrics"), dict):
             jr["metrics"]["index_clamp_count"] = clamp_count
+            # 回傳給 API Server，讓後端能統計使用者 Token 使用量（compute service）
+            if isinstance(llm_usage, dict):
+                jr["metrics"]["llm_prompt_tokens"] = int(llm_usage.get("prompt_tokens") or 0)
+                jr["metrics"]["llm_completion_tokens"] = int(llm_usage.get("completion_tokens") or 0)
+                jr["metrics"]["llm_total_tokens"] = int(llm_usage.get("total_tokens") or 0)
+                # 供 API Server 記錄使用的模型資訊
+                jr["metrics"]["llm_provider"] = "google"
+                jr["metrics"]["llm_model"] = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
+
+        # ====== 影片完成後立刻生成縮圖（併入 videosprocessing；不再依賴 thumbnail_tasks）======
+        try:
+            params = job.get("params", {}) if isinstance(job, dict) else {}
+            recording_id = params.get("video_id") or params.get("recording_id") or job.get("video_id") or job.get("recording_id")
+            user_id = params.get("user_id") or job.get("user_id")
+            input_url = job.get("input_url", "")
+
+            # 僅在必要資訊齊全、且已抽到幀的情況下生成縮圖
+            if recording_id and user_id and isinstance(frames, list) and len(frames) > 0:
+                # 直接用記憶體裡的第一張幀（已在本任務讀取/解碼）
+                first_frame = frames[0].get("frame") if isinstance(frames[0], dict) else None
+                jpeg_bytes = _frame_to_thumbnail_jpeg_bytes(first_frame)
+                if jpeg_bytes:
+                    thumb_key = _build_thumbnail_object_key(int(user_id), str(input_url), str(recording_id))
+                    if _upload_thumbnail_bytes_to_s3(jpeg_bytes, thumb_key):
+                        _update_recording_thumbnail_via_api(str(recording_id), thumb_key)
+        except Exception as e:
+            _dbg(f"[Thumbnail Inline] failed: {e}")
 
         return jr
 
@@ -1080,11 +1342,19 @@ def video_description_extraction(self, job: dict):
         
         except requests.RequestException as e:
             # API 呼叫失敗，回傳錯誤訊息
+            err_body = None
+            try:
+                if getattr(e, "response", None) is not None:
+                    err_body = e.response.text
+            except Exception:
+                err_body = None
+            if err_body:
+                _dbg(f"[CompleteJob] API ERROR body: {err_body[:2000]}")
             return {
                 "job_id": job.get("job_id", "?"),
                 "trace_id": job.get("trace_id"),
                 "error_code": "API_CALL_FAILED",
-                "error_message": str(e)
+                "error_message": f"{str(e)}; body={err_body}" if err_body else str(e)
             }
     finally:
         # 任務完成後強制清理記憶體

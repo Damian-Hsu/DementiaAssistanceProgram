@@ -1,10 +1,10 @@
 """
 檔案內所有的檔名為表格名稱(除去Enumeration與Function)，每個表格都有對應的不同模型：
-Schema - 所有表格的基底(透過pydantic)，用於限制傳入傳出的基礎欄位限制，與Table對齊
 Table - 表格模型 (繼承自 Base)
-{ApiName}_{input/output} - 其他自訂義的不同API特殊回傳的
+{ApiName}_{input/output} - 其他自訂義的不同API特殊回傳的（定義在 router/{ApiName}/DTO.py）
 
 所有非table欄位的寫在Enumeration與Function
+注意：Schema 已移除，請使用 router/{ApiName}/DTO.py 中的 DTO 類別
 """
 __all__ = ["ORMBase",
            "TimestampMixin",

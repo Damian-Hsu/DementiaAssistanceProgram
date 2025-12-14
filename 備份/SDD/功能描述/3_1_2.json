@@ -1,0 +1,106 @@
+{
+  "功能編號": "3-1-2",
+  "功能名稱": "依狀態/類型篩選",
+  "功能說明": "管理員可透過任務類型與狀態下拉選單篩選任務。後端會根據 status_filter 判斷要過濾 Compute 任務（pending/processing/success/failed）或 Streaming 任務（running/starting/stopped/error/reconnecting），並根據 task_type 將 UI 值映射到 inference_jobs.type（例如 video_description → video_description_extraction）。",
+  "程式名稱": "services/WebUIServer/app/template/admin_tasks.html; services/WebUIServer/app/static/js/admin_tasks.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py",
+  "輸入": [
+    "task_type（可空）",
+    "status_filter（可空）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "篩選後的 TaskListRespDTO.items[]",
+    "任務列表刷新（pageNow 會重置為 1）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "選擇任務類型（taskTypeFilter）"
+          },
+          {
+            "sub_no": "②",
+            "item": "選擇狀態（taskStatusFilter）"
+          },
+          {
+            "sub_no": "③",
+            "item": "選擇「全部」清空篩選"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "前端觸發刷新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "任一篩選變更後，前端將 pageNow 重置為 1 並呼叫 loadTasks"
+          },
+          {
+            "sub_no": "②",
+            "item": "呼叫 GET /api/v1/admin/tasks?task_type={...}&status_filter={...}"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "後端篩選規則",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若 status_filter 為 pending/processing/success/failed：只過濾 inference_jobs（Compute 任務）"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 status_filter 為 running/starting/stopped/error/reconnecting：只過濾 StreamingServer /streams（串流任務）"
+          },
+          {
+            "sub_no": "③",
+            "item": "若 task_type=streaming：僅回傳串流任務；若 task_type 為其他：映射到 inference_jobs.type 進行過濾"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示篩選結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示符合條件的任務列表；若為空則顯示「目前沒有任務」"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "inference_jobs",
+    "columns": [
+      {
+        "欄位": "type",
+        "中文": "任務類型",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": "inference_jobs.type（映射：video_description_extraction/vlog_generation/diary_generation/...）"
+      },
+      {
+        "欄位": "status",
+        "中文": "任務狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "inference_jobs.status（Compute 狀態篩選依據）"
+      }
+    ]
+  }
+}

@@ -1,0 +1,219 @@
+{
+  "功能編號": "2-2",
+  "功能名稱": "鏡頭串流",
+  "功能說明": "使用者可在鏡頭頁面新增/編輯/刪除鏡頭，並取得 RTSP 推流 URL 供外部攝影機/OBS 推流；啟動串流時後端會呼叫 StreamingServer 開始錄影切片並回傳狀態，前端會輪詢串流狀態並以 WebRTC（WHEP）播放即時畫面，停止串流需經確認對話框。",
+  "程式名稱": "services/WebUIServer/app/template/camera.html; services/WebUIServer/app/static/js/camera.js; services/WebUIServer/app/static/js/services/CameraService.js; services/WebUIServer/app/static/js/APIClient.js; services/WebUIServer/app/template/partials/stop_stream_confirm_dialog.html; services/APIServer/app/router/Camera/service.py; services/APIServer/app/router/Camera/DTO.py; services/APIServer/app/DataAccess/tables/camera.py; services/StreamingServer/app/main.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統",
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "鏡頭介面",
+      "camera資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "鏡頭介面",
+      "即時預覽畫面",
+      "camera資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "鏡頭介面"
+        ],
+        "text": "系統載入鏡頭介面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "載入鏡頭清單並輪詢串流狀態。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "鏡頭介面"
+        ],
+        "text": "顯示鏡頭清單與串流狀態",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【開始串流】"
+        ],
+        "text": "滑鼠點選【開始串流】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "建立串流連線並提供推流 URL，串流狀態為 running 時啟動即時預覽。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "即時預覽畫面"
+        ],
+        "text": "顯示即時預覽畫面",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【停止串流】"
+        ],
+        "text": "滑鼠點選【停止串流】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【取消】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【確認】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "停止確認視窗"
+        ],
+        "text": "跳出停止確認視窗",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "camera; settings; users",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "鏡頭ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "camera.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "camera.user_id；ForeignKey(users.id)；索引"
+      },
+      {
+        "欄位": "name",
+        "中文": "鏡頭名稱",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": "camera.name"
+      },
+      {
+        "欄位": "status",
+        "中文": "鏡頭狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "inactive",
+        "備註": "camera.status（active/inactive/deleted）"
+      },
+      {
+        "欄位": "path",
+        "中文": "串流路徑",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "是",
+        "預設值": null,
+        "備註": "camera.path（公開串流 path）"
+      },
+      {
+        "欄位": "token_version",
+        "中文": "Token版本",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "camera.token_version"
+      },
+      {
+        "欄位": "last_seen_at",
+        "中文": "最後上線時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "camera.last_seen_at"
+      },
+      {
+        "欄位": "max_publishers",
+        "中文": "最大推流者數量",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 1,
+        "備註": "camera.max_publishers"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "camera.created_at；TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "camera.updated_at；TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  },
+  "備註": ""
+}

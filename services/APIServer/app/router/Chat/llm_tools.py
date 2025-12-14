@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import os
 import json
 import threading
 from pathlib import Path
@@ -34,8 +33,8 @@ SYSTEM_PROMPT_PATH = PROMPTS_DIR / "system_instruction.md"
 with open(SYSTEM_PROMPT_PATH, "r", encoding="utf-8") as f:
         SYSTEM_INSTRUCTION = f.read()
 # LLM 模型設定
-# 定義工具函數（使用字典格式，Gemini SDK 會自動轉換）
-DEFAULT_GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+# 注意：系統預設 API Key 應由呼叫方（例如 Chat/service.py）從 settings 表取得並傳入，
+# 此檔案不應直接讀取環境變數或資料庫。
 
 
 # 所有工具列表
@@ -155,7 +154,7 @@ class UserLLMManager:
         self._lock = threading.RLock()  # 線程安全鎖
         self._cleanup_interval = cleanup_interval
         self._default_provider = "google"
-        self._default_model = "gemini-2.0-flash"  # 使用穩定版本，免費層支持
+        self._default_model = "gemini-2.5-flash-lite"  # 使用穩定版本，免費層支持
         self._stop_cleanup = False  # 添加停止標記
         
         # 不要在這裡啟動清理線程，改為延遲啟動
@@ -311,13 +310,8 @@ class UserLLMManager:
             model_name: 模型名稱
             use_tools: 是否使用工具（Function Calling），預設 True
         """
-        # 如果沒有提供 API Key，使用系統預設的
         if not api_key:
-            api_key = DEFAULT_GOOGLE_API_KEY
-            print("[LLM Manager] 使用系統預設的 Google API Key")
-        
-        if not api_key:
-            raise ValueError("Google API Key 未提供（請設定 GOOGLE_API_KEY 環境變數）")
+            raise ValueError("Google API Key 未提供（請在系統設定或使用者設定中配置）")
         
         try:
             genai.configure(api_key=api_key)
@@ -375,7 +369,9 @@ class UserLLMManager:
                     'model_name': model_info['config']['model_name'],
                     'last_access': last_access,
                     'time_since_access': time_since_access,
-                    'has_custom_api_key': model_info['config']['api_key'] != DEFAULT_GOOGLE_API_KEY
+                    # 由於此模組不再讀取系統預設 API Key，無法判斷是否為「自訂」；
+                    # 僅回傳是否有提供 api_key（避免誤判）。
+                    'has_api_key': bool(model_info['config'].get('api_key'))
                 })
             
             return {
@@ -1110,15 +1106,21 @@ async def process_chat_with_llm(
     user_id: int,
     user_timezone: str = "Asia/Taipei",
     max_iterations: int = 5
-) -> tuple[str, List[FunctionCallResult], List[Dict[str, Any]]]:
+) -> tuple[str, List[FunctionCallResult], List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]], dict]:
     """處理與 LLM 的對話，包括 Function Calling（支援使用者時區）"""
+    from ...utils.llm_usage import extract_usage_from_response
     
     # 開始對話
     chat = model.start_chat(history=history_messages[:-1])
+    usage_total = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
     
     # 發送用戶訊息
     try:
         response = chat.send_message(history_messages[-1]["parts"][0])
+        u = extract_usage_from_response(response)
+        usage_total["prompt_tokens"] += u["prompt_tokens"]
+        usage_total["completion_tokens"] += u["completion_tokens"]
+        usage_total["total_tokens"] += u["total_tokens"]
     except Exception as api_error:
         # 處理 Google API 錯誤，顯示完整的錯誤訊息
         error_msg = _format_api_error(
@@ -1232,6 +1234,10 @@ async def process_chat_with_llm(
                                 "response": {"result": result}
                             }
                         })
+                        u = extract_usage_from_response(response)
+                        usage_total["prompt_tokens"] += u["prompt_tokens"]
+                        usage_total["completion_tokens"] += u["completion_tokens"]
+                        usage_total["total_tokens"] += u["total_tokens"]
                     except Exception as send_error:
                         # 如果再次調用 LLM 失敗，記錄完整錯誤訊息
                         error_msg = _format_api_error(
@@ -1257,6 +1263,10 @@ async def process_chat_with_llm(
                                 "response": {"error": str(e)}
                             }
                         })
+                        u = extract_usage_from_response(response)
+                        usage_total["prompt_tokens"] += u["prompt_tokens"]
+                        usage_total["completion_tokens"] += u["completion_tokens"]
+                        usage_total["total_tokens"] += u["total_tokens"]
                     except Exception as send_error:
                         # 如果發送錯誤也失敗，記錄並跳出
                         send_error_msg = _format_api_error(
@@ -1281,4 +1291,4 @@ async def process_chat_with_llm(
     if not final_message:
         final_message = "抱歉，我無法理解您的問題。請試著換個方式描述。"
     
-    return final_message, function_calls_made, all_events, all_recordings, all_diaries, all_vlogs
+    return final_message, function_calls_made, all_events, all_recordings, all_diaries, all_vlogs, usage_total

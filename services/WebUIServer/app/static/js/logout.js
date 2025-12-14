@@ -49,6 +49,16 @@ if (logoutbtn) {
   });
 }
 
+// 設定頁面底部登出按鈕
+const settingsLogoutBtn = document.getElementById("logoutbtn_settings");
+if (settingsLogoutBtn) {
+  settingsLogoutBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showLogoutConfirm();
+  });
+}
+
 // 綁定取消按鈕事件
 if (logoutCancelBtn) {
   logoutCancelBtn.addEventListener("click", () => {

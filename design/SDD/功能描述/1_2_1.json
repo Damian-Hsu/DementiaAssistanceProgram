@@ -1,0 +1,192 @@
+{
+  "功能編號": "1-2-1",
+  "功能名稱": "登出確認對話框",
+  "功能說明": "當使用者點擊登出按鈕時，系統跳出「是否登出」確認視窗；使用者可選擇取消、確認、點擊視窗外部或按 ESC 關閉。若確認則觸發登出流程（清除本機認證資料並導向登入介面）；若取消或關閉則不改變登入狀態。",
+  "程式名稱": "services/WebUIServer/app/template/base.html; services/WebUIServer/app/template/partials/logout_confirm_dialog.html; services/WebUIServer/app/static/js/logout.js; services/WebUIServer/app/static/css/logout_dialog.css",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "是否登出視窗"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "是否登出視窗",
+      "登入介面"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "跳出",
+        "objects": [
+          "是否登出視窗"
+        ],
+        "text": "系統跳出是否登出視窗",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【取消】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【確認】"
+          },
+          {
+            "sub_no": "③",
+            "text": "【點擊視窗外】"
+          },
+          {
+            "sub_no": "④",
+            "text": "【ESC】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "是否登出視窗"
+        ],
+        "text": "顯示是否登出視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-①",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【取消】"
+        ],
+        "text": "滑鼠點選【取消】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "是否登出視窗"
+        ],
+        "text": "關閉是否登出視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-②",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【確認】"
+        ],
+        "text": "滑鼠點選【確認】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "觸發登出流程（清除 localStorage.jwt 與使用者快取資訊）。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "切換",
+        "objects": [
+          "登入介面"
+        ],
+        "text": "切換至登入介面",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-③",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點擊",
+        "objects": [
+          "視窗外"
+        ],
+        "text": "滑鼠點擊視窗外",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "是否登出視窗"
+        ],
+        "text": "關閉是否登出視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-④",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "按下",
+        "objects": [
+          "【ESC】"
+        ],
+        "text": "鍵盤按下【ESC】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "是否登出視窗"
+        ],
+        "text": "關閉是否登出視窗",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  },
+  "備註": "此檔僅描述確認視窗行為；實際登出清除 token 與導頁流程請參考 1-2。"
+}

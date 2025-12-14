@@ -1,0 +1,103 @@
+{
+  "功能編號": "2-6-4",
+  "功能名稱": "日記自動刷新設定",
+  "功能說明": "使用者可設定系統自動刷新當天日記的間隔時間（分鐘）。前端會在載入時從 GET /users/settings 取得 diary_auto_refresh_interval_minutes，若未設定則填入預設 30；儲存後以 PATCH /users/settings 更新 users.settings.diary_auto_refresh_interval_minutes（範圍 5-1440 分鐘）。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/User/settings.py; services/APIServer/app/router/User/service.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入": [
+    "diary_auto_refresh_interval_minutes（5-1440）",
+    "diary_auto_refresh_enabled（可選，預設 true）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "UserSettingsResponse.settings.diary_auto_refresh_interval_minutes",
+    "成功/失敗提示訊息"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /users/settings 取得 diary_auto_refresh_interval_minutes"
+          },
+          {
+            "sub_no": "②",
+            "item": "若後端未回傳該欄位，前端使用預設值 30 分鐘"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "輸入日記刷新間隔（分鐘）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊【儲存應用程式設定】"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端 PATCH /users/settings（diary_auto_refresh_interval_minutes）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端驗證區間（ge=5, le=1440），不符合則回 422/400"
+          },
+          {
+            "sub_no": "③",
+            "item": "寫入 users.settings.diary_auto_refresh_interval_minutes（以及可選的 diary_auto_refresh_enabled）並 commit"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示「應用程式設定已更新」"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示「更新應用程式設定失敗」或後端 detail"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users",
+    "columns": [
+      {
+        "欄位": "settings",
+        "中文": "使用者設定(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings.diary_auto_refresh_enabled / users.settings.diary_auto_refresh_interval_minutes"
+      }
+    ]
+  }
+}

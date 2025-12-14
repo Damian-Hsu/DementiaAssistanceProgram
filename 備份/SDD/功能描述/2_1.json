@@ -1,0 +1,180 @@
+{
+  "功能編號": "2-1",
+  "功能名稱": "首頁",
+  "功能說明": "首頁提供以日期為核心的「今日日記 + 當日 Vlog」整合視圖：使用者可切換日期後查看該日的日記摘要與 Vlog 狀態；日記可手動刷新並可依事件變化自動刷新；Vlog 可查看進度、播放完成影片、生成新 Vlog 或刪除既有 Vlog。",
+  "程式名稱": "services/WebUIServer/app/template/home.html; services/WebUIServer/app/static/js/home.js; services/WebUIServer/app/static/js/diary.js; services/WebUIServer/app/static/js/vlog.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Chat/service.py; services/APIServer/app/router/Vlogs/service.py",
+  "輸入": [
+    "date（URL query 或日期選擇器）",
+    "Bearer JWT（localStorage.jwt）",
+    "使用者設定（users.settings：timezone、日記自動刷新、串流 TTL、LLM 設定等）"
+  ],
+  "輸出": [
+    "日記摘要內容與事件數量",
+    "每日 Vlog 狀態/進度/訊息與影片/縮圖",
+    "生成/刪除操作結果與錯誤提示"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "使用者進入首頁（/home），系統讀取 URL query date 或使用今天日期"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "使用者操作",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "切換日期（日期選擇器/左右翻頁）"
+          },
+          {
+            "sub_no": "②",
+            "item": "刷新日記（點擊刷新按鈕）"
+          },
+          {
+            "sub_no": "③",
+            "item": "生成 Vlog（事件選擇 → 設定 → 送出）"
+          },
+          {
+            "sub_no": "④",
+            "item": "刪除 Vlog（確認後刪除）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "權限檢查",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端檢查 localStorage.jwt 是否存在；不存在則導向 /auth"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端呼叫 GET /api/v1/users/me 驗證 token 仍有效；失敗則導向 /auth"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入指定日期日記（GET /api/v1/chat/diary/{date}）"
+          },
+          {
+            "sub_no": "②",
+            "item": "載入指定日期 Vlog（GET /api/v1/vlogs/date/{date}）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "自動刷新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端定期檢查今日事件列表是否變化（計算 hash）；若變化則觸發刷新日記"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 Vlog 狀態為 pending/processing，前端輪詢更新狀態與進度"
+          }
+        ]
+      },
+      {
+        "step_no": 4,
+        "title": "操作處理",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "日記刷新：POST /api/v1/chat/diary/summary（force_refresh=true）"
+          },
+          {
+            "sub_no": "②",
+            "item": "Vlog 生成：POST /api/v1/vlogs（建立任務並派送 compute）"
+          },
+          {
+            "sub_no": "③",
+            "item": "Vlog 刪除：DELETE /api/v1/vlogs/{id}"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示該日期日記內容（或無事件/錯誤提示）"
+          },
+          {
+            "sub_no": "②",
+            "item": "顯示該日期 Vlog 狀態、進度、縮圖/影片（或尚未生成提示）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users; diary; events; vlogs; vlog_segments; inference_jobs; music",
+    "columns": [
+      {
+        "欄位": "settings",
+        "中文": "使用者設定",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings（timezone/diary_auto_refresh_interval_minutes/LLM 等）"
+      },
+      {
+        "欄位": "diary_date",
+        "中文": "日記日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "diary.diary_date"
+      },
+      {
+        "欄位": "content",
+        "中文": "日記內容",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "diary.content"
+      },
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.start_time"
+      },
+      {
+        "欄位": "status",
+        "中文": "Vlog 狀態",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "vlogs.status"
+      }
+    ]
+  }
+}

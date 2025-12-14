@@ -50,6 +50,29 @@
   line-height: var(--line-height-relaxed, 1.8);
 }
 
+/* 設定子區塊（用於在主要設定區塊內分組） */
+.settings-subsection {
+  margin-top: var(--spacing-xl, 32px);
+  padding-top: var(--spacing-xl, 32px);
+  border-top: 1px solid var(--color-border, #D3C0A8);
+}
+
+.settings-subsection-title {
+  font-size: var(--font-size-xl, 20px);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-accent, #6B4F4F);
+  margin: 0 0 var(--spacing-sm, 8px);
+  line-height: var(--line-height-tight, 1.4);
+}
+
+.settings-subsection .settings-section-desc {
+  margin-bottom: var(--spacing-lg, 24px);
+}
+
+.settings-subsection .admin-table-container {
+  margin-top: var(--spacing-lg, 24px);
+}
+
 /* 主內容區域 */
 .profile-container {
   display: flex;
@@ -83,7 +106,14 @@
   border-color: var(--color-accent, #6B4F4F);
 }
 
-.info-group label {
+.info-group form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+}
+
+/* 排除 form-check-label，讓 Bootstrap 處理 */
+.info-group label:not(.form-check-label) {
   display: block;
   font-size: var(--font-size-sm, 14px);
   font-weight: var(--font-weight-medium, 500);
@@ -92,7 +122,7 @@
   line-height: var(--line-height-normal, 1.6);
 }
 
-.info-group input,
+.info-group input:not([type="checkbox"]):not([type="radio"]):not(.form-check-input),
 .info-group select {
   width: 100%;
   padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
@@ -491,33 +521,24 @@
   margin-bottom: var(--spacing-md, 16px);
 }
 
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm, 8px);
+/* Bootstrap form-check 樣式覆蓋（如果需要自訂） */
+.info-group .form-check {
+  margin-bottom: var(--spacing-sm, 8px);
+  /* 確保使用 Bootstrap 的 display 和 align-items */
+  display: block;
+}
+
+.info-group .form-check-input {
+  cursor: pointer;
+  /* 讓 Bootstrap 完全接管 checkbox 的外觀 */
+}
+
+.info-group .form-check-label {
   cursor: pointer;
   font-size: var(--font-size-base, 16px);
   color: var(--color-text, #2E2E2E);
   user-select: none;
-  min-height: 24px; /* 確保有足夠的高度對齊 */
-}
-
-.checkbox-label input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
-  min-width: 20px; /* 防止縮放 */
-  min-height: 20px;
-  cursor: pointer;
-  accent-color: var(--color-accent, #6B4F4F);
-  flex-shrink: 0; /* 防止 checkbox 被壓縮 */
-  margin: 0; /* 移除默認 margin */
-  vertical-align: middle; /* 垂直對齊 */
-}
-
-.checkbox-label span {
-  line-height: 1.5; /* 與 checkbox 高度對齊 */
-  display: flex;
-  align-items: center; /* 確保文字垂直居中 */
+  /* 讓 Bootstrap 處理 margin-left 和對齊 */
 }
 
 /* 設定說明 */
@@ -527,6 +548,37 @@
   background: var(--bg-button, #F3F0EB);
   border-radius: var(--radius-md, 12px);
   border-left: 4px solid var(--color-accent, #6B4F4F);
+}
+
+/* 設定頁底部登出按鈕 */
+.settings-logout {
+  display: none; /* 預設隱藏，只在手機模式下顯示 */
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.settings-logout button {
+  width: min(420px, 100%);
+}
+
+/* 手機模式下顯示登出按鈕，並確保在底部導航上方 */
+@media (max-width: 768px) {
+  .settings-logout {
+    display: flex; /* 手機模式下顯示 */
+    margin-top: var(--spacing-xl, 32px);
+    margin-bottom: calc(var(--spacing-lg, 24px) + var(--mobile-nav-total-height, 65px)); /* 底部導航高度（含安全區）+ 間距 */
+    padding: 0 var(--spacing-md, 16px) var(--spacing-md, 16px);
+    position: relative;
+    z-index: 1;
+  }
+  
+  .settings-logout button {
+    width: 100%;
+    max-width: 100%;
+  }
 }
 
 .settings-note p {

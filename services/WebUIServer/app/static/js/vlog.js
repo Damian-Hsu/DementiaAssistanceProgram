@@ -9,6 +9,8 @@ class VlogManager {
     constructor() {
         this.selectedEvents = [];
         this.selectedDate = null;
+        this.currentDateEventTotal = 0;
+        this.currentDateMinRequired = 10;
         this.pollTimer = null;
         this.dailyVlog = null;
         this.currentVideoUrl = null;
@@ -35,6 +37,15 @@ class VlogManager {
         this.dragStartX = 0;
         this.isPlaying = false;
         this.initPromise = this.init();
+    }
+
+    updateConfirmVlogGenerateButtonState() {
+        const btn = document.getElementById('confirmVlogGenerate');
+        if (!btn) return;
+        const hasMusic = !!this.musicSelection.trackId;
+        btn.disabled = !hasMusic;
+        // 不使用任何警告窗；僅以 disabled 限制操作（避免打斷使用者）
+        btn.title = '';
     }
 
     initializeMusicAudio() {
@@ -121,6 +132,7 @@ class VlogManager {
         this.toggleMusicPreview();
         // 更新生成按鈕狀態（音樂列表載入後）
         this.updateGenerateButtonState();
+        this.updateConfirmVlogGenerateButtonState();
     }
 
     resetMusicSelection() {
@@ -155,6 +167,7 @@ class VlogManager {
         if (this.musicElements.preview) {
             this.musicElements.preview.classList.add('hidden');
         }
+        this.updateConfirmVlogGenerateButtonState();
     }
 
     async handleMusicSelectChange() {
@@ -166,11 +179,13 @@ class VlogManager {
             this.toggleMusicPreview();
             // 更新生成按鈕狀態（未選擇音樂時禁用）
             this.updateGenerateButtonState();
+            this.updateConfirmVlogGenerateButtonState();
             return;
         }
         await this.prepareMusicPreview(musicId);
         // 更新生成按鈕狀態（選擇音樂後啟用）
         this.updateGenerateButtonState();
+        this.updateConfirmVlogGenerateButtonState();
     }
 
     async prepareMusicPreview(musicId) {
@@ -271,9 +286,11 @@ class VlogManager {
             }
             // 更新平均分鏡時間
             this.updateAvgSegmentTime();
+            this.updateConfirmVlogGenerateButtonState();
         } catch (error) {
             console.error('載入音樂預覽失敗:', error);
             this.showToast('載入音樂預覽失敗，請稍後再試', 'error');
+            this.updateConfirmVlogGenerateButtonState();
         }
     }
 
@@ -736,14 +753,6 @@ class VlogManager {
             deleteBtn.addEventListener('click', () => this.deleteDailyVlog());
         }
 
-        const generateBtn = document.getElementById('generateVlogBtn');
-        if (generateBtn) {
-            generateBtn.addEventListener('click', () => {
-                this.selectedEvents = [];
-                this.openEventSelectModal();
-            });
-        }
-
         this.musicElements = {
             select: document.getElementById('musicSelect'),
             preview: document.getElementById('musicPreview'),
@@ -775,6 +784,9 @@ class VlogManager {
                 this.musicSelection.fade = !!this.musicElements.fadeToggle.checked;
             });
         }
+
+        // 初始狀態：未選音樂不可生成
+        this.updateConfirmVlogGenerateButtonState();
 
         // 波形圖拖動功能
         const waveformWrapper = document.querySelector('.music-waveform-wrapper');
@@ -1177,14 +1189,62 @@ class VlogManager {
         try {
             const response = await ApiClient.vlogs.getDateEvents(date);
             if (response.events && response.events.length > 0) {
+                this.currentDateEventTotal = response.events.length;
+                this.syncEventSelectionConstraints();
                 this.renderEventList(response.events);
             } else {
+                this.currentDateEventTotal = 0;
+                this.syncEventSelectionConstraints();
                 eventList.innerHTML = '<div class="empty-state"><p>該日期沒有事件記錄</p></div>';
             }
         } catch (error) {
             console.error('載入事件失敗:', error);
+            this.currentDateEventTotal = 0;
+            this.syncEventSelectionConstraints();
             eventList.innerHTML = '<div class="error-state"><p>載入失敗,請重試</p></div>';
         }
+    }
+
+    syncEventSelectionConstraints() {
+        // 最少選擇 10 個；若當日事件不足 10，則以當日事件總數為最少（避免永遠無法繼續）
+        const total = Math.max(0, Number(this.currentDateEventTotal || 0));
+        const minRequired = Math.min(10, total || 10);
+        this.currentDateMinRequired = minRequired;
+
+        // 數量欄位：最多 100，且不可超過當日事件總數
+        const maxSelectable = Math.min(100, total || 0);
+        const aiSelectLimit = document.getElementById('aiSelectLimit');
+        if (aiSelectLimit) {
+            const minAttr = Math.max(1, minRequired || 1);
+            aiSelectLimit.min = String(minAttr);
+            aiSelectLimit.max = String(Math.max(minAttr, maxSelectable || minAttr));
+
+            const current = parseInt(aiSelectLimit.value, 10);
+            const clamped = Math.max(minAttr, Math.min(Math.max(minAttr, maxSelectable || minAttr), Number.isFinite(current) ? current : minAttr));
+            aiSelectLimit.value = String(clamped);
+        }
+
+        this.updateEventSelectFooter();
+        this.updateConfirmEventSelectButtonState();
+    }
+
+    updateEventSelectFooter() {
+        const selected = this.selectedEvents?.length || 0;
+        const total = this.currentDateEventTotal || 0;
+        const el1 = document.getElementById('eventSelectCountText');
+        if (el1) el1.textContent = `已選擇：${selected} / ${total}`;
+        const el2 = document.getElementById('vlogSettingsCountText');
+        if (el2) el2.textContent = `已選擇：${selected} / ${total}`;
+    }
+
+    updateConfirmEventSelectButtonState() {
+        const confirmBtn = document.getElementById('confirmEventSelect');
+        if (!confirmBtn) return;
+        const selected = this.selectedEvents.length;
+        const minRequired = this.currentDateMinRequired || 10;
+        confirmBtn.disabled = selected < minRequired;
+        // 提示文字更直觀
+        confirmBtn.title = confirmBtn.disabled ? `最少需選擇 ${minRequired} 個事件` : '';
     }
 
     renderEventList(events) {
@@ -1218,16 +1278,17 @@ class VlogManager {
         checkboxes.forEach(checkbox => {
             checkbox.addEventListener('change', () => this.updateSelectedEvents());
         });
+
+        // 初次渲染後同步一次狀態（含 footer 與按鈕）
+        this.updateSelectedEvents();
     }
 
     updateSelectedEvents() {
         const checkboxes = document.querySelectorAll('.event-checkbox:checked');
         this.selectedEvents = Array.from(checkboxes).map(cb => cb.closest('.event-item').dataset.eventId);
 
-        const confirmBtn = document.getElementById('confirmEventSelect');
-        if (confirmBtn) {
-            confirmBtn.disabled = this.selectedEvents.length === 0;
-        }
+        this.updateEventSelectFooter();
+        this.updateConfirmEventSelectButtonState();
         
         // 更新平均分鏡時間（如果已經在設定頁面）
         this.updateAvgSegmentTime();
@@ -1236,7 +1297,14 @@ class VlogManager {
     async aiSelectEvents() {
         const aiSelectBtn = document.getElementById('aiSelectBtn');
         const aiSelectLimit = document.getElementById('aiSelectLimit');
-        const limit = aiSelectLimit ? parseInt(aiSelectLimit.value, 10) : 20;
+        let limit = aiSelectLimit ? parseInt(aiSelectLimit.value, 10) : 20;
+        // 再保險一次：limit 介於 [minRequired, min(100, total)]
+        const minRequired = Math.max(1, this.currentDateMinRequired || 10);
+        const total = Math.max(0, this.currentDateEventTotal || 0);
+        const maxAllowed = Math.max(minRequired, Math.min(100, total || 0) || minRequired);
+        if (!Number.isFinite(limit)) limit = minRequired;
+        limit = Math.max(minRequired, Math.min(maxAllowed, limit));
+        if (aiSelectLimit) aiSelectLimit.value = String(limit);
 
         if (!aiSelectBtn || !this.selectedDate) return;
 
@@ -1271,7 +1339,11 @@ class VlogManager {
     }
 
     confirmEventSelection() {
-        if (this.selectedEvents.length === 0) return;
+        const minRequired = this.currentDateMinRequired || 10;
+        if (this.selectedEvents.length < minRequired) {
+            this.showToast(`最少需要選擇 ${minRequired} 個事件片段`, 'info');
+            return;
+        }
         this.closeEventSelectModal();
         this.openVlogSettingsModal();
         // 更新平均分鏡時間（進入設定頁面後）
@@ -1286,6 +1358,10 @@ class VlogManager {
             if (titleInput) {
                 titleInput.value = `${this.selectedDate} 的 Vlog`;
             }
+            // 同步已選擇數量顯示
+            this.updateEventSelectFooter();
+            // 同步生成按鈕狀態（未選音樂不可生成）
+            this.updateConfirmVlogGenerateButtonState();
             this.loadMusicTracks();
             this.toggleMusicPreview();
         }
@@ -1307,7 +1383,7 @@ class VlogManager {
     async generateVlog() {
         // 驗證：必須選擇音樂才能生成
         if (!this.musicSelection.trackId) {
-            this.showToast('請先選擇音樂才能生成 Vlog', 'error');
+            this.updateConfirmVlogGenerateButtonState();
             return;
         }
 
@@ -1366,7 +1442,7 @@ class VlogManager {
             console.error('生成 Vlog 失敗:', error);
             this.showToast('生成 Vlog 失敗,請重試', 'error');
         } finally {
-            confirmBtn.disabled = false;
+            this.updateConfirmVlogGenerateButtonState();
             confirmBtn.innerHTML = originalText;
         }
     }

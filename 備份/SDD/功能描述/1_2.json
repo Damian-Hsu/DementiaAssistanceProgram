@@ -1,0 +1,134 @@
+{
+  "功能編號": "1-2",
+  "功能名稱": "登出",
+  "功能說明": "已登入使用者可透過側邊欄、行動版底部導覽或設定頁的登出按鈕執行登出；系統先顯示登出確認對話框，若確認則清除前端保存的 JWT 與使用者快取資訊並導回登入頁，若取消則關閉對話框並維持登入狀態。",
+  "程式名稱": "services/WebUIServer/app/template/base.html; services/WebUIServer/app/template/partials/sidebar.html; services/WebUIServer/app/template/partials/mobile_nav.html; services/WebUIServer/app/template/partials/logout_confirm_dialog.html; services/WebUIServer/app/static/js/logout.js; services/WebUIServer/app/static/js/AuthService.js; services/WebUIServer/app/static/css/logout_dialog.css",
+  "輸入": [
+    "滑鼠",
+    "鍵盤",
+    "base.html頁面"
+  ],
+  "輸出": [
+    "螢幕"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點選側邊欄「登出」按鈕（id=logoutbtn 或 sidebarLogoutBtn）"
+          },
+          {
+            "sub_no": "②",
+            "item": "或於行動版底部導覽點選「登出」按鈕（id=mobileLogoutBtn）"
+          },
+          {
+            "sub_no": "③",
+            "item": "或於設定頁點選登出按鈕（id=logoutbtn_settings）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "顯示對話框",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 showLogoutConfirm()，以 <dialog>.showModal() 顯示登出確認對話框"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點選「取消」：關閉對話框並返回原頁面"
+          },
+          {
+            "sub_no": "②",
+            "item": "點選「確認」：關閉對話框並執行登出流程"
+          },
+          {
+            "sub_no": "③",
+            "item": "點擊對話框外部或按下 ESC：關閉對話框並返回原頁面"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "資料刪除",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "確認登出時：呼叫 AuthService.delToken() 清除 localStorage.jwt"
+          },
+          {
+            "sub_no": "②",
+            "item": "確認登出時：清除 localStorage.user_role、localStorage.user_id"
+          },
+          {
+            "sub_no": "③",
+            "item": "確認登出時：清除 window.__CURRENT_USER 快取（若存在）"
+          }
+        ]
+      },
+      {
+        "step_no": 4,
+        "title": "導頁",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "確認登出後：以 window.location.replace('/auth') 導回登入頁"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示登出確認對話框"
+          },
+          {
+            "sub_no": "②",
+            "item": "取消或關閉對話框：維持原頁面與登入狀態"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "儲存結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "確認登出：localStorage.jwt、user_role、user_id 被清除"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "導頁結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "確認登出：導向 /auth"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  }
+}

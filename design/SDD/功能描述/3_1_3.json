@@ -1,0 +1,57 @@
+{
+  "功能編號": "3-1-3",
+  "功能名稱": "查看任務詳情",
+  "功能說明": "管理員點擊任務列後，系統開啟詳情視窗顯示任務資訊與 details。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_tasks.js; services/WebUIServer/app/template/admin_tasks.html; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "任務列表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "任務詳情視窗"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "任務列"
+        ],
+        "text": "滑鼠點選任務列",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "從既有列表資料組裝詳情內容。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "任務詳情視窗"
+        ],
+        "text": "跳出任務詳情視窗",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "inference_jobs",
+    "columns": []
+  },
+  "備註": ""
+}

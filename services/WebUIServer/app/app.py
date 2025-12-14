@@ -13,9 +13,15 @@ app = Flask(__name__,
            instance_relative_config=True)
 
 # CORS設置 - 允許跨域請求
+# 從環境變數讀取允許的來源，支援多個來源（用逗號分隔）
+# 如果未設定，允許所有來源（開發環境）
+cors_origins = os.getenv("CORS_ORIGINS", "*")
+if cors_origins != "*":
+    cors_origins = [origin.strip() for origin in cors_origins.split(",")]
+
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://127.0.0.1:30202", "http://192.168.191.20:30202","http://192.168.191.254:30202"],
+        "origins": cors_origins,
         "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "Accept"],
         "supports_credentials": True
@@ -88,23 +94,32 @@ def chat():
     )
 
 
-@app.route('/admin/home')
 @app.route('/admin')
-def admin_home():
+@app.route('/admin/tasks')
+def admin_tasks():
     return render_template(
-        'admin_home.html',
-        title_zh='管理員首頁',
+        'admin_tasks.html',
+        title_zh='任務管理',
         desc_zh='',
-        active_page='admin_home'
+        active_page='admin_tasks'
     )
 
-@app.route('/admin/dashboard')
-def admin_dashboard():
+@app.route('/admin/users')
+def admin_users():
     return render_template(
-        'admin_dashboard.html',
-        title_zh='管理儀表板',
+        'admin_users.html',
+        title_zh='使用者統計',
         desc_zh='',
-        active_page='admin_dashboard'
+        active_page='admin_users'
+    )
+
+@app.route('/admin/music')
+def admin_music():
+    return render_template(
+        'admin_music.html',
+        title_zh='音樂庫管理',
+        desc_zh='',
+        active_page='admin_music'
     )
 
 @app.route('/admin/settings')
@@ -142,9 +157,8 @@ HOP_BY_HOP_RESP_HEADERS = {
 @app.route("/bff/v1/<path:path>", methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"])
 def proxy_to_backend(path):
     # 在 Docker 環境中使用服務名稱，本地開發時使用環境變數或預設值
-    api_host = os.getenv("API_HOST", "api")  # Docker 服務名稱或 IP
-    api_port = os.getenv("API_PORT", "30000")
-    backend_url = f"http://{api_host}:{api_port}/api/v1/{path}"
+    api_base = os.getenv("API_BASE_URL", "http://api:30000")  # Docker 服務名稱
+    backend_url = f"{api_base}/api/v1/{path}"
 
     # 過濾 hop-by-hop；保留 Authorization
     fwd_headers = {k: v for k, v in request.headers.items()
@@ -162,7 +176,6 @@ def proxy_to_backend(path):
     else:
         kwargs["data"] = request.get_data()
 
-    # 🔎 這裡新增兩個偵錯點（只印存在與否）
     has_auth_in  = "Authorization" in request.headers
     has_auth_out = "Authorization" in fwd_headers
     try:

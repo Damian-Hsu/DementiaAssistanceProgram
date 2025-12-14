@@ -8,6 +8,8 @@ import gc
 from typing import List, Dict, Any, Tuple, Callable
 from datetime import datetime, timezone
 from celery import Task
+from celery.exceptions import SoftTimeLimitExceeded
+from billiard.exceptions import TimeLimitExceeded
 from ..main import app
 import tempfile
 import subprocess
@@ -56,8 +58,21 @@ def _update_vlog_status(
     progress: float | None = None,
     status_message: str | None = None,
     error_message: str | None = None,
+    job_id: str | None = None,
 ):
-    """調用 API 更新 Vlog 狀態"""
+    """調用 API 更新 Vlog 狀態。
+    
+    Args:
+        vlog_id: Vlog ID
+        status: 狀態（processing, completed, failed）
+        s3_key: S3 物件鍵值
+        thumbnail_s3_key: 縮圖 S3 物件鍵值
+        duration: 影片時長（秒）
+        progress: 進度（0.0-100.0）
+        status_message: 狀態訊息
+        error_message: 錯誤訊息
+        job_id: inference_jobs ID（用於同步更新）
+    """
     url = f"{API_BASE_URL}/vlogs/internal/{vlog_id}/status"
     payload: Dict[str, Any] = {}
     if status:
@@ -74,6 +89,8 @@ def _update_vlog_status(
         payload["status_message"] = status_message
     if error_message is not None:
         payload["error_message"] = error_message
+    if job_id is not None:
+        payload["job_id"] = job_id
 
     if not payload:
         return
@@ -87,7 +104,14 @@ def _update_vlog_status(
 
 
 def _get_video_segments(event_ids: List[str]) -> List[Dict[str, Any]]:
-    """調用 API 獲取視頻片段信息"""
+    """調用 API 獲取視頻片段資訊。
+    
+    Args:
+        event_ids: 事件 ID 列表
+        
+    Returns:
+        List[Dict[str, Any]]: 視頻片段資訊列表
+    """
     if not event_ids:
         return []
         
@@ -104,6 +128,14 @@ def _get_video_segments(event_ids: List[str]) -> List[Dict[str, Any]]:
 
 
 def _parse_s3_path(raw: str) -> Tuple[str, str]:
+    """解析 S3 路徑，提取 bucket 和 object_name。
+    
+    Args:
+        raw: 原始 S3 路徑（可能包含 s3:// 前綴）
+        
+    Returns:
+        Tuple[str, str]: (bucket, object_name)
+    """
     """解析 s3://bucket/object or bucket/object or object"""
     if not raw:
         raise ValueError("缺少 s3_key")
@@ -123,6 +155,17 @@ def _parse_s3_path(raw: str) -> Tuple[str, str]:
 
 
 def _merge_event_ranges(segments: List[Dict[str, Any]], merge_gap: float = 0.3) -> List[Dict[str, Any]]:
+    """合併重疊或接近的事件區間。
+    
+    將時間上重疊或間隔小於 merge_gap 的事件合併成不重疊的區間。
+    
+    Args:
+        segments: 事件片段列表，每個包含 start, end, recording_duration 等
+        merge_gap: 合併間隔閾值（秒），預設 0.3
+        
+    Returns:
+        List[Dict[str, Any]]: 合併後的不重疊區間列表
+    """
     """
     合併重疊或相鄰的事件區間（Union of intervals）
     
@@ -203,8 +246,8 @@ def _merge_event_ranges(segments: List[Dict[str, Any]], merge_gap: float = 0.3) 
     return merged_ranges
 
 def _merge_clipped_segments(prepared: List[Dict[str, Any]], merge_gap: float = 0.0) -> List[Dict[str, Any]]:
-    """
-    對同一支影片 (同 bucket/object_name/recording_id) 的 clip 做區間合併，
+    """對同一支影片（同 bucket/object_name/recording_id）的 clip 做區間合併。
+    
     規則：
       - 有重疊或間隔 <= merge_gap 的 clip → 合併成一段
       - 合併後如果少掉的時間 (lost_time) > 0，就優先向前擴張 start 來補回
@@ -215,7 +258,7 @@ def _merge_clipped_segments(prepared: List[Dict[str, Any]], merge_gap: float = 0
         merge_gap: 合併間隔閾值（秒），預設 0.0（只合併重疊的）
     
     Returns:
-        合併後的片段列表
+        List[Dict[str, Any]]: 合併後的片段列表
     """
     from collections import defaultdict
     
@@ -349,15 +392,15 @@ def _merge_clipped_segments(prepared: List[Dict[str, Any]], merge_gap: float = 0
     return merged_all
 
 def _final_no_overlap_guard(prepared: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    最終的 no-overlap guard：強制保證同一支影片內的片段絕對不重疊
-    如果發現重疊，會 trim 後面的片段頭部，確保不重疊
+    """最終的 no-overlap guard：強制保證同一支影片內的片段絕對不重疊。
+    
+    如果發現重疊，會 trim 後面的片段頭部，確保不重疊。
     
     Args:
         prepared: Stage 4 產出的片段列表
     
     Returns:
-        保證不重疊的片段列表
+        List[Dict[str, Any]]: 保證不重疊的片段列表
     """
     from collections import defaultdict
     
@@ -402,6 +445,21 @@ def _final_no_overlap_guard(prepared: List[Dict[str, Any]]) -> List[Dict[str, An
     return fixed
 
 def _prepare_segments(event_ids: List[str], raw_segments: List[Dict[str, Any]], max_duration: float = 180.0) -> List[Dict[str, Any]]:
+    """準備視頻片段，進行時長分配和裁剪窗口計算。
+    
+    執行三個階段的處理：
+    - Baseline 平均分配 + 可行上限 cap
+    - 重新分配多餘時間
+    - 平移置中 window
+    
+    Args:
+        event_ids: 事件 ID 列表（用於保持順序）
+        raw_segments: 原始片段列表
+        max_duration: 最大總時長（秒），預設 180.0
+        
+    Returns:
+        List[Dict[str, Any]]: 準備好的片段列表，包含 clip_start, clip_duration 等
+    """
     """
     按照事件順序準備剪輯片段，使用三段式壓縮（Feasible Cap → Global Scale → Center Clip）
     
@@ -605,10 +663,10 @@ def _prepare_segments(event_ids: List[str], raw_segments: List[Dict[str, Any]], 
     # ==========================================
     # Stage 1 — Baseline 平均分配 + 可行上限 cap
     # ==========================================
-    # 1. 計算 baseline 平均長度（直接使用平均，不含 padding）
+    # 計算 baseline 平均長度（直接使用平均，不含 padding）
     L = max_total / N if N > 0 else 0.0
     
-    # 2. 每段先算可行總長上限
+    # 計算每段的可行總長上限
     feasible_total: List[float] = []
     base_total: List[float] = []  # 基準總長度
     
@@ -762,16 +820,16 @@ def _prepare_segments(event_ids: List[str], raw_segments: List[Dict[str, Any]], 
     
     # ==========================================
     # Stage 3 — 平移置中 window
-    # 規則：
-    # 1. 計算平均長度 L = max_total / N
-    # 2. 如果 range 比平均片段小（range_len < L）：
-    #    - 以 range 中點為中心，在 recording_duration 範圍內擴寬至 L
-    #    - 如果影片本身比 L 小，則使用整段影片
-    # 3. 如果 range 超過平均時間（range_len >= L）：
-    #    - 以 range 中點為中心，裁切到 min(L+1, range_len) 的長度
-    #    - 必須在 range 內
-    # 4. 最終總時長應該等於用戶輸入的時間
     # ==========================================
+    # 規則：
+    # - 計算平均長度 L = max_total / N
+    # - 如果 range 比平均片段小（range_len < L）：
+    #   以 range 中點為中心，在 recording_duration 範圍內擴寬至 L
+    #   如果影片本身比 L 小，則使用整段影片
+    # - 如果 range 超過平均時間（range_len >= L）：
+    #   以 range 中點為中心，裁切到 min(L+1, range_len) 的長度
+    #   必須在 range 內
+    # - 最終總時長應該等於用戶輸入的時間
     prepared: List[Dict[str, Any]] = []
     skipped_segments: List[int] = []  # 記錄被跳過的片段索引（理論上不應該有）
     
@@ -913,20 +971,41 @@ class VlogGenerationTask(Task):
     """Vlog 生成任務基類"""
     
     def on_failure(self, exc, task_id, args, kwargs, einfo):
-        """任務失敗時的回調"""
-        logger.error(f"Vlog 生成任務失敗: {exc}")
+        """任務失敗時的回調（包括超時）"""
+        logger.error(f"Vlog 生成任務失敗: {type(exc).__name__}: {exc}")
         
         vlog_id = kwargs.get('vlog_id')
+        job_id = None
+        if kwargs.get('settings'):
+            job_id = kwargs['settings'].get('job_id')
+        
+        # 判斷錯誤類型
+        if isinstance(exc, (TimeLimitExceeded, SoftTimeLimitExceeded)):
+            error_msg = "任務執行超時（超過 1200 秒），請嘗試減少影片長度或事件數量"
+            status_msg = "生成超時"
+        else:
+            error_msg = str(exc)
+            status_msg = f"任務失敗: {type(exc).__name__}"
+        
         if vlog_id:
             _update_vlog_status(
                 vlog_id,
                 status='failed',
-                status_message=f"任務失敗: {exc}",
-                error_message=str(exc)
+                status_message=status_msg,
+                error_message=error_msg,
+                job_id=job_id
             )
+        
+        logger.info(f"Vlog {vlog_id} 已標記為失敗（on_failure 回調）")
 
 
-@app.task(bind=True, base=VlogGenerationTask, name="tasks.generate_vlog")
+@app.task(
+    bind=True,
+    base=VlogGenerationTask,
+    name="tasks.generate_vlog",
+    time_limit=1200,
+    soft_time_limit=1100,
+)
 def generate_vlog(
     self,
     vlog_id: str = None,
@@ -934,14 +1013,24 @@ def generate_vlog(
     event_ids: List[str] = None,
     settings: Dict[str, Any] = None
 ) -> Dict[str, Any]:
-    """
-    生成 Vlog
+    """Celery 任務：生成 Vlog。
+    
+    從事件列表中生成 Vlog 影片，包括：
+    - 獲取視頻片段
+    - 剪輯和合併片段
+    - 套用背景音樂
+    - 生成縮圖
+    - 上傳到 MinIO
     
     Args:
+        self: Celery Task 實例
         vlog_id: Vlog ID
         user_id: 用戶 ID
         event_ids: 事件 ID 列表
-        settings: 設定 (max_duration, resolution, music_preference)
+        settings: 設定字典（max_duration, resolution, music_preference 等）
+        
+    Returns:
+        Dict[str, Any]: 包含 vlog_id, s3_key, duration, status 的結果字典
     """
     logger.info(f"開始生成 Vlog: {vlog_id}")
     logger.info(f"參數檢查: vlog_id={vlog_id}, user_id={user_id}, event_ids_len={len(event_ids) if event_ids else 0}")
@@ -972,7 +1061,7 @@ def generate_vlog(
         set_progress(2.0, "排程已啟動，準備生成 Vlog")
         logger.info(f"[Vlog] 生成任務參數: vlog_id={vlog_id}, user_id={user_id}, event_ids={event_ids}, settings={settings}")
         
-        # 1. 獲取事件對應的錄影片段 (通過 API)
+        # 獲取事件對應的錄影片段（通過 API）
         raw_segments = _get_video_segments(event_ids)
         
         if not raw_segments:
@@ -980,8 +1069,8 @@ def generate_vlog(
 
         set_progress(5.0, "取得事件與錄影資訊")
 
-        # 2. 按事件順序整理、平均分配時長、中間取片
-        # 修復問題 1: 確認 max_duration 是否正確傳入
+        # 按事件順序整理、平均分配時長、中間取片
+        # 確認 max_duration 是否正確傳入
         raw_max_duration = settings.get('max_duration') if settings else None
         max_duration = float(raw_max_duration if raw_max_duration is not None else 180)
         logger.info(f"[Vlog] max_duration from settings: raw={raw_max_duration}, final={max_duration}, settings keys={list(settings.keys()) if settings else None}")
@@ -997,7 +1086,7 @@ def generate_vlog(
         logger.info(f"獲取到 {total_segments} 個有效的視頻片段")
         set_progress(8.0, f"共 {total_segments} 個片段，開始剪輯")
         
-        # 3. 下載並剪輯視頻片段
+        # 下載並剪輯視頻片段
         temp_dir = tempfile.mkdtemp()
         try:
             clip_span = 65.0
@@ -1025,7 +1114,7 @@ def generate_vlog(
             if not clipped_videos:
                  raise ValueError("視頻剪輯失敗，沒有生成任何片段")
 
-            # 4. 合併視頻片段
+            # 合併視頻片段
             output_path = os.path.join(temp_dir, f"vlog_{vlog_id}.mp4")
             set_progress(80.0, "剪輯完成，開始合併影片")
             final_duration = _merge_videos(clipped_videos, output_path, settings or {})
@@ -1033,37 +1122,46 @@ def generate_vlog(
             # 清理剪輯後的視頻列表（文件仍在，但列表可以釋放）
             del clipped_videos
             gc.collect()
+            
+            # 保存最終影片路徑（用於縮圖生成）
+            final_video_path = output_path
+            
             try:
                 output_path = _apply_music_track(output_path, temp_dir, settings or {})
+                # 如果音樂處理成功，更新最終影片路徑
+                if output_path and os.path.exists(output_path):
+                    final_video_path = output_path
                 # 音樂處理完成後清理記憶體
                 gc.collect()
             except Exception as exc:
-                logger.error(f"[Vlog] 套用背景音樂失敗: {exc}")
+                logger.error(f"[Vlog] 套用背景音樂失敗: {exc}，使用原始影片")
+                # 如果音樂處理失敗，使用原始合併的影片
+                final_video_path = output_path
             
-            # 5. 上傳到 MinIO
+            # 確保最終影片文件存在
+            if not os.path.exists(final_video_path):
+                raise FileNotFoundError(f"最終影片文件不存在: {final_video_path}")
+            
+            # 準備上傳路徑（先創建 timestamp，確保影片和縮圖使用相同的時間戳）
             timestamp_slug = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
             object_name = f"{user_id}/vlogs/{timestamp_slug}_{vlog_id}.mp4"
-            set_progress(92.0, "合併完成，準備上傳")
-            set_progress(95.0, "上傳影片中")
-            _upload_to_minio(output_path, object_name, 'video/mp4')
             
-            # 上傳完成後清理記憶體
-            gc.collect()
-            
-            # 6. 生成並上傳縮圖
-            set_progress(97.0, "生成縮圖中")
+            # 生成並上傳縮圖（在影片上傳前生成，確保使用正確的影片路徑）
+            set_progress(90.0, "生成縮圖中")
             thumbnail_s3_key = None
             thumbnail_path = os.path.join(temp_dir, f"vlog_{vlog_id}_thumb.jpg")
             
-            if _generate_thumbnail(output_path, thumbnail_path):
+            logger.info(f"[Vlog] 開始生成縮圖，來源影片: {final_video_path}")
+            if _generate_thumbnail(final_video_path, thumbnail_path):
                 # 檢查縮圖文件是否真的生成成功
                 if os.path.exists(thumbnail_path) and os.path.getsize(thumbnail_path) > 0:
                     try:
-                        thumbnail_s3_key = object_name.replace('.mp4', '.jpg').replace('/vlogs/', '/vlog_thumbnails/')
+                        # 使用與影片相同的 timestamp_slug，確保一致性
+                        thumbnail_s3_key = f"{user_id}/vlog_thumbnails/{timestamp_slug}_{vlog_id}.jpg"
                         _upload_to_minio(thumbnail_path, thumbnail_s3_key, 'image/jpeg')
-                        logger.info(f"[Vlog] 縮圖已成功上傳: {thumbnail_s3_key}")
+                        logger.info(f"[Vlog] 縮圖已成功上傳: {thumbnail_s3_key} (大小: {os.path.getsize(thumbnail_path)} bytes)")
                     except Exception as upload_exc:
-                        logger.error(f"[Vlog] 縮圖上傳失敗: {upload_exc}，但繼續執行")
+                        logger.error(f"[Vlog] 縮圖上傳失敗: {upload_exc}，但繼續執行", exc_info=True)
                         thumbnail_s3_key = None  # 上傳失敗時設為 None
                 else:
                     logger.warning(f"[Vlog] 縮圖文件生成失敗或文件為空: {thumbnail_path}")
@@ -1073,8 +1171,17 @@ def generate_vlog(
             # 縮圖處理完成後清理記憶體
             gc.collect()
             
-            # 7. 更新狀態為完成 (通過 API，包含縮圖路徑)
+            # 上傳影片到 MinIO（使用已創建的 object_name）
+            set_progress(95.0, "上傳影片中")
+            _upload_to_minio(final_video_path, object_name, 'video/mp4')
+            logger.info(f"[Vlog] 影片已成功上傳: {object_name}")
+            
+            # 上傳完成後清理記憶體
+            gc.collect()
+            
+            # 更新狀態為完成（通過 API，包含縮圖路徑）
             progress_state["value"] = 100.0
+            logger.info(f"[Vlog] 準備更新狀態: vlog_id={vlog_id}, s3_key={object_name}, thumbnail_s3_key={thumbnail_s3_key}")
             _update_vlog_status(
                 vlog_id,
                 status='completed',
@@ -1085,13 +1192,13 @@ def generate_vlog(
                 thumbnail_s3_key=thumbnail_s3_key
             )
             
-            logger.info(f"Vlog 生成成功: {vlog_id}")
+            logger.info(f"[Vlog] Vlog 生成成功: {vlog_id}, 影片: {object_name}, 縮圖: {thumbnail_s3_key or '無'}")
             
             return {
                 "vlog_id": vlog_id,
                 "s3_key": object_name,
                 "duration": final_duration,
-                "status": "completed"
+                "status": "success"
             }
             
         finally:
@@ -1105,14 +1212,30 @@ def generate_vlog(
             # 強制垃圾回收，釋放所有記憶體
             gc.collect()
     
+    except SoftTimeLimitExceeded:
+        # 捕獲軟超時異常（在硬超時之前）
+        logger.error(f"Vlog 生成軟超時（1100 秒），即將被硬超時終止")
+        job_id = settings.get('job_id') if settings else None
+        _update_vlog_status(
+            vlog_id,
+            status='failed',
+            error_message="任務執行超時（超過 1100 秒），請嘗試減少影片長度或事件數量",
+            progress=progress_state["value"],
+            status_message="生成超時",
+            job_id=job_id
+        )
+        raise
+    
     except Exception as e:
         logger.error(f"生成 Vlog 時發生錯誤: {e}", exc_info=True)
+        job_id = settings.get('job_id') if settings else None
         _update_vlog_status(
             vlog_id,
             status='failed',
             error_message=str(e),
             progress=progress_state["value"],
-            status_message=f"生成失敗: {e}"
+            status_message=f"生成失敗: {e}",
+            job_id=job_id
         )
         raise
 
@@ -1123,13 +1246,18 @@ def _download_and_clip_segments(
     settings: Dict[str, Any],
     progress_callback: Callable[[int, int, bool], None] | None = None,
 ) -> List[str]:
-    """
-    下載並剪輯視頻片段
+    """下載並剪輯視頻片段。
     
-    progress_callback: 在每個片段完成（或失敗）時回報進度 (idx, total, success)
+    從 MinIO 下載視頻，使用 FFmpeg 剪輯指定時間範圍的片段。
+    
+    Args:
+        segments: 片段列表，每個包含 bucket, object_name, clip_start, clip_duration 等
+        temp_dir: 臨時目錄
+        settings: 設定字典（resolution 等）
+        progress_callback: 可選的進度回調函數 (idx, total, success)
     
     Returns:
-        剪輯後的視頻文件路徑列表
+        List[str]: 剪輯後的視頻文件路徑列表
     """
     from minio import Minio
     
@@ -1242,11 +1370,17 @@ def _merge_videos(
     output_path: str, 
     settings: Dict[str, Any]
 ) -> float:
-    """
-    合併多個視頻文件
+    """合併多個視頻文件為單一影片。
+    
+    使用 FFmpeg concat demuxer 將多個視頻片段合併成一個影片。
+    
+    Args:
+        video_files: 視頻文件路徑列表
+        output_path: 輸出文件路徑
+        settings: 設定字典（max_duration 等）
     
     Returns:
-        最終視頻的時長 (秒)
+        float: 合併後的影片時長（秒）
     """
     if not video_files:
         raise ValueError("沒有視頻文件可以合併")
@@ -1304,15 +1438,16 @@ def _merge_videos(
 
 
 def _generate_thumbnail(video_path: str, thumbnail_path: str) -> bool:
-    """
-    從視頻第一幀生成縮圖
+    """從視頻第一幀生成縮圖。
+    
+    使用 FFmpeg 從視頻的第一幀（偏移 0.1 秒以避免黑屏）提取縮圖。
     
     Args:
         video_path: 視頻文件路徑
         thumbnail_path: 縮圖輸出路徑
     
     Returns:
-        True 如果生成成功，False 如果失敗
+        bool: True 如果生成成功，False 如果失敗
     """
     try:
         # 檢查視頻文件是否存在
@@ -1320,33 +1455,66 @@ def _generate_thumbnail(video_path: str, thumbnail_path: str) -> bool:
             logger.error(f"[Vlog] 視頻文件不存在: {video_path}")
             return False
         
+        # 檢查視頻文件大小
+        video_size = os.path.getsize(video_path)
+        if video_size == 0:
+            logger.error(f"[Vlog] 視頻文件為空: {video_path}")
+            return False
+        logger.info(f"[Vlog] 視頻文件大小: {video_size} bytes")
+        
+        # 確保輸出目錄存在
+        thumbnail_dir = os.path.dirname(thumbnail_path)
+        if thumbnail_dir and not os.path.exists(thumbnail_dir):
+            os.makedirs(thumbnail_dir, exist_ok=True)
+        
         # 使用 FFmpeg 提取第一幀
+        # 改進：使用更可靠的參數，確保能從各種格式的視頻中提取
         cmd = [
             'ffmpeg', '-y',
             '-i', video_path,
-            '-ss', '00:00:00',
+            '-ss', '0.1',  # 稍微偏移，避免黑屏
             '-vframes', '1',
-            '-vf', 'scale=320:-1',  # 縮放寬度為 320，高度自動
-            '-q:v', '2',  # 高質量
+            '-vf', 'scale=320:-1',  # 縮放寬度為 320，高度自動保持比例
+            '-q:v', '2',  # JPEG 質量（2 = 高質量）
+            '-f', 'image2',  # 明確指定輸出格式
             thumbnail_path
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+        logger.info(f"[Vlog] 執行 FFmpeg 命令生成縮圖: {' '.join(cmd)}")
+        result = subprocess.run(
+            cmd, 
+            capture_output=True, 
+            text=True, 
+            check=True, 
+            timeout=60  # 增加超時時間到 60 秒
+        )
+        
+        # 記錄 FFmpeg 輸出（如果有）
+        if result.stdout:
+            logger.debug(f"[Vlog] FFmpeg stdout: {result.stdout}")
+        if result.stderr:
+            logger.debug(f"[Vlog] FFmpeg stderr: {result.stderr}")
         
         # 驗證縮圖文件是否生成成功
-        if os.path.exists(thumbnail_path) and os.path.getsize(thumbnail_path) > 0:
-            logger.info(f"[Vlog] 縮圖生成成功: {thumbnail_path} (大小: {os.path.getsize(thumbnail_path)} bytes)")
-            return True
-        else:
-            logger.error(f"[Vlog] 縮圖文件生成失敗或為空: {thumbnail_path}")
+        if os.path.exists(thumbnail_path):
+            thumbnail_size = os.path.getsize(thumbnail_path)
+            if thumbnail_size > 0:
+                logger.info(f"[Vlog] 縮圖生成成功: {thumbnail_path} (大小: {thumbnail_size} bytes)")
+                return True
+
+            logger.error(f"[Vlog] 縮圖文件為空: {thumbnail_path}")
             return False
+
+        logger.error(f"[Vlog] 縮圖文件未生成: {thumbnail_path}")
+        return False
             
     except subprocess.TimeoutExpired:
         logger.error(f"[Vlog] 生成縮圖超時: {video_path}")
         return False
     except subprocess.CalledProcessError as e:
-        error_msg = e.stderr if e.stderr else str(e)
+        error_msg = e.stderr if e.stderr else (e.stdout if e.stdout else str(e))
         logger.error(f"[Vlog] 生成縮圖失敗 (FFmpeg 錯誤): {error_msg}")
+        logger.error(f"[Vlog] FFmpeg 返回碼: {e.returncode}")
         return False
     except Exception as e:
         logger.error(f"[Vlog] 生成縮圖時發生錯誤: {e}", exc_info=True)
@@ -1358,7 +1526,18 @@ def _apply_music_track(
     temp_dir: str,
     settings: Dict[str, Any],
 ) -> str:
-    """將背景音樂與影片合成"""
+    """將背景音樂與影片合成。
+    
+    從 MinIO 下載音樂檔案，使用 FFmpeg 將音樂與影片合併。
+    
+    Args:
+        video_path: 影片文件路徑
+        temp_dir: 臨時目錄
+        settings: 設定字典，包含 music 配置（s3_key 等）
+        
+    Returns:
+        str: 合成後的影片路徑（如果音樂處理失敗，返回原始路徑）
+    """
     logger.info(f"[Vlog] 開始套用背景音樂，settings: {settings}")
     music_cfg = (settings or {}).get("music") or {}
     logger.info(f"[Vlog] 音樂設定: {music_cfg}")
@@ -1664,17 +1843,16 @@ def _apply_music_track(
 
 
 def _upload_to_minio(file_path: str, s3_key: str, content_type: str = 'video/mp4'):
-    """
-    上傳文件到 MinIO
+    """上傳文件到 MinIO。
     
     Args:
         file_path: 本地文件路徑
-        s3_key: S3 對象鍵
-        content_type: 文件 MIME 類型
+        s3_key: S3 物件鍵值
+        content_type: 內容類型，預設 'video/mp4'
     
     Raises:
-        FileNotFoundError: 如果文件不存在
-        Exception: 如果上傳失敗
+        FileNotFoundError: 當文件不存在時
+        Exception: 當上傳失敗時
     """
     from minio import Minio
     from minio.error import S3Error

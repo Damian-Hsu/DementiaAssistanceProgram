@@ -1,0 +1,93 @@
+{
+  "功能編號": "3-4",
+  "功能名稱": "系統設定",
+  "功能說明": "管理員可在系統設定介面管理系統層級參數（預設 LLM、預設 Google API Key、預設 AI key 用量限制、影片參數）與 M2M API Key。",
+  "程式名稱": "services/WebUIServer/app/template/admin_settings.html; services/WebUIServer/app/static/js/admin_settings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/settings.py; services/APIServer/app/DataAccess/tables/api_keys.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統",
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "管理員系統設定介面",
+      "settings資料表",
+      "api_keys資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "管理員系統設定介面",
+      "settings資料表",
+      "api_keys資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "管理員系統設定介面"
+        ],
+        "text": "系統載入管理員系統設定介面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "讀取 settings 與 api_keys 以顯示目前設定與 API Key 列表。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "系統設定",
+          "API Key 列表"
+        ],
+        "text": "顯示系統設定與API Key列表",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存設定】"
+        ],
+        "text": "滑鼠點選【儲存設定】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "將表單中的系統設定值寫入 settings 資料表。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "settings資料表"
+        ],
+        "text": "更新系統設定",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "settings; api_keys; users",
+    "columns": []
+  },
+  "備註": "僅管理員可使用。"
+}

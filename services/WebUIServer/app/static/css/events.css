@@ -1,13 +1,18 @@
-/* 容器設定已移至 layout.css 的 .page-content */
+他要可以˙˙/* 容器設定已移至 layout.css 的 .page-content */
 /* --- 區塊：讓事件區在容器中更聚焦，但不和外層 container 衝突 --- */
 .events-section {
   background: var(--bg-main, #F5EBDD);                          /* 內層白底，和外層米色背景對比 */
   border-radius: calc(var(--radius-lg, 16px) + 4px);
   padding: var(--spacing-lg, 24px) 0;
-  margin-bottom: var(--spacing-lg, 24px);
+  margin-bottom: 0; /* 移除多餘的 margin-bottom */
   overflow-y: visible; /* 允許內容滾動 */
   overflow-x: hidden; /* 防止水平滾動 */
   max-height: none; /* 不限制高度，讓內容自然展開 */
+}
+
+/* /events：表格區塊往上留 12px 空氣感 */
+.events-section .table-responsive {
+  padding-top: 12px;
 }
 
 /* --- 搜尋列：沿用 components.css 的 .search-bar，再加些空氣感 --- */

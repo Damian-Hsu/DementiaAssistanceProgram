@@ -1,0 +1,102 @@
+{
+  "功能編號": "2-1-1",
+  "功能名稱": "切換日期",
+  "功能說明": "使用者在首頁可透過日期選擇器或左右翻頁區域切換顯示日期；系統會同步更新 URL query 參數 date，並重新載入該日期的日記內容與每日 Vlog 狀態。",
+  "程式名稱": "services/WebUIServer/app/template/home.html; services/WebUIServer/app/static/js/home.js; services/WebUIServer/app/static/js/diary.js; services/WebUIServer/app/static/js/vlog.js",
+  "輸入": [
+    "選擇日期（YYYY-MM-DD）",
+    "翻頁操作（上一天/下一天）"
+  ],
+  "輸出": [
+    "URL query 參數 date 更新",
+    "日記內容重新載入",
+    "每日 Vlog 狀態重新載入",
+    "畫面日期顯示更新"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊日期顯示文字（dateDisplay）開啟日期選擇器"
+          },
+          {
+            "sub_no": "②",
+            "item": "或點擊左側翻頁區域（prevPageArea/prevPageAreaHeader）切換到前一天"
+          },
+          {
+            "sub_no": "③",
+            "item": "或點擊右側翻頁區域（nextPageArea/nextPageAreaHeader）切換到後一天"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "日期選擇",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "在日期選擇器（input#diaryDate）選擇目標日期"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "狀態更新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端更新 currentDate 與日期顯示（dateDisplay）"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端以 history.replaceState 更新 URL query 參數 date（避免產生過多歷史記錄）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 loadDiaryPages() 重新載入該日期日記內容"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 vlogManager 存在：同步 selectedDate 並呼叫 loadDailyVlog() 重新載入該日期 Vlog"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "頁面日期顯示更新為目標日期"
+          },
+          {
+            "sub_no": "②",
+            "item": "日記區塊顯示該日期內容（或空狀態/錯誤提示）"
+          },
+          {
+            "sub_no": "③",
+            "item": "Vlog 區塊顯示該日期的狀態/縮圖/影片（或尚未生成提示）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  }
+}

@@ -1,39 +1,14 @@
 from __future__ import annotations
 import uuid
-from datetime import date, datetime
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import String, Date, Text, ForeignKey, Integer, Float, Boolean
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import date
+from sqlalchemy import String, Date, Text, ForeignKey, Integer, Float
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from pgvector.sqlalchemy import Vector
 
-from . import ORMBase, TimestampMixin, TimestampSchema
+from . import ORMBase, TimestampMixin
 from .__Function import create_uuid7
 
-__all__ = ["Schema", "Table", "SegmentSchema", "SegmentTable"]
-
-class Schema(BaseModel):
-    """vlog 的基礎 I/O 欄位"""
-    user_id: int
-    title: str | None = None
-    target_date: date
-    duration: float | None = None
-    status: str = 'pending'
-    settings: dict | None = None
-    progress: float | None = None
-    status_message: str | None = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-class SegmentSchema(BaseModel):
-    vlog_id: uuid.UUID
-    recording_id: uuid.UUID
-    event_id: uuid.UUID | None = None
-    start_offset: float
-    end_offset: float
-    sequence_order: int
-    
-    model_config = ConfigDict(from_attributes=True)
+__all__ = ["Table", "SegmentTable"]
 
 class VlogsTable(ORMBase, TimestampMixin):
     __tablename__ = "vlogs"

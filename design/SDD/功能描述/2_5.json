@@ -1,0 +1,336 @@
+{
+  "功能編號": "2-5",
+  "功能名稱": "AI 助手",
+  "功能說明": "AI 助手提供聊天式介面，使用者可送出訊息並保留對話歷史（瀏覽器本機持久化），可指定查詢日期範圍；後端會依使用者時區與對話上下文呼叫 LLM，並透過 Function Calling 查詢事件/影片/日記/Vlog 等關聯資料後回傳給前端呈現；若使用系統預設 AI Key 則套用速率/日配額限制並提示用量。",
+  "程式名稱": "services/WebUIServer/app/template/chat.html; services/WebUIServer/app/static/js/chat.js; services/WebUIServer/app/static/css/chat.css; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Chat/service.py; services/APIServer/app/router/Chat/DTO.py; services/APIServer/app/router/Chat/llm_tools.py; services/APIServer/app/router/Chat/tools_schema.py; services/APIServer/app/router/Chat/rate_limiter.py; services/APIServer/app/DataAccess/tables/events.py; services/APIServer/app/DataAccess/tables/recordings.py; services/APIServer/app/DataAccess/tables/diary.py; services/APIServer/app/DataAccess/tables/vlogs.py; services/APIServer/app/DataAccess/tables/llm_usage_logs.py; services/APIServer/app/DataAccess/tables/settings.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統",
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "AI助手介面",
+      "events資料表",
+      "recordings資料表",
+      "diary資料表",
+      "vlogs資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "AI助手介面",
+      "llm_usage_logs資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "AI助手介面"
+        ],
+        "text": "系統載入AI助手介面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "載入本機對話歷史並初始化工具設定（日期範圍）。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "對話歷史"
+        ],
+        "text": "顯示對話歷史",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【訊息】"
+        ],
+        "text": "鍵盤輸入【訊息】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【送出】"
+        ],
+        "text": "滑鼠點選【送出】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "送出聊天請求並取得 AI 回覆，必要時查詢關聯資料；若觸發限制則回傳錯誤訊息。",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "成功：回覆文字與關聯資料"
+          },
+          {
+            "sub_no": "②",
+            "text": "失敗：登入過期/額度限制/系統錯誤"
+          }
+        ]
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "AI回覆"
+        ],
+        "text": "顯示AI回覆與關聯資料",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "events; recordings; diary; vlogs; llm_usage_logs; settings; api_key_blacklist; users",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "事件ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "events.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "events.user_id / recordings.user_id / diary.user_id / vlogs.user_id / llm_usage_logs.user_id"
+      },
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.recording_id（關聯 recordings.id）"
+      },
+      {
+        "欄位": "action",
+        "中文": "行為",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.action"
+      },
+      {
+        "欄位": "scene",
+        "中文": "地點",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.scene"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.summary（關聯資料顯示/關鍵字查詢）"
+      },
+      {
+        "欄位": "objects",
+        "中文": "物件清單",
+        "型態": "ARRAY(VARCHAR)",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.objects"
+      },
+      {
+        "欄位": "start_time",
+        "中文": "開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.start_time / recordings.start_time（會轉換為使用者時區顯示）"
+      },
+      {
+        "欄位": "duration",
+        "中文": "持續秒數",
+        "型態": "FLOAT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.duration / recordings.duration / vlogs.duration"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "S3 路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "recordings.s3_key（必填）/ vlogs.s3_key（可選）"
+      },
+      {
+        "欄位": "thumbnail_s3_key",
+        "中文": "縮圖S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "recordings.thumbnail_s3_key / vlogs.thumbnail_s3_key"
+      },
+      {
+        "欄位": "diary_date",
+        "中文": "日記日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "diary.diary_date"
+      },
+      {
+        "欄位": "content",
+        "中文": "內容",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "diary.content"
+      },
+      {
+        "欄位": "status",
+        "中文": "狀態",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "vlogs.status（pending/processing/completed/failed）"
+      },
+      {
+        "欄位": "target_date",
+        "中文": "目標日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlogs.target_date"
+      },
+      {
+        "欄位": "assistant_replies",
+        "中文": "AI 助手回覆次數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.assistant_replies"
+      },
+      {
+        "欄位": "key",
+        "中文": "設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key（例如 default_ai_key_limits）"
+      },
+      {
+        "欄位": "value",
+        "中文": "設定值",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value（JSON 字串）"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "黑名單使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_key_blacklist.user_id（Primary Key；ForeignKey(users.id)）"
+      },
+      {
+        "欄位": "account",
+        "中文": "帳號",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.account（unique/index）"
+      },
+      {
+        "欄位": "settings",
+        "中文": "使用者設定(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings（含時區/LLM 設定等）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  },
+  "備註": "若未設定個人 key，會套用系統預設 key 的限流/配額限制。"
+}

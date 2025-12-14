@@ -1,0 +1,167 @@
+{
+  "功能編號": "3-3-2",
+  "功能名稱": "上傳音樂",
+  "功能說明": "管理員可透過「新增音樂」彈窗上傳音訊檔案並建立音樂紀錄。前端以 multipart/form-data 傳送 file/name/composer/description/metadata；後端會驗證檔案 content_type 必須為 audio/*，上傳至 MinIO(S3) 後寫入 music 表並回傳 MusicAdminRead（含 s3_key）。metadata 需為合法 JSON 字串（可選）。",
+  "程式名稱": "services/WebUIServer/app/template/admin_music.html; services/WebUIServer/app/static/js/admin_music.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Music/service.py; services/APIServer/app/utils/s3_utils.py; services/APIServer/app/DataAccess/tables/music.py",
+  "輸入": [
+    "file（audio/*）",
+    "name（必填）",
+    "composer（可選）",
+    "description（可選）",
+    "metadata（可選，JSON 字串）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "201 MusicAdminRead",
+    "上傳成功/失敗提示",
+    "清單刷新"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊【新增音樂】開啟 addMusicModal"
+          },
+          {
+            "sub_no": "②",
+            "item": "選擇音樂檔案（input[type=file] accept=audio/*）"
+          },
+          {
+            "sub_no": "③",
+            "item": "點擊【上傳音樂】送出"
+          },
+          {
+            "sub_no": "④",
+            "item": "點擊取消/關閉/背景關閉彈窗"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "輸入音樂名稱（必填）"
+          },
+          {
+            "sub_no": "②",
+            "item": "輸入製作者/詳細資訊/metadata（可選）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "前端驗證",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "未選檔案：顯示錯誤提示"
+          },
+          {
+            "sub_no": "②",
+            "item": "未填名稱：顯示錯誤提示"
+          },
+          {
+            "sub_no": "③",
+            "item": "metadata 非合法 JSON：顯示錯誤提示並停止送出"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "檔案上傳/資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端組 FormData（file/name/composer/description/metadata）呼叫 POST /api/v1/admin/music"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端驗證 content_type 必須為 audio/*；檔案內容不可為空"
+          },
+          {
+            "sub_no": "③",
+            "item": "後端產生 object_name（{admin_user_id}/music/{uuid}.{ext}），上傳至 S3（upload_fileobj）"
+          },
+          {
+            "sub_no": "④",
+            "item": "後端解析 metadata JSON 字串（可選）並合併預設欄位（original_filename/content_length），寫入 music 表並 commit"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示上傳結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示「上傳成功」，關閉彈窗並重新載入清單"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示後端錯誤訊息（例如僅支援音訊檔案/metadata JSON 錯誤）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "music",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "音樂ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "music.id"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "S3 物件鍵",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "music.s3_key（unique）"
+      },
+      {
+        "欄位": "meta_data",
+        "中文": "Metadata(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.meta_data（含原始檔名/檔案大小與自訂 metadata）"
+      },
+      {
+        "欄位": "content_type",
+        "中文": "內容類型",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.content_type（audio/*）"
+      },
+      {
+        "欄位": "uploader_user_id",
+        "中文": "上傳者使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "music.uploader_user_id"
+      }
+    ]
+  }
+}

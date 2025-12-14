@@ -58,7 +58,7 @@ class UserSettings(BaseModel):
     
     # 預設 LLM 供應商和模型
     default_llm_provider: str = Field(default="google", description="預設 LLM 供應商")
-    default_llm_model: str = Field(default="gemini-2.0-flash", description="預設 LLM 模型（使用穩定版本，免費層支持）")
+    default_llm_model: str = Field(default="gemini-2.5-flash-lite", description="預設 LLM 模型（使用穩定版本，免費層支持）")
     
     # 其他設定
     language: str = Field(default="zh-TW", description="語言設定")
@@ -69,8 +69,12 @@ class UserSettings(BaseModel):
     diary_auto_refresh_enabled: bool = Field(default=True, description="是否啟用日記自動刷新")
     diary_auto_refresh_interval_minutes: int = Field(default=30, ge=5, le=1440, description="日記自動刷新間隔（分鐘）")
     
-    # 串流 TTL 設定
-    default_stream_ttl: int = Field(default=300, ge=30, le=3600, description="預設串流 TTL（秒），範圍：30-3600")
+    # 串流連結 TTL 設定（用於 RTSP 推流連結/建立串流的有效時間）
+    # 注意：此 TTL 主要對應 Camera 相關端點（例如 publish_rtsp_url / connect stream）的限制
+    default_stream_ttl: int = Field(default=300, ge=300, le=21600, description="串流連結 TTL（秒），範圍：300-21600")
+    
+    # 是否使用預設 API Key
+    use_default_api_key: bool = Field(default=True, description="是否使用系統預設 API Key（如果管理員允許）")
     
     @field_validator('timezone')
     def validate_timezone(cls, v):
@@ -113,16 +117,36 @@ class UserSettings(BaseModel):
             user_datetime = user_tz.localize(user_datetime)
         return user_datetime.astimezone(timezone.utc)
     
-    def get_llm_config(self) -> tuple[str, str, Optional[str]]:
-        """獲取 LLM 設定 (provider, model, api_key)"""
+    def get_llm_config(self, use_default_api_key: bool = True, is_blacklisted: bool = False) -> tuple[str, str, Optional[str]]:
+        """獲取 LLM 設定 (provider, model, api_key)
+        
+        Args:
+            use_default_api_key: 是否使用預設 API Key（從使用者設定中讀取）
+            is_blacklisted: 是否在黑名單中（如果為 True，則不能使用預設 API Key）
+        
+        Returns:
+            (provider, model, api_key) - 如果 api_key 為 None，表示使用系統預設的 API Key
+        """
         provider_config = self.llm_model_api.get_provider_config(self.default_llm_provider)
-        api_key = provider_config.api_key if provider_config else None
+        user_api_key = provider_config.api_key if provider_config else None
         
-        # 如果沒有設定 API Key，使用預設的
-        if not api_key:
-            api_key = None  # 將使用系統預設的 API Key
+        # 如果使用者在黑名單中，強制使用自己的 API Key（不能使用預設）
+        if is_blacklisted:
+            # 如果在黑名單中但沒有自己的 API Key，返回 None（讓上層知道需要設定）
+            # 注意：上層應該檢查並提示使用者設定自己的 API Key
+            if not user_api_key:
+                # 返回 None，讓上層知道應該提示使用者設定 API Key
+                return self.default_llm_provider, self.default_llm_model, None
+            # 返回使用者自己的 API Key
+            return self.default_llm_provider, self.default_llm_model, user_api_key
         
-        return self.default_llm_provider, self.default_llm_model, api_key
+        # 如果使用者選擇使用預設 API Key 且不在黑名單中
+        if use_default_api_key and not user_api_key:
+            # 返回 None，表示使用系統預設的 API Key
+            return self.default_llm_provider, self.default_llm_model, None
+        
+        # 如果使用者有自己的 API Key，使用自己的
+        return self.default_llm_provider, self.default_llm_model, user_api_key
 
 
 # ====== 預設設定 ======
@@ -133,13 +157,14 @@ def get_default_user_settings() -> UserSettings:
         timezone="Asia/Taipei",
         llm_model_api=LLMModelAPIConfig(),
         default_llm_provider="google",
-        default_llm_model="gemini-2.0-flash",
+        default_llm_model="gemini-2.5-flash-lite",
         language="zh-TW",
         theme="light",
         notifications_enabled=True,
         diary_auto_refresh_enabled=True,
         diary_auto_refresh_interval_minutes=30,
-        default_stream_ttl=300
+        default_stream_ttl=300,
+        use_default_api_key=True
     )
 
 
@@ -160,7 +185,7 @@ def create_user_settings_with_llm_config(
         timezone=timezone,
         llm_model_api=llm_config,
         default_llm_provider=provider,
-        default_llm_model=model_names[0] if model_names else "gemini-2.0-flash",
+        default_llm_model=model_names[0] if model_names else "gemini-2.5-flash-lite",
         language="zh-TW",
         theme="light",
         notifications_enabled=True,
@@ -190,8 +215,11 @@ class UpdateUserSettingsRequest(BaseModel):
     diary_auto_refresh_enabled: Optional[bool] = Field(None, description="是否啟用日記自動刷新")
     diary_auto_refresh_interval_minutes: Optional[int] = Field(None, ge=5, le=1440, description="日記自動刷新間隔（分鐘）")
     
-    # 串流 TTL 設定
-    default_stream_ttl: Optional[int] = Field(None, ge=30, le=3600, description="預設串流 TTL（秒），範圍：30-3600")
+    # 串流連結 TTL 設定（用於 RTSP 推流連結/建立串流的有效時間）
+    default_stream_ttl: Optional[int] = Field(None, ge=300, le=21600, description="串流連結 TTL（秒），範圍：300-21600")
+    
+    # 是否使用預設 API Key
+    use_default_api_key: Optional[bool] = Field(None, description="是否使用系統預設 API Key（如果管理員允許）")
 
 
 class UserSettingsResponse(BaseModel):

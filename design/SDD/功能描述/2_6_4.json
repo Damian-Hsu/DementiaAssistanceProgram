@@ -1,0 +1,85 @@
+{
+  "功能編號": "2-6-4",
+  "功能名稱": "日記自動刷新設定",
+  "功能說明": "使用者設定日記自動刷新間隔後，系統更新 users.settings.diary_auto_refresh_interval_minutes。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/User/settings.py; services/APIServer/app/router/User/service.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "使用者設定介面",
+      "users資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "資料庫"
+    ],
+    "資源名詞": [
+      "users資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【刷新間隔(分鐘)】"
+        ],
+        "text": "鍵盤輸入【刷新間隔(分鐘)】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存應用程式設定】"
+        ],
+        "text": "滑鼠點選【儲存應用程式設定】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "更新 users.settings.diary_auto_refresh_interval_minutes。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "users資料表"
+        ],
+        "text": "更新日記自動刷新設定",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "users",
+    "columns": []
+  },
+  "備註": ""
+}

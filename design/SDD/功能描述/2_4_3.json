@@ -1,0 +1,164 @@
+{
+  "功能編號": "2-4-3",
+  "功能名稱": "編輯事件",
+  "功能說明": "使用者編輯事件內容並儲存後，系統更新 events 資料並刷新事件列表。",
+  "程式名稱": "services/WebUIServer/app/static/js/events.js; services/APIServer/app/router/Events/service.py; services/APIServer/app/router/Events/DTO.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "事件詳情視窗",
+      "events資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "事件列表",
+      "events資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【編輯】"
+        ],
+        "text": "滑鼠點選【編輯】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "編輯視窗"
+        ],
+        "text": "跳出編輯視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【行為】",
+          "【地點】",
+          "【摘要】",
+          "【物件】"
+        ],
+        "text": "鍵盤輸入【行為】、【地點】、【摘要】、【物件】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存】"
+        ],
+        "text": "滑鼠點選【儲存】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "送出更新請求並更新 events 資料表。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "events資料表"
+        ],
+        "text": "更新事件資料",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "events",
+    "columns": [
+      {
+        "欄位": "action",
+        "中文": "行為",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "可編輯"
+      },
+      {
+        "欄位": "scene",
+        "中文": "地點",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "可編輯"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "可編輯"
+      },
+      {
+        "欄位": "objects",
+        "中文": "物件清單",
+        "型態": "ARRAY(VARCHAR)",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "可編輯"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      }
+    ]
+  },
+  "備註": ""
+}

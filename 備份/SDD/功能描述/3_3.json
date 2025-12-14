@@ -1,0 +1,200 @@
+{
+  "功能編號": "3-3",
+  "功能名稱": "音樂庫管理",
+  "功能說明": "管理員可在音樂庫管理頁維護系統音樂資源，包含查看音樂清單、上傳音訊檔、編輯音樂資訊（名稱/製作者/描述/metadata）與刪除音樂。音樂檔會上傳至 MinIO(S3) 並在資料庫 music 表建立紀錄；刪除時會嘗試刪除對應的 S3 物件並刪除資料庫紀錄。",
+  "程式名稱": "services/WebUIServer/app/template/admin_music.html; services/WebUIServer/app/static/js/admin_music.js; services/WebUIServer/app/static/css/admin_tasks.css; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Music/service.py; services/APIServer/app/router/Music/DTO.py; services/APIServer/app/DataAccess/tables/music.py; services/APIServer/app/utils/s3_utils.py",
+  "輸入": [
+    "skip/limit（音樂清單）",
+    "file/name/composer/description/metadata（上傳音樂）",
+    "music_id + name/composer/description/metadata（編輯音樂）",
+    "music_id（刪除音樂）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "MusicListResponse（items/total）",
+    "MusicAdminRead（含 s3_key）",
+    "刪除結果（ok）",
+    "音樂清單表格 + 新增/編輯/刪除 Modal"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員進入 /admin/music，載入音樂清單表格與新增/編輯彈窗"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端驗證登入者為 admin，否則導回首頁"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "使用者操作",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊【新增音樂】開啟上傳彈窗並送出"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊音樂列開啟詳情/編輯彈窗並儲存"
+          },
+          {
+            "sub_no": "③",
+            "item": "在編輯彈窗點擊【刪除】並確認"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 GET /api/v1/admin/music 取得 MusicListResponse 並渲染"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "檔案上傳與資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "上傳：POST /api/v1/admin/music（multipart）→ 後端檢查 audio/* content_type、上傳至 S3，寫入 music 表"
+          },
+          {
+            "sub_no": "②",
+            "item": "編輯：PATCH /api/v1/admin/music/{music_id}（JSON）→ 更新 music 表欄位"
+          },
+          {
+            "sub_no": "③",
+            "item": "刪除：DELETE /api/v1/admin/music/{music_id} → 嘗試刪除 S3 物件並刪除 music 表紀錄"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示音樂清單（名稱/製作者/時長/上傳者/建立時間）"
+          },
+          {
+            "sub_no": "②",
+            "item": "新增/編輯/刪除成功後關閉彈窗並重新載入清單"
+          },
+          {
+            "sub_no": "③",
+            "item": "失敗時顯示錯誤提示（metadata JSON 格式錯誤、非音訊檔等）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "music",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "音樂ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "music.id；Primary Key"
+      },
+      {
+        "欄位": "name",
+        "中文": "音樂名稱",
+        "型態": "VARCHAR",
+        "長度": 255,
+        "空值": "否",
+        "預設值": null,
+        "備註": "music.name"
+      },
+      {
+        "欄位": "uploader_user_id",
+        "中文": "上傳者使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "music.uploader_user_id；ForeignKey(users.id)；索引"
+      },
+      {
+        "欄位": "composer",
+        "中文": "製作者",
+        "型態": "VARCHAR",
+        "長度": 255,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.composer"
+      },
+      {
+        "欄位": "description",
+        "中文": "詳細資訊",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.description"
+      },
+      {
+        "欄位": "meta_data",
+        "中文": "Metadata(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.meta_data"
+      },
+      {
+        "欄位": "content_type",
+        "中文": "內容類型",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.content_type（audio/*）"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "S3 物件鍵",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "music.s3_key（unique）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "功能編號": "2-1-6",
+  "功能名稱": "刪除當日 Vlog",
+  "功能說明": "當每日 Vlog 狀態為已完成或失敗時，首頁顯示「刪除 Vlog」按鈕；使用者確認後，前端呼叫後端刪除端點，後端刪除 vlogs 記錄並（best-effort）刪除 MinIO 影片物件，vlog_segments 由資料庫 CASCADE 一併刪除；刪除成功後首頁重新載入該日期 Vlog 狀態。",
+  "程式名稱": "services/WebUIServer/app/template/home.html; services/WebUIServer/app/static/js/vlog.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Vlogs/service.py; services/APIServer/app/DataAccess/tables/vlogs.py",
+  "輸入": [
+    "vlog_id",
+    "使用者確認刪除（confirm 對話框）",
+    "Bearer JWT（localStorage.jwt）"
+  ],
+  "輸出": [
+    "刪除結果 {ok: true, message}",
+    "vlogs 記錄刪除",
+    "vlog_segments 記錄連帶刪除",
+    "（若存在）MinIO 影片物件刪除"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊「刪除 Vlog」按鈕（id=deleteDailyVlogBtn）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "對話框確認",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "在 confirm 對話框選擇「確定」"
+          },
+          {
+            "sub_no": "②",
+            "item": "或選擇「取消」"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "分支處理",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若取消：不呼叫 API，維持原狀"
+          },
+          {
+            "sub_no": "②",
+            "item": "若確定：呼叫 DELETE /api/v1/vlogs/{vlog_id}"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料刪除",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端查詢 vlogs（id + user_id）做權限驗證；不存在回 404"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 vlog.s3_key 存在：best-effort 刪除 MinIO 物件"
+          },
+          {
+            "sub_no": "③",
+            "item": "刪除 vlogs 記錄並 commit（vlog_segments 由 CASCADE 自動刪除）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "重新載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端刪除成功後，清空 dailyVlog 並重新呼叫 loadDailyVlog()"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "刪除成功：顯示已刪除，並回到「尚未生成」狀態"
+          },
+          {
+            "sub_no": "②",
+            "item": "刪除失敗：顯示刪除失敗提示"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "API 回應",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "回傳 JSON：{ok, message}"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "vlogs; vlog_segments",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "VlogID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "vlogs.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlogs.user_id（權限驗證）"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "影片S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.s3_key（刪除 MinIO 物件）"
+      },
+      {
+        "欄位": "id",
+        "中文": "分鏡ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "vlog_segments.id；Primary Key"
+      },
+      {
+        "欄位": "vlog_id",
+        "中文": "VlogID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlog_segments.vlog_id；ForeignKey(vlogs.id)；CASCADE 刪除"
+      }
+    ]
+  }
+}

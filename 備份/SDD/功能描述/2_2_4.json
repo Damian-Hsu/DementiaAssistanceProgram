@@ -1,0 +1,96 @@
+{
+  "功能編號": "2-2-4",
+  "功能名稱": "取得 RTSP 推流 URL",
+  "功能說明": "使用者可取得指定鏡頭的 RTSP 推流 URL（含 JWT token 與 TTL），用於外部推流端（攝影機/OBS/模擬器）向 MediaMTX 發布串流；前端可一鍵複製連結到剪貼簿。",
+  "程式名稱": "services/WebUIServer/app/static/js/camera.js; services/WebUIServer/app/static/js/services/CameraService.js; services/APIServer/app/router/Camera/service.py; services/APIServer/app/security/jwt_manager.py",
+  "輸入": [
+    "camera_id",
+    "ttl（300~21600 秒）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "PublishRTSPURLResp（publish_rtsp_url/ttl/expires_at）",
+    "剪貼簿內容（publish_rtsp_url）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊「串流連結」按鈕（publishUrlBtn）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /api/v1/camera/{id}/publish_rtsp_url?ttl=..."
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "權杖簽發",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端簽發串流 token（aud=rtsp, action=publish, ver=token_version）並組成 RTSP URL"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端將 publish_rtsp_url 複製到剪貼簿（Clipboard API 或 fallback）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示 toast：已複製串流連結 / 複製失敗提示"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "camera",
+    "columns": [
+      {
+        "欄位": "path",
+        "中文": "串流路徑",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "是",
+        "預設值": null,
+        "備註": "組成 RTSP URL 的 path"
+      },
+      {
+        "欄位": "token_version",
+        "中文": "Token版本",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "簽發 token ver"
+      }
+    ]
+  }
+}

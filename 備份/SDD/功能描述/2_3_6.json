@@ -1,0 +1,99 @@
+{
+  "功能編號": "2-3-6",
+  "功能名稱": "顯示影片事件列表",
+  "功能說明": "使用者選取影片後，前端呼叫後端取得該錄影底下的事件清單，並於播放器下方呈現事件時間、摘要與場景/活動等資訊。",
+  "程式名稱": "services/WebUIServer/app/static/js/recordings.js; services/APIServer/app/router/Recordings/service.py",
+  "輸入": [
+    "recording_id",
+    "sort（預設 -start_time）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "EventRead[]",
+    "事件列表 UI"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "播放觸發",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "選取影片後自動載入事件列表"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /api/v1/recordings/{recording_id}/events?sort=-start_time"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "畫面渲染",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "依序渲染事件時間、摘要與 meta 資訊"
+          },
+          {
+            "sub_no": "②",
+            "item": "若無事件：顯示「此影片無事件」"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "影片內事件列表顯示於播放器下方"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "events",
+    "columns": [
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.recording_id"
+      },
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.start_time"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.summary"
+      }
+    ]
+  }
+}

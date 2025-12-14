@@ -1,0 +1,138 @@
+{
+  "功能編號": "2-2-2",
+  "功能名稱": "編輯鏡頭",
+  "功能說明": "使用者在鏡頭資訊卡可修改鏡頭名稱與狀態；送出後前端分別呼叫更新鏡頭資料與更新狀態端點，成功則重新載入鏡頭資料並更新畫面。",
+  "程式名稱": "services/WebUIServer/app/template/camera.html; services/WebUIServer/app/static/js/camera.js; services/WebUIServer/app/static/js/services/CameraService.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Camera/service.py; services/APIServer/app/router/Camera/DTO.py",
+  "輸入": [
+    "camera_id",
+    "name（新名稱）",
+    "status（active/inactive/deleted）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "OkResp（ok=true）",
+    "鏡頭資料更新後的畫面"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "修改鏡頭名稱（cameraNameInput）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "下拉選擇",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "選擇鏡頭狀態（cameraStatusSelect）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點選「儲存變更」（saveCameraBtn）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料驗證",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端檢查名稱必填；空值則提示並停止送出"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端以 CameraUpdate/CameraStatusReq 驗證欄位"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "更新名稱：PATCH /api/v1/camera/{id}（body: {name}）"
+          },
+          {
+            "sub_no": "②",
+            "item": "更新狀態：PATCH /api/v1/camera/{id}/status（body: {status}）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "畫面更新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：重新載入鏡頭清單與狀態"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示錯誤提示"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "更新成功：鏡頭資訊卡顯示新名稱/新狀態"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "camera",
+    "columns": [
+      {
+        "欄位": "name",
+        "中文": "鏡頭名稱",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": "camera.name"
+      },
+      {
+        "欄位": "status",
+        "中文": "鏡頭狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "inactive",
+        "備註": "camera.status"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "camera.updated_at"
+      }
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "功能編號": "2-2-3",
+  "功能名稱": "刪除鏡頭",
+  "功能說明": "使用者刪除鏡頭時，後端採邏輯刪除（將 camera.status 設為 deleted）；前端重新載入鏡頭清單並隱藏已刪除鏡頭，若無可用鏡頭則顯示新增鏡頭表單。",
+  "程式名稱": "services/WebUIServer/app/static/js/services/CameraService.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Camera/service.py",
+  "輸入": [
+    "camera_id",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "OkResp（ok=true）",
+    "camera.status=deleted"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "（目前 UI 以狀態選擇代替刪除）選擇狀態為 deleted 並儲存"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "DELETE /api/v1/camera/{id}（後端將 status 設為 deleted）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "畫面更新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "重新載入鏡頭清單，前端選取第一個非 deleted 鏡頭"
+          },
+          {
+            "sub_no": "②",
+            "item": "若清單無可用鏡頭：顯示新增鏡頭表單"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "刪除成功：鏡頭不再出現在可操作清單"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "camera",
+    "columns": [
+      {
+        "欄位": "status",
+        "中文": "鏡頭狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "inactive",
+        "備註": "刪除時設為 deleted"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      }
+    ]
+  }
+}

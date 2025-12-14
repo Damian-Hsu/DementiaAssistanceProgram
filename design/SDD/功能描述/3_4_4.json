@@ -1,0 +1,85 @@
+{
+  "功能編號": "3-4-4",
+  "功能名稱": "影片參數",
+  "功能說明": "管理員設定影片切片長度，寫入 settings 供串流錄影切片使用。",
+  "程式名稱": "services/WebUIServer/app/template/admin_settings.html; services/WebUIServer/app/static/js/admin_settings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/settings.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "管理員系統設定介面",
+      "settings資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "資料庫"
+    ],
+    "資源名詞": [
+      "settings資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【切片長度(秒)】"
+        ],
+        "text": "鍵盤輸入【切片長度(秒)】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存設定】"
+        ],
+        "text": "滑鼠點選【儲存設定】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "寫入 settings（video_segment_seconds）。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "settings資料表"
+        ],
+        "text": "更新影片參數",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "settings",
+    "columns": []
+  },
+  "備註": ""
+}

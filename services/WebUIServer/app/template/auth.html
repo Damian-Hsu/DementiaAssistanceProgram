@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>登入 / 註冊</title>
+  <link rel="icon" type="image/svg+xml" href="../static/icons/lifelog-logo.svg" />
   <link rel="stylesheet" href="../static/css/auth.css" />
 </head>
 <body>
@@ -12,8 +13,13 @@
     <!-- 登入區塊 -->
     <section id="loginSection" class="active">
       <form id="loginform" autocomplete="on" novalidate>
-        <h1>Welcome Back</h1>
-        <p class="subtitle">Sign in to monitor your home</p>
+        <div class="auth-brand" aria-label="回憶拾光 LifeLog.ai">
+          <img class="auth-brand-logo" src="../static/icons/lifelog-logo.svg" alt="LifeLog.ai Logo" />
+          <div class="auth-brand-text">
+            <div class="auth-brand-title">回憶拾光</div>
+            <div class="auth-brand-subtitle">LifeLog.ai</div>
+          </div>
+        </div>
 
         <div>
           <label for="login_account">帳號 Account</label>
@@ -24,6 +30,8 @@
           <label for="login_password">密碼 Password</label>
           <input type="password" id="login_password" name="password" autocomplete="current-password" required />
         </div>
+
+        <div id="loginError" class="error-message" style="display: none; color: #C45B5B; font-size: 14px; margin: 8px 0; text-align: center;"></div>
 
         <button type="submit">Log in</button>
         <p class="helper">Don’t have an account? <a href="#" onclick="showSection('signup')">Sign up 註冊</a></p>
@@ -72,14 +80,15 @@
 
         <div>
           <label for="sign_password">密碼 Password</label>
-          <input type="password" id="sign_password" name="password" required minlength="6" />
+          <input type="password" id="sign_password" name="password" required />
         </div>
 
         <div>
           <label for="sign_password_confirm">再次輸入密碼 Confirm Password</label>
-           <input type="password" id="sign_password_confirm" name="password_confirm" required minlength="6" />
+           <input type="password" id="sign_password_confirm" name="password_confirm" required />
         </div>
 
+        <div id="signupError" class="error-message" style="display: none; color: #C45B5B; font-size: 14px; margin: 8px 0; text-align: center;"></div>
 
         <button type="submit">下一步 Next</button>
         <p class="helper">Already have an account? <a href="#" onclick="showSection('login')">Log in 登入</a></p>

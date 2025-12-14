@@ -1,0 +1,165 @@
+{
+  "功能編號": "2-6-6",
+  "功能名稱": "LLM 設定",
+  "功能說明": "使用者可設定 AI 助手使用的 LLM 供應商/模型與 API 金鑰，並可選擇是否使用系統預設 API Key。當勾選使用系統預設 API Key 時，前端會改為顯示系統預設 provider/model 並禁用編輯；儲存時僅送出 use_default_api_key。若取消勾選則需填入自己的 Google API Key，並可設定 default_llm_provider/default_llm_model 與 llm_providers。若使用者在預設 key 黑名單，後端會拒絕 use_default_api_key=true 並提示需設定自帶 key；更新 LLM 相關設定後會清除該使用者的 LLM 模型快取。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/User/service.py; services/APIServer/app/router/User/settings.py; services/APIServer/app/router/Chat/llm_tools.py; services/APIServer/app/DataAccess/tables/users.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py; services/APIServer/app/DataAccess/tables/settings.py",
+  "輸入": [
+    "use_default_api_key（boolean）",
+    "default_llm_provider（不使用預設 key 時）",
+    "default_llm_model（不使用預設 key 時）",
+    "llm_providers.google.api_key（不使用預設 key 時）",
+    "GET /users/settings/system-default-llm（顯示系統預設 provider/model）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "UserSettingsResponse.settings（含 LLM 設定）",
+    "黑名單限制錯誤（400）",
+    "更新後清除 LLM 模型快取結果（後端內部）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /users/settings 取得使用者 LLM 設定（use_default_api_key/default_llm_provider/default_llm_model/llm_model_api.providers）"
+          },
+          {
+            "sub_no": "②",
+            "item": "呼叫 GET /users/settings/system-default-llm 取得系統預設 provider/model（僅用於顯示）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "切換「使用系統預設 API Key」勾選狀態"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊【儲存模型設定】"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "取消使用預設 key 時：輸入 LLM 模型名稱與 Google API Key"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "前端 UI 切換",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若 use_default_api_key=true：禁用 provider/model 欄位並隱藏 API key 區塊，改顯示系統預設 provider/model"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 use_default_api_key=false：啟用 provider/model 欄位並顯示 API key 區塊，填入使用者自己的設定"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端 PATCH /users/settings：若 use_default_api_key=true 只送 use_default_api_key；若 false 則送 default_llm_provider/default_llm_model/llm_providers.google.api_key"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端若收到 use_default_api_key=true：先查 api_key_blacklist；若在黑名單則回 400"
+          },
+          {
+            "sub_no": "③",
+            "item": "後端更新 users.settings（LLM 相關欄位），並判斷 llm_config_changed（provider/model/providers 變更）"
+          },
+          {
+            "sub_no": "④",
+            "item": "若 llm_config_changed=true：清除該 user 的 LLM 模型實例快取（force_cleanup_user）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示「模型設定已更新」"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗（黑名單/驗證失敗）：顯示後端 detail（例如需設定自己的 API Key）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users; api_key_blacklist; settings",
+    "columns": [
+      {
+        "欄位": "settings",
+        "中文": "使用者設定(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings.use_default_api_key / users.settings.default_llm_provider / users.settings.default_llm_model / users.settings.llm_model_api.providers.google.api_key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "黑名單使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_key_blacklist.user_id（禁止使用系統預設 API Key）"
+      },
+      {
+        "欄位": "reason",
+        "中文": "禁止原因",
+        "型態": "VARCHAR",
+        "長度": 500,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_key_blacklist.reason"
+      },
+      {
+        "欄位": "key",
+        "中文": "系統預設 LLM 設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key（default_llm_provider/default_llm_model/default_google_api_key）"
+      },
+      {
+        "欄位": "value",
+        "中文": "系統預設 LLM 設定值",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value（JSON 字串）"
+      }
+    ]
+  }
+}

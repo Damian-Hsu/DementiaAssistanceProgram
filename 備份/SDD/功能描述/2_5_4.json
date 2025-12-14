@@ -1,0 +1,175 @@
+{
+  "功能編號": "2-5-4",
+  "功能名稱": "額度限制提示",
+  "功能說明": "當使用者使用系統預設 AI API Key 進行聊天時（未設定個人 Google API Key），後端會套用 per-user 速率/日配額限制（RPM/RPD）並在超限時回傳 429；若使用者在預設 key 黑名單則回傳 400 提示需改用自帶 key；前端接到錯誤後會在對話中顯示錯誤訊息，必要時引導重新登入或提示稍後再試。",
+  "程式名稱": "services/APIServer/app/router/Chat/service.py; services/APIServer/app/router/Chat/rate_limiter.py; services/APIServer/app/DataAccess/tables/settings.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py; services/WebUIServer/app/static/js/chat.js; services/WebUIServer/app/static/js/APIClient.js",
+  "輸入": [
+    "使用者是否有自訂 llm_api_key（users.settings）",
+    "settings.default_ai_key_limits（rpm/rpd）",
+    "api_key_blacklist 是否包含該 user_id",
+    "聊天請求次數（滑動視窗/每日累計）"
+  ],
+  "輸出": [
+    "429 Too Many Requests（含等待秒數/剩餘時間/已用量提示）",
+    "400（被禁止使用預設 key，提示設定自帶 Google API Key）",
+    "對話中的錯誤訊息泡泡"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "API 請求",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "使用者送出聊天訊息，觸發 POST /api/v1/chat"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "判斷是否使用預設 AI Key",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端取得使用者 LLM 設定；若 llm_api_key 為 null，視為使用系統預設 key"
+          },
+          {
+            "sub_no": "②",
+            "item": "若使用預設 key：先查詢 api_key_blacklist 是否存在 user_id"
+          },
+          {
+            "sub_no": "③",
+            "item": "若在黑名單：回傳 400，提示需在設定中配置自帶 Google API Key"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "讀取限制並限流",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "從 settings.key=default_ai_key_limits 讀取 JSON（rpm/rpd），無則使用預設 rpm=10, rpd=20"
+          },
+          {
+            "sub_no": "②",
+            "item": "RateLimiter.check_and_update(user_id, rpm, rpd) 進行 per-user 限流（每分鐘/每日）"
+          },
+          {
+            "sub_no": "③",
+            "item": "若超出每日限制：回傳 429（提示距離重置剩餘時間）"
+          },
+          {
+            "sub_no": "④",
+            "item": "若超出每分鐘限制：回傳 429（提示需等待秒數）"
+          },
+          {
+            "sub_no": "⑤",
+            "item": "若未超限：允許請求並將計數器更新（minute_window + daily_count）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "前端錯誤呈現",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若後端回 429：前端將 err.message 顯示為對話錯誤泡泡（含已用量/限制值）"
+          },
+          {
+            "sub_no": "②",
+            "item": "若後端回 400（黑名單/未配置預設 key）：前端顯示錯誤泡泡，引導至設定頁配置自帶 key"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示限制訊息",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示「請求過於頻繁」或「今日 API 配額已用完」等訊息，並提示等待時間/重置時間"
+          },
+          {
+            "sub_no": "②",
+            "item": "顯示「被禁止使用系統預設 API Key」提示，要求配置自帶 Google API Key"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "settings; api_key_blacklist",
+    "columns": [
+      {
+        "欄位": "key",
+        "中文": "設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key（default_ai_key_limits）"
+      },
+      {
+        "欄位": "value",
+        "中文": "設定值",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value（JSON：{rpm, rpd}）"
+      },
+      {
+        "欄位": "description",
+        "中文": "設定描述",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "settings.description"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "黑名單使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_key_blacklist.user_id；Primary Key；ForeignKey(users.id)"
+      },
+      {
+        "欄位": "reason",
+        "中文": "禁止原因",
+        "型態": "VARCHAR",
+        "長度": 500,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_key_blacklist.reason"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

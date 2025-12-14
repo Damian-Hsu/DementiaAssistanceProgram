@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import asyncio
+import os
 from .DataAccess.Connect import create_db_and_tables
 from .DTO import DateTimeResponse
 from .security.deps import get_current_user, require_user,require_admin, get_current_api_client, get_uploader_api_client
@@ -14,7 +15,7 @@ from .router.Admin.service import admin_router
 from .router.Jobs.service import jobs_router
 from .router.Camera.service import camera_router
 from .router.Events.service import events_router
-from .router.Recordings.service import recordings_router
+from .router.Recordings.service import recordings_router, recordings_m2m_router
 from .router.Chat.service import chat_router
 from .router.Vlogs.service import vlogs_router
 from .router.Music import music_router, admin_music_router
@@ -101,9 +102,15 @@ app = FastAPI(
 #     # "http://localhost:30500",
 # ]
 
+# CORS 設定：從環境變數讀取允許的來源
+# 如果未設定，允許所有來源（開發環境）
+cors_origins = os.getenv("CORS_ORIGINS", "*")
+if cors_origins != "*":
+    cors_origins = [origin.strip() for origin in cors_origins.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
     max_age=600,  # 預檢快取
@@ -126,6 +133,7 @@ app.include_router(admin_music_router, dependencies=[Depends(require_admin)])
 app.include_router(camera_router, dependencies=[Depends(require_user)])
 app.include_router(events_router, dependencies=[Depends(require_user)])
 app.include_router(recordings_router, dependencies=[Depends(require_user)])
+app.include_router(recordings_m2m_router, dependencies=[Depends(get_current_api_client)])
 app.include_router(chat_router, dependencies=[Depends(require_user)])
 
 

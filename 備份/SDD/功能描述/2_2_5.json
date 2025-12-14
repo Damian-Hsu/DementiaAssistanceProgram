@@ -1,0 +1,130 @@
+{
+  "功能編號": "2-2-5",
+  "功能名稱": "開始串流",
+  "功能說明": "使用者點擊開始串流後，前端呼叫 connect 端點建立串流連線；後端簽發 StreamingServer 拉流用的 internal RTSP token 並呼叫 StreamingServer /streams/start 啟動錄影切片，前端同時取得 RTSP 推流 URL 並複製給使用者開始推流，並在串流狀態變為 running 時自動啟動 WebRTC 預覽。",
+  "程式名稱": "services/WebUIServer/app/static/js/camera.js; services/WebUIServer/app/static/js/services/CameraService.js; services/APIServer/app/router/Camera/service.py; services/StreamingServer/app/main.py",
+  "輸入": [
+    "camera_id",
+    "ttl（300~21600 秒）",
+    "segment_seconds（可選）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "StreamConnectResp（ttl/info）",
+    "StreamingServer 建立串流（streams/start）",
+    "RTSP 推流 URL（供外部推流端使用）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊「開始串流」（startStreamBtn）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 POST /api/v1/camera/{id}/stream/connect（body: {ttl}）"
+          },
+          {
+            "sub_no": "②",
+            "item": "若回 409（AlreadyConnected）：前端視為已建立，仍繼續後續流程"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "服務呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端呼叫 StreamingServer POST /streams/start（rtsp_url/segment_seconds）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 GET /api/v1/camera/{id}/publish_rtsp_url 取得推流 URL 並複製"
+          }
+        ]
+      },
+      {
+        "step_no": 4,
+        "title": "狀態更新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端更新/輪詢串流狀態；狀態變為 running 時自動啟動預覽"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示 toast：已複製串流連結，提示使用者開始推流"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "camera; settings",
+    "columns": [
+      {
+        "欄位": "status",
+        "中文": "鏡頭狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "inactive",
+        "備註": "僅 active 可 connect"
+      },
+      {
+        "欄位": "token_version",
+        "中文": "Token版本",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "簽 internal read token"
+      },
+      {
+        "欄位": "key",
+        "中文": "設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key（video_segment_seconds）"
+      },
+      {
+        "欄位": "value",
+        "中文": "設定值",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value（JSON 字串）"
+      }
+    ]
+  }
+}

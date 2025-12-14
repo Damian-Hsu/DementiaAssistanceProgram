@@ -1,0 +1,255 @@
+{
+  "功能編號": "2-5-1",
+  "功能名稱": "送出訊息/顯示對話歷史",
+  "功能說明": "使用者在 AI 助手頁輸入訊息後送出，前端會先在畫面新增使用者訊息並顯示 AI 載入中，再呼叫後端聊天 API 取得回覆；同時前端會將對話以 user_id 為 key 保存於 localStorage，重新進入頁面時會載入並顯示歷史對話，直到使用者按下清除對話才會移除。",
+  "程式名稱": "services/WebUIServer/app/template/chat.html; services/WebUIServer/app/static/js/chat.js; services/WebUIServer/app/static/js/APIClient.js; services/WebUIServer/app/static/js/AuthService.js; services/APIServer/app/router/Chat/service.py; services/APIServer/app/router/Chat/DTO.py; services/APIServer/app/DataAccess/tables/llm_usage_logs.py",
+  "輸入": [
+    "chatInput（textarea 文字）",
+    "history（最近 20 則，送後端最多取 10 則）",
+    "localStorage.user_id（組合 chat_history_user_v1:{user_id}）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "聊天畫面新增訊息（user/assistant）",
+    "ChatResponse.message（AI 回覆文字）",
+    "localStorage 對話持久化（保留最近 200 則）",
+    "錯誤提示（401 重新登入；其他錯誤文字）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入聊天頁時讀取 localStorage.chat_history_user_v1:{user_id}"
+          },
+          {
+            "sub_no": "②",
+            "item": "若有歷史訊息則依 role（user/assistant）渲染對話；若無則顯示預設歡迎訊息"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "使用者在 textarea 輸入訊息（Enter 送出；Shift+Enter 換行）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊【發送】按鈕送出訊息"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "權限檢查",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "送出前檢查 AuthService.isLoggedIn；若未登入則 alert 並導向 /auth"
+          },
+          {
+            "sub_no": "②",
+            "item": "頁面初始化時呼叫 ApiClient.getCurrentUser；失敗則導向 /auth"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "畫面更新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "將使用者訊息新增至聊天畫面，並寫入 localStorage（role=user）"
+          },
+          {
+            "sub_no": "②",
+            "item": "在聊天畫面新增 AI 載入中訊息（思考中...），並暫時禁用輸入框與送出按鈕"
+          },
+          {
+            "sub_no": "③",
+            "item": "將訊息加入 chatHistory，並裁切保留最近 20 則（送後端時再裁切為最多 10 則）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 POST /api/v1/chat，body 含 message/history/date_from/date_to"
+          },
+          {
+            "sub_no": "②",
+            "item": "成功：移除載入中訊息，將 AI 回覆加入 chatHistory 並寫入 localStorage（role=assistant）"
+          },
+          {
+            "sub_no": "③",
+            "item": "失敗（401/登入過期）：在對話中顯示提示並 1.5 秒後導向 /auth"
+          },
+          {
+            "sub_no": "④",
+            "item": "失敗（其他）：在對話中顯示 err.message，並回滾本次 chatHistory（移除剛剛加入的 user 訊息）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功時：顯示使用者訊息 + AI 回覆訊息，並自動滾動到底部"
+          },
+          {
+            "sub_no": "②",
+            "item": "重新進入頁面時：自動載入並顯示 localStorage 中保留的歷史對話"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "錯誤訊息呈現",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "401：顯示「登入已過期」並導向登入頁"
+          },
+          {
+            "sub_no": "②",
+            "item": "429/500/503：顯示「查詢失敗」或後端回傳的具體錯誤原因"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "llm_usage_logs",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "使用量紀錄ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "llm_usage_logs.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "llm_usage_logs.user_id；ForeignKey(users.id)；索引"
+      },
+      {
+        "欄位": "source",
+        "中文": "來源",
+        "型態": "VARCHAR",
+        "長度": 32,
+        "空值": "否",
+        "預設值": null,
+        "備註": "llm_usage_logs.source（chat/diary/compute）"
+      },
+      {
+        "欄位": "provider",
+        "中文": "供應商",
+        "型態": "VARCHAR",
+        "長度": 32,
+        "空值": "是",
+        "預設值": null,
+        "備註": "llm_usage_logs.provider（google/openai/...）"
+      },
+      {
+        "欄位": "model_name",
+        "中文": "模型名稱",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "llm_usage_logs.model_name"
+      },
+      {
+        "欄位": "prompt_tokens",
+        "中文": "提示詞 Token 數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.prompt_tokens"
+      },
+      {
+        "欄位": "completion_tokens",
+        "中文": "回覆 Token 數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.completion_tokens"
+      },
+      {
+        "欄位": "total_tokens",
+        "中文": "總 Token 數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.total_tokens"
+      },
+      {
+        "欄位": "assistant_replies",
+        "中文": "AI 助手回覆次數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.assistant_replies（聊天成功回覆 +1）"
+      },
+      {
+        "欄位": "meta",
+        "中文": "附加資訊",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "llm_usage_logs.meta（例如 type=assistant_reply）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

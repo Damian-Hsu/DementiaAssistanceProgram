@@ -1,0 +1,163 @@
+{
+  "功能編號": "3-4-3",
+  "功能名稱": "預設 AI key 用量限制",
+  "功能說明": "管理員可設定「使用系統預設 AI API Key」時，每位使用者的用量限制（RPM/RPD）。後端將限制寫入 settings 表（key=default_ai_key_limits），並由聊天服務的 rate limiter 於使用預設 key 時套用。前端載入時讀取目前限制值；儲存時會檢查範圍（RPM:1-300、RPD:1-10000）。",
+  "程式名稱": "services/WebUIServer/app/template/admin_settings.html; services/WebUIServer/app/static/js/admin_settings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/settings.py; services/APIServer/app/router/Chat/rate_limiter.py",
+  "輸入": [
+    "rpm（每分鐘請求上限）",
+    "rpd（每日請求上限）",
+    "description（選填）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "DefaultAiKeyLimitsResponse（rpm/rpd/updated_at）",
+    "表單欄位顯示（RPM/RPD）",
+    "成功/失敗提示訊息"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員進入 /admin/settings，前端 boot() 驗證角色為 admin"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端自動載入預設 AI key 用量限制並填入 RPM/RPD 欄位"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員輸入 RPM（1-300）"
+          },
+          {
+            "sub_no": "②",
+            "item": "管理員輸入 RPD（1-10000）"
+          },
+          {
+            "sub_no": "③",
+            "item": "若欄位為空或非數字則不更新（保留現有設定）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員點擊【儲存設定】觸發儲存（與模型設定同一儲存按鈕）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入：前端呼叫 GET /api/v1/admin/settings/default-ai-key-limits 取得 DefaultAiKeyLimitsResponse"
+          },
+          {
+            "sub_no": "②",
+            "item": "儲存：前端呼叫 POST /api/v1/admin/settings/default-ai-key-limits（rpm/rpd）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端驗證範圍（rpm 1-300、rpd 1-10000）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端以 upsert 寫入 settings（key=default_ai_key_limits；value={\"rpm\":... ,\"rpd\":...}）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "畫面顯示",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入成功：RPM/RPD 欄位顯示目前限制值"
+          },
+          {
+            "sub_no": "②",
+            "item": "儲存成功：顯示「設定已儲存」提示"
+          },
+          {
+            "sub_no": "③",
+            "item": "儲存失敗：顯示錯誤提示（範圍錯誤/未授權/伺服器錯誤）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "settings",
+    "columns": [
+      {
+        "欄位": "key",
+        "中文": "設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key；Primary Key；本功能使用 key=default_ai_key_limits"
+      },
+      {
+        "欄位": "value",
+        "中文": "設定值(JSON字串)",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value；JSON 字串（例：{\"rpm\":10,\"rpd\":20}）"
+      },
+      {
+        "欄位": "description",
+        "中文": "設定描述",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "settings.description（選填）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；onupdate timezone('UTC', now())"
+      }
+    ]
+  }
+}

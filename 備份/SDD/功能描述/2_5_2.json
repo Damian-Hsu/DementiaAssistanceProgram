@@ -1,0 +1,139 @@
+{
+  "功能編號": "2-5-2",
+  "功能名稱": "指定查詢日期範圍",
+  "功能說明": "AI 助手提供開始/結束日期篩選，使用者可在工具面板指定 date_from/date_to；前端會把日期範圍一併送到後端聊天 API，後端會將該範圍寫入本次訊息的系統上下文，並在工具查詢（事件/影片/Vlog）時作為查詢範圍參考。",
+  "程式名稱": "services/WebUIServer/app/template/chat.html; services/WebUIServer/app/static/js/chat.js; services/APIServer/app/router/Chat/service.py; services/APIServer/app/router/Chat/DTO.py",
+  "輸入": [
+    "chatDateFrom（YYYY-MM-DD，可空）",
+    "chatDateTo（YYYY-MM-DD，可空）",
+    "message（使用者訊息）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "ChatRequest.date_from/date_to 傳入後端",
+    "LLM 上下文附加「用戶指定查詢範圍」文字",
+    "查詢結果（events/recordings/vlogs 等）依日期範圍縮小"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊【工具】按鈕展開工具面板"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊頁面其他區域收起工具面板"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤/日期選擇",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "設定開始日期（date_from）"
+          },
+          {
+            "sub_no": "②",
+            "item": "設定結束日期（date_to）"
+          },
+          {
+            "sub_no": "③",
+            "item": "清空任一日期欄位（不限制該端）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "請求組裝",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "送出訊息時讀取 chatDateFrom/chatDateTo，空值轉為 null"
+          },
+          {
+            "sub_no": "②",
+            "item": "將 date_from/date_to 一併放入 POST /api/v1/chat 的 body"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "後端上下文附加",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端取得使用者時區與當前日期，組合 [系統上下文] 與 [使用者資訊]"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 date_from 或 date_to 任一存在：附加「用戶指定查詢範圍：{from} 到 {to}」到本次訊息"
+          },
+          {
+            "sub_no": "③",
+            "item": "LLM 若判斷需查詢資料，會在工具參數中使用 date_from/date_to（或將相對日期轉成具體日期）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "回傳結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若只填 date_from：以起始日期為主查詢（視工具/模型決策）"
+          },
+          {
+            "sub_no": "②",
+            "item": "若只填 date_to：以結束日期為主查詢（視工具/模型決策）"
+          },
+          {
+            "sub_no": "③",
+            "item": "若兩者皆填：以區間查詢並回傳區間內的關聯資料"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "events; recordings; vlogs",
+    "columns": [
+      {
+        "欄位": "start_time",
+        "中文": "事件/錄影開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.start_time / recordings.start_time（日期範圍過濾依據）"
+      },
+      {
+        "欄位": "target_date",
+        "中文": "Vlog 目標日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlogs.target_date（日期範圍過濾依據）"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "events.user_id / recordings.user_id / vlogs.user_id"
+      }
+    ]
+  }
+}

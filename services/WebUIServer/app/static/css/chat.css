@@ -1,5 +1,89 @@
 /* ===== AI助手聊天頁面樣式 ===== */
 
+/* 鍵盤狀態：在聊天頁面鍵盤彈出時，隱藏底部導覽列，讓輸入列直接貼齊鍵盤（風格如一般聊天 App） */
+body.page-chat.keyboard-open .mobile-nav {
+  display: none !important;
+}
+
+/* 聊天頁的「有效底部導覽高度」：預設為底部導覽列高度；鍵盤彈出時視為 0（因為 nav 會被隱藏） */
+body.page-chat {
+  --chat-nav-effective-height: var(--mobile-nav-total-height, 65px);
+}
+body.page-chat.keyboard-open {
+  --chat-nav-effective-height: 0px;
+}
+
+/* 手機模式聊天頁：建立固定高度佈局，阻止整頁滾動，只讓訊息區可滾動 */
+@media (max-width: 768px) {
+  /* 聊天頁的 main-content 改為固定高度容器，禁止滾動 */
+  body.page-chat .main-content {
+    display: flex;
+    flex-direction: column;
+    /* ✅ 以 VisualViewport 為準：鍵盤出現時高度會縮小，容器會被上下壓縮到剛好 */
+    height: var(--chat-vv-height, 100dvh);
+    overflow: hidden !important;
+    overscroll-behavior: none; /* 防止滾動鏈把整頁拖動（支援的瀏覽器） */
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* chat-header 固定在頂部，不隨滾動移動 */
+  body.page-chat .chat-header {
+    /* ✅ 終極修正：鍵盤彈出時瀏覽器可能會強制 scroll-into-view 推動整頁，
+       用 fixed 讓 header 永遠釘在視窗頂端 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    flex-shrink: 0;
+    z-index: 1200;
+  }
+
+  /* chat-container 填充剩餘空間 */
+  body.page-chat .chat-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* header 變成 fixed 後，讓內容往下讓出空間（高度由 JS 動態量測） */
+    padding-top: var(--chat-header-height, 64px);
+    box-sizing: border-box;
+  }
+
+  /* chat-messages 成為唯一的滾動區域 */
+  body.page-chat .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain; /* 防止往上/下拉時把外層（header/nav）一起拉動 */
+    touch-action: pan-y;
+  }
+
+  /* chat-input-area 固定在底部（鍵盤上方或導覽列上方） */
+  body.page-chat .chat-input-area {
+    position: fixed;
+    /* 
+     * 關鍵修正：viewport 本身會因鍵盤而縮小，所以 bottom 不需要加鍵盤高度
+     * 鍵盤開啟時：bottom = 0（因為 viewport 底部就是鍵盤頂部，nav 已隱藏）
+     * 鍵盤關閉時：bottom = nav 高度（讓輸入區在 nav 上方）
+     */
+    bottom: var(--chat-nav-effective-height, var(--mobile-nav-total-height, 65px));
+    left: 0;
+    right: 0;
+    padding: 5px;
+    margin: 0;
+    border-top: 2px solid var(--color-border, #D3C0A8);
+    border-bottom: none;
+    background: #fff;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+    transition: bottom 0.2s ease;
+    z-index: 1000;
+    box-sizing: border-box;
+  }
+}
+
 /* 聊天標題區域 - 固定在頂部 */
 .chat-header {
   padding: var(--spacing-md, 16px) var(--spacing-lg, 24px);
@@ -134,6 +218,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  /* 桌機版：正常內距即可（避免最後訊息離輸入區太遠） */
   padding: var(--spacing-lg, 24px);
   padding-bottom: var(--spacing-md, 16px);
   display: flex;
@@ -141,6 +226,7 @@
   gap: var(--spacing-md, 16px);
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
+  scroll-padding-bottom: var(--spacing-md, 16px);
   min-height: 0;
   box-sizing: border-box;
 }
@@ -938,7 +1024,7 @@
   flex-shrink: 0;
   z-index: 10;
   border-top: 2px solid var(--color-border, #D3C0A8);
-  padding: var(--spacing-md, 16px);
+  padding: 5px 10px;
   background: #fff;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
@@ -946,45 +1032,8 @@
 
 /* 手機版：輸入區域貼齊底部導覽列 */
 @media (max-width: 768px) {
-  .chat-input-area {
-    position: fixed;
-    bottom: calc(80px + env(safe-area-inset-bottom, 0px)); /* 底部導覽列高度 + 安全區域 */
-    left: 0;
-    right: 0;
-    padding: var(--spacing-md, 16px);
-    padding-bottom: calc(var(--spacing-md, 16px) + env(safe-area-inset-bottom, 0px));
-    margin: 0;
-    border-top: 2px solid var(--color-border, #D3C0A8);
-    border-bottom: none;
-    transition: bottom 0.3s ease;
-    will-change: bottom;
-    z-index: 1000; /* 確保在內容之上 */
-    background: #fff; /* 確保背景色 */
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1); /* 確保有陰影 */
-  }
-
-  /* 為輸入區域留出空間 */
-  .chat-container {
-    padding-bottom: calc(80px + 80px + env(safe-area-inset-bottom, 0px)); /* 底部導覽列 + 輸入區域高度 + 安全區域 */
-  }
-
-  /* 防止整個頁面被鍵盤推動 */
-  .main-content {
-    position: relative !important; /* 覆蓋 fixed，但允許 JavaScript 動態設置 */
-    overflow: hidden !important; /* 防止滾動 */
-  }
-
-  /* 當鍵盤打開時，固定主內容區域 */
-  .main-content.keyboard-open {
-    position: fixed !important;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100% !important;
-    height: 100vh !important;
-    overflow: hidden !important;
-  }
+  /* 注意：body.page-chat 的佈局已在前面定義（固定高度容器，只有訊息區可滾動） */
+  /* 這裡的 .chat-input-area 樣式適用於非聊天頁，聊天頁使用 body.page-chat .chat-input-area */
 }
 
 .chat-input-row {
@@ -1139,8 +1188,8 @@
 @media (max-width: 768px) {
   .chat-tools-panel {
     position: fixed;
-    /* 計算位置：底部導覽列 + 輸入區域高度（約 80px）+ 間距 */
-    bottom: calc(80px + 80px + var(--spacing-md, 16px) * 2);
+    /* 計算位置：底部導覽列 + 輸入區域高度 + 間距 */
+    bottom: calc(var(--mobile-nav-total-height, 65px) + var(--chat-input-area-height, 80px) + var(--spacing-md, 16px) * 2);
     left: var(--spacing-md, 16px);
     right: var(--spacing-md, 16px);
     width: calc(100vw - var(--spacing-md, 16px) * 2);
@@ -1223,6 +1272,10 @@
 }
 
 @media (max-width: 768px) {
+  /* 不在這裡用 body fixed：
+     - Android/iOS 的鍵盤/viewport 行為不一致，容易造成高度計算錯/畫面被頂起
+     - 改由 chat.js 在 focus 期間鎖定 window scroll（更穩） */
+
   .chat-header {
     padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
     padding-bottom: calc(var(--spacing-sm, 8px)); /* 為底部導覽留出空間 */
@@ -1232,13 +1285,22 @@
     font-size: var(--font-size-xl, 20px);
   }
 
-  .chat-container {
-    padding-bottom: 80px; /* 為底部導覽留出空間 */
-  }
+  /* 由 .chat-messages 的 padding-bottom 統一處理底部預留空間 */
 
   .chat-messages {
-    padding: var(--spacing-md, 16px);
+    padding: 8px;
     gap: var(--spacing-sm, 8px);
+    /* 手機版：底部預留（輸入框 + nav + 鍵盤），避免最新訊息被蓋住 */
+    padding-bottom: calc(
+      var(--spacing-md, 16px)
+      + var(--chat-input-area-height, 80px)
+      + var(--chat-nav-effective-height, var(--mobile-nav-total-height, 65px))
+    );
+    scroll-padding-bottom: calc(
+      var(--spacing-md, 16px)
+      + var(--chat-input-area-height, 80px)
+      + var(--chat-nav-effective-height, var(--mobile-nav-total-height, 65px))
+    );
   }
 
   .chat-message {
@@ -1276,16 +1338,11 @@
 
   .chat-input-area {
     padding: var(--spacing-sm, 8px);
-    bottom: 80px; /* 確保貼齊底部導覽列 */
-  }
-
-  .chat-container {
-    padding-bottom: calc(80px + 100px); /* 底部導覽列 + 輸入區域高度 */
   }
 
   .chat-tools-panel {
-    /* 計算位置：底部導覽列 + 輸入區域高度（約 80px）+ 間距 */
-    bottom: calc(80px + 80px + var(--spacing-sm, 8px) * 2);
+    /* 計算位置：底部導覽列 + 輸入區域高度 + 間距 */
+    bottom: calc(var(--mobile-nav-total-height, 65px) + var(--chat-input-area-height, 80px) + var(--spacing-sm, 8px) * 2);
     left: var(--spacing-sm, 8px);
     right: var(--spacing-sm, 8px);
     width: calc(100vw - var(--spacing-sm, 8px) * 2);

@@ -1,0 +1,193 @@
+{
+  "功能編號": "1-2",
+  "功能名稱": "登出",
+  "功能說明": "已登入使用者可透過側邊欄、行動版底部導覽或設定頁的登出按鈕執行登出；系統先顯示登出確認對話框，若確認則清除前端保存的 JWT 與使用者快取資訊並導回登入頁，若取消則關閉對話框並維持登入狀態。",
+  "程式名稱": "services/WebUIServer/app/template/base.html; services/WebUIServer/app/template/partials/sidebar.html; services/WebUIServer/app/template/partials/mobile_nav.html; services/WebUIServer/app/template/partials/logout_confirm_dialog.html; services/WebUIServer/app/static/js/logout.js; services/WebUIServer/app/static/js/AuthService.js; services/WebUIServer/app/static/css/logout_dialog.css",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "導覽介面",
+      "是否登出視窗"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "是否登出視窗",
+      "登入介面"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【登出】"
+        ],
+        "text": "滑鼠點選【登出】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【取消】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【確認】"
+          },
+          {
+            "sub_no": "③",
+            "text": "【點擊視窗外】"
+          },
+          {
+            "sub_no": "④",
+            "text": "【ESC】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "跳出是否登出視窗",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "是否登出視窗"
+        ],
+        "text": "跳出是否登出視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-①",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【取消】"
+        ],
+        "text": "滑鼠點選【取消】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "是否登出視窗"
+        ],
+        "text": "關閉是否登出視窗並維持登入狀態",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-②",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【確認】"
+        ],
+        "text": "滑鼠點選【確認】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "刪除瀏覽器中的 JWT Token（localStorage.jwt）並清除 localStorage.user_role、localStorage.user_id 與 window.__CURRENT_USER 快取（若存在）。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "切換",
+        "objects": [
+          "登入介面"
+        ],
+        "text": "切換至登入介面",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-③",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點擊",
+        "objects": [
+          "視窗外"
+        ],
+        "text": "滑鼠點擊視窗外",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "是否登出視窗"
+        ],
+        "text": "關閉是否登出視窗並維持登入狀態",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-④",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "按下",
+        "objects": [
+          "【ESC】"
+        ],
+        "text": "鍵盤按下【ESC】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "是否登出視窗"
+        ],
+        "text": "關閉是否登出視窗並維持登入狀態",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  },
+  "備註": "登出僅清除前端 token/快取，不呼叫後端登出 API。"
+}

@@ -1,0 +1,98 @@
+{
+  "功能編號": "3-1-3",
+  "功能名稱": "查看任務詳情",
+  "功能說明": "管理員點擊任務列表列後，前端以既有列表資料直接開啟詳情 Modal（不額外呼叫 API），顯示任務基本資訊（ID/類型/狀態/使用者ID/相機ID/時間/進度），若有錯誤則顯示 error_message，並以 JSON pretty-print 顯示 details（Compute 任務含 input/output/trace_id/metrics；串流任務含 pid/cmdline/record_dir 等）。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_tasks.js; services/WebUIServer/app/template/admin_tasks.html; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py",
+  "輸入": [
+    "TaskInfoDTO（task_id/task_type/status/user_id/camera_id/progress/error_message/details）"
+  ],
+  "輸出": [
+    "任務詳情 Modal（基本資訊表格 + 錯誤區塊 + details JSON）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊任務列表列（tr.task-row）"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊 × 或點擊背景關閉詳情視窗"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料組裝",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端從 state.tasks 依 task_id 找到對應 TaskInfoDTO"
+          },
+          {
+            "sub_no": "②",
+            "item": "組合基本資訊表格（含格式化時間與進度百分比）"
+          },
+          {
+            "sub_no": "③",
+            "item": "若 error_message 存在：顯示錯誤資訊區塊"
+          },
+          {
+            "sub_no": "④",
+            "item": "若 details 為非空：以 JSON.stringify(details, null, 2) 顯示詳細資訊"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示詳情",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "開啟 taskDetailModal 顯示任務詳情"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "inference_jobs",
+    "columns": [
+      {
+        "欄位": "error_message",
+        "中文": "錯誤訊息",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.error_message（Compute 任務）"
+      },
+      {
+        "欄位": "metrics",
+        "中文": "度量(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.metrics（會出現在 details.metrics）"
+      },
+      {
+        "欄位": "params",
+        "中文": "參數(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.params（包含 progress/user_id/camera_id 等）"
+      }
+    ]
+  }
+}

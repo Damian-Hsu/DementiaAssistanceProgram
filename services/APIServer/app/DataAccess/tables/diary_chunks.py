@@ -1,26 +1,14 @@
 from __future__ import annotations
 import uuid
-from datetime import date, datetime
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import String, Date, Text, ForeignKey, Integer, Boolean
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Text, ForeignKey, Integer, Boolean
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 from pgvector.sqlalchemy import Vector
 
-from . import ORMBase, TimestampMixin, TimestampSchema
+from . import ORMBase, TimestampMixin
 from .__Function import create_uuid7
 
-__all__ = ["Schema", "Table"]
-
-class Schema(BaseModel):
-    """diary_chunks 的基礎 I/O 欄位"""
-    daily_summary_id: uuid.UUID
-    chunk_text: str
-    chunk_index: int
-    embedding: list[float] | None = None
-    is_processed: bool = False
-
-    model_config = ConfigDict(from_attributes=True)
+__all__ = ["Table"]
 
 class DiaryChunksTable(ORMBase, TimestampMixin):
     __tablename__ = "diary_chunks"
@@ -30,9 +18,9 @@ class DiaryChunksTable(ORMBase, TimestampMixin):
         primary_key=True,
         default=create_uuid7
     )
-    daily_summary_id: Mapped[uuid.UUID] = mapped_column(
+    diary_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("daily_summaries.id", ondelete="CASCADE"),
+        ForeignKey("diary.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )

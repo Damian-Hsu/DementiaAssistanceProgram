@@ -1,0 +1,67 @@
+{
+  "功能編號": "2-5-4",
+  "功能名稱": "額度限制提示",
+  "功能說明": "當使用者使用系統預設 AI Key 且觸發限流/配額或黑名單時，後端回傳錯誤，前端在對話中顯示提示訊息。",
+  "程式名稱": "services/APIServer/app/router/Chat/service.py; services/APIServer/app/router/Chat/rate_limiter.py; services/APIServer/app/DataAccess/tables/settings.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py; services/WebUIServer/app/static/js/chat.js; services/WebUIServer/app/static/js/APIClient.js",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統"
+    ],
+    "資源名詞": [
+      "settings資料表",
+      "api_key_blacklist資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "額度限制提示"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "判斷",
+        "objects": [
+          "使用者是否使用預設AI Key"
+        ],
+        "text": "系統判斷使用者是否使用預設AI Key",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【在黑名單】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【超出配額/限流】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "若在黑名單或超出限制，回傳錯誤並要求使用者稍後再試或改用自帶 Key。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "額度限制提示"
+        ],
+        "text": "顯示額度限制提示",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "settings; api_key_blacklist",
+    "columns": []
+  },
+  "備註": ""
+}

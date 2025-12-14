@@ -1,0 +1,92 @@
+{
+  "功能編號": "1-2-1",
+  "功能名稱": "登出確認對話框",
+  "功能說明": "當使用者點擊登出按鈕時，系統以 <dialog> 方式顯示「確認登出」對話框；使用者可選擇取消、確認、點擊對話框外部或按 ESC 關閉。若確認則觸發登出流程清除本機認證資料並導向登入頁；若取消或關閉則不做任何狀態改變。",
+  "程式名稱": "services/WebUIServer/app/template/base.html; services/WebUIServer/app/template/partials/logout_confirm_dialog.html; services/WebUIServer/app/static/js/logout.js; services/WebUIServer/app/static/css/logout_dialog.css",
+  "輸入": [
+    "滑鼠",
+    "鍵盤",
+    "logout_confirm_dialog.html頁面"
+  ],
+  "輸出": [
+    "螢幕"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊「登出」按鈕觸發 showLogoutConfirm()"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "顯示對話框",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 logoutConfirmDialog.showModal() 顯示對話框"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊「取消」按鈕（logoutCancelBtn）：呼叫 closeLogoutConfirm() 關閉對話框"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊「確認」按鈕（logoutConfirmBtn）：先關閉對話框，再呼叫 performLogout()"
+          },
+          {
+            "sub_no": "③",
+            "item": "點擊對話框外部：關閉對話框（不登出）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "按下 ESC（dialog cancel event）：阻止預設行為並關閉對話框（不登出）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示「確認登出」對話框（含取消/確認按鈕）"
+          },
+          {
+            "sub_no": "②",
+            "item": "取消/點擊外部/ESC：關閉對話框並維持登入狀態"
+          },
+          {
+            "sub_no": "③",
+            "item": "確認：關閉對話框並進入登出流程"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  }
+}

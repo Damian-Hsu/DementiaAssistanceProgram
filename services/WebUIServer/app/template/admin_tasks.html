@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% include './partials/header.html'%}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_tasks.css') }}">
+
+  <section class="search-bar">
+    <div class="search-group">
+      <label for="taskTypeFilter">任務類型：</label>
+      <select id="taskTypeFilter">
+        <option value="">全部</option>
+        <option value="video_description">影像轉換事件</option>
+        <option value="vlog_generation">Vlog 生成</option>
+        <option value="diary_generation">日記生成</option>
+        <option value="embedding_generation">Embedding 生成</option>
+        <option value="diary_embeddings">日記 Embedding</option>
+        <option value="rag_highlights">RAG 推薦</option>
+        <option value="streaming">影像串流</option>
+      </select>
+    </div>
+    <div class="search-group">
+      <label for="taskStatusFilter">狀態：</label>
+      <select id="taskStatusFilter">
+        <option value="">全部</option>
+        <option value="pending">等待中</option>
+        <option value="processing">處理中</option>
+        <option value="running">運行中</option>
+        <option value="success">成功</option>
+        <option value="failed">失敗</option>
+        <option value="error">錯誤</option>
+        <option value="stopped">已停止</option>
+        <option value="reconnecting">重連中</option>
+      </select>
+    </div>
+    <div class="search-actions">
+      <button id="refreshTasks" class="btn-primary" type="button" title="刷新">
+        <img src="{{ url_for('static', filename='icons/refresh-line.svg') }}" alt="刷新" style="width: 20px; height: 20px;">
+      </button>
+    </div>
+  </section>
+
+  <section class="events-section">
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>任務 ID</th>
+            <th>任務類型</th>
+            <th>狀態</th>
+            <th>使用者 ID</th>
+            <th>相機 ID</th>
+            <th>進度</th>
+            <th>建立時間</th>
+          </tr>
+        </thead>
+        <tbody id="tasksList">
+          <tr>
+            <td colspan="7" class="text-center">載入中...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <button id="prevBtn" class="page-btn">&lt;</button>
+      <span>第</span>
+      <input id="pageInput" type="number" min="1" value="1" />
+      <span id="pageTotal">/ 1</span>
+      <span>頁</span>
+      <button id="nextBtn" class="page-btn">&gt;</button>
+      <span class="pagination-info">
+        <span>每頁</span>
+        <input id="pageSize" type="number" min="1" max="100" value="20" />
+        <span>筆, 共</span>
+        <span id="totalCount">0</span>
+        <span>筆</span>
+      </span>
+    </div>
+  </section>
+
+  <!-- 任務詳情模態框 -->
+  <div class="modal-overlay" id="taskDetailModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>任務詳情</h3>
+        <span class="modal-close" id="closeTaskDetail">&times;</span>
+      </div>
+      <div class="modal-body" id="taskDetailContent">
+        <!-- 任務詳情將在這裡動態載入 -->
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="{{ url_for('static', filename='js/admin_tasks.js') }}"></script>
+{% endblock %}
+

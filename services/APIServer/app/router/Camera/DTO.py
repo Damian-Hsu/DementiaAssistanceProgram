@@ -15,7 +15,8 @@ class TokenVersionResp(BaseModel):
 
 # ====== 建立 / 更新 ======
 class CameraCreate(BaseModel):
-    user_id: int
+    # user_id：一般使用者不允許指定（會強制使用自己的 id）；管理員才可指定
+    user_id: Optional[int] = None
     name: str = Field(max_length=128)
     # allow_ip: Optional[List[str]] = None
     max_publishers: Optional[int] = Field(default=1, ge=1)
@@ -83,8 +84,10 @@ class CameraListResp(BaseModel):
 # ====== 產 Token ======
 class GenerateTokenReq(BaseModel):
     action: Literal["publish", "read"] = "publish"
-    segment_seconds: int = Field(default=30, ge=1, le=600)  # 秒
-    ttl: Optional[int] = Field(default=None, ge=30, le=3600)  # 秒
+    # ⚠️ 重要：這裡不能預設 30，否則即使前端不傳值，也會被 Pydantic 補成 30，
+    # 造成 connect_stream 永遠不會去讀取「管理員設定」的 video_segment_seconds。
+    segment_seconds: Optional[int] = Field(default=None, ge=1, le=600, description="影片切片長度（秒）；未提供則使用系統設定，最後 fallback 30")  # 秒
+    ttl: Optional[int] = Field(default=None, ge=300, le=21600)  # 秒（RTSP 推流：300-21600）
     # bind_ip: bool = True  # 是否把 request 來源 IP 綁進 token
 
 class StreamConnectResp(BaseModel):
@@ -92,17 +95,13 @@ class StreamConnectResp(BaseModel):
     info: Optional[dict[str, Any]] = None  # streaming 回傳的 JSON（僅成功時）
 
 class RefreshTokenResp(BaseModel):
-    audience: Literal["rtsp", "hls", "webrtc"]
+    audience: Literal["rtsp", "webrtc"]
     action: Literal["publish", "read"]
     token: str
     ttl: int
     expires_at: int
 class PublishRTSPURLResp(BaseModel):
     publish_rtsp_url: str
-    ttl: int
-    expires_at: int
-class PlayHLSURLResp(BaseModel):
-    play_hls_url: str
     ttl: int
     expires_at: int
 class PlayWebRTCURLResp(BaseModel):

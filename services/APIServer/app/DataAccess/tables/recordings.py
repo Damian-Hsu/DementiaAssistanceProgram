@@ -2,16 +2,15 @@ from __future__ import annotations
 from datetime import datetime
 import uuid
 
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, Float, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Float, Text
 from sqlalchemy.dialects.postgresql import UUID, JSONB, BIGINT
 from sqlalchemy.orm import Mapped, mapped_column
 
-from . import ORMBase, TimestampMixin, TimestampSchema
+from . import ORMBase, TimestampMixin
 from .__Function import create_uuid7
 from .__Enumeration import UploadStatus, UploadStatusEnum
 
-__all__ = ["Schema", "Table"]
+__all__ = ["Table"]
 
 
 class RecordingsTable(ORMBase, TimestampMixin):

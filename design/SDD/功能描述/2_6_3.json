@@ -1,0 +1,84 @@
+{
+  "功能編號": "2-6-3",
+  "功能名稱": "時區設定",
+  "功能說明": "使用者選擇時區並儲存後，系統更新 users.settings.timezone，供後續顯示與查詢轉換。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/User/service.py; services/APIServer/app/router/User/settings.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "使用者設定介面",
+      "users資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "資料庫"
+    ],
+    "資源名詞": [
+      "users資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "選擇",
+        "objects": [
+          "【時區】"
+        ],
+        "text": "滑鼠選擇【時區】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存應用程式設定】"
+        ],
+        "text": "滑鼠點選【儲存應用程式設定】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "更新 users.settings.timezone。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "users資料表"
+        ],
+        "text": "更新時區設定",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "users",
+    "columns": []
+  },
+  "備註": ""
+}

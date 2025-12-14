@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% include './partials/header.html'%}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_tasks.css') }}">
+
+  <section class="events-section">
+    <div style="margin-bottom: 16px; display: flex; justify-content: flex-end;">
+      <button id="addMusicBtn" class="btn-primary" type="button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        新增音樂
+      </button>
+    </div>
+
+    <div class="admin-table-container">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover table-bordered">
+          <thead class="table-light">
+            <tr>
+              <th>音樂名稱</th>
+              <th>製作者</th>
+              <th>時長</th>
+              <th>上傳者</th>
+              <th>建立時間</th>
+            </tr>
+          </thead>
+          <tbody id="musicList">
+            <tr>
+              <td colspan="5" class="text-center">載入中...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 新增音樂彈出視窗 -->
+  <div class="modal-overlay" id="addMusicModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>新增音樂</h3>
+        <span class="modal-close" id="closeAddMusicModal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <form id="musicUploadForm" class="admin-form" enctype="multipart/form-data">
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="musicName">音樂名稱 *</label>
+              <input type="text" id="musicName" required placeholder="輸入音樂名稱">
+            </div>
+            <div class="form-field">
+              <label for="musicComposer">製作者</label>
+              <input type="text" id="musicComposer" placeholder="音樂製作者 / 作者">
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="musicDescription">詳細資訊</label>
+            <textarea id="musicDescription" rows="3" placeholder="補充說明（選填）"></textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="musicMetadata">Metadata (JSON)</label>
+            <textarea id="musicMetadata" rows="3" placeholder='{"bpm": 120, "mood": "relax"}（選填）'></textarea>
+          </div>
+
+          <div class="form-field file-field">
+            <label for="musicFile">音樂檔案 *</label>
+            <input type="file" id="musicFile" accept="audio/*" required>
+          </div>
+
+          <div class="form-hint" id="musicUploadMessage" aria-live="polite"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" id="cancelAddMusic">取消</button>
+        <button type="button" class="btn-primary" id="submitAddMusic">上傳音樂</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 音樂詳情/編輯彈出視窗 -->
+  <div class="modal-overlay" id="musicDetailModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>音樂詳情</h3>
+        <span class="modal-close" id="closeMusicDetailModal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <form id="musicEditForm" class="admin-form">
+          <input type="hidden" id="editMusicId">
+          
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="editMusicName">音樂名稱 *</label>
+              <input type="text" id="editMusicName" required placeholder="輸入音樂名稱">
+            </div>
+            <div class="form-field">
+              <label for="editMusicComposer">製作者</label>
+              <input type="text" id="editMusicComposer" placeholder="音樂製作者 / 作者">
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="editMusicDescription">詳細資訊</label>
+            <textarea id="editMusicDescription" rows="3" placeholder="補充說明（選填）"></textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="editMusicMetadata">Metadata (JSON)</label>
+            <textarea id="editMusicMetadata" rows="3" placeholder='{"bpm": 120, "mood": "relax"}（選填）'></textarea>
+          </div>
+
+          <div class="form-field">
+            <label>音樂 ID</label>
+            <input type="text" id="editMusicIdDisplay" readonly style="background-color: #f5f5f5;">
+          </div>
+
+          <div class="form-field">
+            <label>上傳者 ID</label>
+            <input type="text" id="editMusicUploader" readonly style="background-color: #f5f5f5;">
+          </div>
+
+          <div class="form-field">
+            <label>建立時間</label>
+            <input type="text" id="editMusicCreatedAt" readonly style="background-color: #f5f5f5;">
+          </div>
+
+          <div class="form-hint" id="musicEditMessage" aria-live="polite"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-danger" id="deleteMusicBtn">刪除</button>
+        <button type="button" class="btn-secondary" id="cancelEditMusic">取消</button>
+        <button type="button" class="btn-primary" id="saveMusicBtn">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="{{ url_for('static', filename='js/admin_music.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,152 @@
+{
+  "功能編號": "2-4-3",
+  "功能名稱": "編輯事件",
+  "功能說明": "使用者點擊事件列表「編輯」後，前端載入事件資料並以 dialog 提供編輯行為、地點、物件（可新增/移除標籤）與摘要；儲存後呼叫事件更新 API，成功後關閉對話框並刷新事件列表。",
+  "程式名稱": "services/WebUIServer/app/static/js/events.js; services/APIServer/app/router/Events/service.py; services/APIServer/app/router/Events/DTO.py",
+  "輸入": [
+    "event_id",
+    "action/scene/summary（可選）",
+    "objects（可選，陣列或 null）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "OkResp（ok=true）",
+    "事件列表刷新"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊事件列表「編輯」按鈕（data-action=edit）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "修改行為/地點/摘要"
+          },
+          {
+            "sub_no": "②",
+            "item": "在物件輸入框輸入文字並按 Enter 新增物件"
+          },
+          {
+            "sub_no": "③",
+            "item": "點擊物件標籤的刪除按鈕移除物件"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊「儲存」送出更新"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "先呼叫 GET /api/v1/events/{event_id} 載入原始資料填入表單"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 PATCH /api/v1/events/{event_id}（body: action/scene/summary/objects）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "畫面更新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：關閉 dialog 並重新載入事件列表"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "事件列表顯示更新後內容"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "events",
+    "columns": [
+      {
+        "欄位": "action",
+        "中文": "行為",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "可編輯"
+      },
+      {
+        "欄位": "scene",
+        "中文": "地點",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "可編輯"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "可編輯"
+      },
+      {
+        "欄位": "objects",
+        "中文": "物件清單",
+        "型態": "ARRAY(VARCHAR)",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "可編輯；空陣列時前端送 null"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      }
+    ]
+  }
+}

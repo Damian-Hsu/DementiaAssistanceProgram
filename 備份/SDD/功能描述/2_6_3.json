@@ -1,0 +1,111 @@
+{
+  "功能編號": "2-6-3",
+  "功能名稱": "時區設定",
+  "功能說明": "使用者可在應用程式設定中選擇時區。前端會先呼叫 /users/settings/timezones 取得常用時區列表並渲染下拉選單，並以 GET /users/settings 取得目前 settings.timezone；使用者儲存後以 PATCH /users/settings 更新 users.settings.timezone，供後續事件/日記/聊天等功能做時區轉換。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/User/service.py; services/APIServer/app/router/User/settings.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入": [
+    "timezone（例如 Asia/Taipei）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "時區選單列表（timezones）",
+    "UserSettingsResponse.settings.timezone",
+    "成功/失敗提示訊息"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /users/settings/timezones 載入時區選單"
+          },
+          {
+            "sub_no": "②",
+            "item": "呼叫 GET /users/settings 取得目前 timezone 並選取"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "從下拉選單選擇時區"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊【儲存應用程式設定】"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端回傳常用時區（value/label），前端渲染為 option"
+          },
+          {
+            "sub_no": "②",
+            "item": "若載入失敗：選單顯示「載入失敗，請重新整理頁面」"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端 PATCH /users/settings（timezone）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端驗證時區有效性（pytz.timezone）；無效則回 422/400"
+          },
+          {
+            "sub_no": "③",
+            "item": "寫入 users.settings.timezone 並 commit"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示「應用程式設定已更新」"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示「更新應用程式設定失敗」或後端 detail"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users",
+    "columns": [
+      {
+        "欄位": "settings",
+        "中文": "使用者設定(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings.timezone"
+      }
+    ]
+  }
+}

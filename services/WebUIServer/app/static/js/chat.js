@@ -14,13 +14,56 @@ const chatToolsPanel = document.getElementById('chatToolsPanel');
 // 對話歷史
 let chatHistory = [];
 
+// === 對話持久化（直到使用者按「清除對話」才清掉） ===
+const CHAT_STORAGE_PREFIX = 'chat_history_user_v1:';
+function getChatStorageKey() {
+  const uid = (localStorage.getItem('user_id') || '').trim() || 'anonymous';
+  return `${CHAT_STORAGE_PREFIX}${uid}`;
+}
+function loadPersistedChat() {
+  try {
+    const raw = localStorage.getItem(getChatStorageKey());
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.messages) ? parsed.messages : [];
+  } catch {
+    return [];
+  }
+}
+function savePersistedChat(messages) {
+  try {
+    // 上限避免無限膨脹（保留最近 200 則即可）
+    const trimmed = Array.isArray(messages) ? messages.slice(-200) : [];
+    localStorage.setItem(getChatStorageKey(), JSON.stringify({ messages: trimmed }));
+  } catch {}
+}
+function clearPersistedChat() {
+  try { localStorage.removeItem(getChatStorageKey()); } catch {}
+}
+
+function renderWelcomeMessage() {
+  if (!chatMessages) return;
+  chatMessages.innerHTML = `
+    <div class="chat-message ai">
+      <div class="chat-avatar">AI</div>
+      <div class="message-content">
+        <div class="chat-bubble">
+          👋 你好，我是你的 AI 助手。<br>
+          你現在想回想什麼呢？我可以陪你聊～
+        </div>
+        <div class="chat-time">AI 助手</div>
+      </div>
+    </div>
+  `;
+}
+
 // 工具函數
 function scrollChatToBottom() {
   if (!chatMessages) return;
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function addChatMessage(content, isUser = false, events = null, recordings = null, diaries = null, vlogs = null) {
+function addChatMessage(content, isUser = false, events = null, recordings = null, diaries = null, vlogs = null, { persist = true } = {}) {
   if (!chatMessages) return;
   
   const messageDiv = document.createElement('div');
@@ -209,6 +252,17 @@ function addChatMessage(content, isUser = false, events = null, recordings = nul
   `;
   
   chatMessages.appendChild(messageDiv);
+
+  // 保存到瀏覽器（不自動清除）
+  if (persist) {
+    const messages = loadPersistedChat();
+    messages.push({
+      role: isUser ? 'user' : 'assistant',
+      content: String(content ?? ''),
+      ts: Date.now(),
+    });
+    savePersistedChat(messages);
+  }
   
   // 綁定「顯示事件」按鈕事件
   if (events && events.length > 0) {
@@ -690,8 +744,10 @@ async function sendChatMessage() {
     return;
   }
   
-  // 顯示使用者訊息
-  addChatMessage(query, true);
+  const hadFocusBeforeSend = document.activeElement === chatInput;
+
+  // 顯示使用者訊息（並持久化）
+  addChatMessage(query, true, null, null, null, null, { persist: true });
   
   // 添加到對話歷史
   chatHistory.push({
@@ -749,23 +805,13 @@ async function sendChatMessage() {
     const diaries = response.diaries || [];
     const vlogs = response.vlogs || [];
     
-    // 調試日誌
-    console.log('[Chat Response]', {
-      message: answer,
-      eventsCount: events.length,
-      recordingsCount: recordings.length,
-      diariesCount: diaries.length,
-      vlogsCount: vlogs.length,
-      recordings: recordings
-    });
-    
     // 添加 AI 回覆到對話歷史
     chatHistory.push({
       role: 'assistant',
       content: answer
     });
     
-    addChatMessage(answer, false, events, recordings, diaries, vlogs);
+    addChatMessage(answer, false, events, recordings, diaries, vlogs, { persist: true });
     
     // 如果有函數調用，可以在控制台輸出（用於調試）
     if (response.function_calls && response.function_calls.length > 0) {
@@ -777,12 +823,12 @@ async function sendChatMessage() {
     
     // 如果是 401 錯誤，提示用戶重新登入
     if (err.message.includes('401') || err.message.includes('登入')) {
-      addChatMessage('❌ 您的登入已過期，請重新登入後再試', false);
+      addChatMessage('❌ 您的登入已過期，請重新登入後再試', false, null, null, null, null, { persist: true });
       setTimeout(() => {
         window.location.href = '/auth.html';
       }, 1500);
     } else {
-      addChatMessage(`❌ ${err.message || '查詢失敗，請稍後再試'}`, false);
+      addChatMessage(`❌ ${err.message || '查詢失敗，請稍後再試'}`, false, null, null, null, null, { persist: true });
     }
     
     // 移除失敗的用戶訊息（保持歷史一致性）
@@ -791,7 +837,10 @@ async function sendChatMessage() {
     // 恢復輸入和按鈕
     chatInput.disabled = false;
     chatSend.disabled = false;
-    chatInput.focus();
+    // 不要強制 focus（避免進頁/操作後自動彈鍵盤）；只有原本就在輸入時才回復 focus
+    if (hadFocusBeforeSend) {
+      try { chatInput.focus({ preventScroll: true }); } catch { chatInput.focus(); }
+    }
   }
 }
 
@@ -800,22 +849,10 @@ function clearChatHistory() {
   if (!confirm('確定要清除所有對話記錄嗎？')) return;
   
   chatHistory = [];
+  clearPersistedChat();
   
   // 保留歡迎訊息
-  if (chatMessages) {
-    chatMessages.innerHTML = `
-      <div class="chat-message ai">
-        <div class="chat-avatar">AI</div>
-        <div class="message-content">
-          <div class="chat-bubble">
-            👋 您好！我是您的 AI 助手。<br><br>
-            我可以協助您回憶任何事!
-          </div>
-          <div class="chat-time">AI 助手</div>
-        </div>
-      </div>
-    `;
-  }
+  renderWelcomeMessage();
   
   scrollChatToBottom();
 }
@@ -895,266 +932,131 @@ window.addEventListener('resize', () => {
   setTimeout(scrollChatToBottom, 50);
 });
 
-// 處理手機鍵盤彈出 - 只推動輸入區域，不推動整個頁面
+// 處理手機鍵盤彈出：
+// - chat-header 不應被往上擠
+// - chat-messages 不整塊上移，而是「可視高度縮小」並保持顯示最新訊息
+// - 只讓 chat-input-area 浮在鍵盤上方
 function handleMobileKeyboard() {
-  if (window.innerWidth <= 768 && chatInput) {
-    const inputArea = document.querySelector('.chat-input-area');
-    const mobileNav = document.querySelector('.mobile-nav');
-    const mainContent = document.querySelector('.main-content');
-    let initialViewportHeight = window.innerHeight;
-    let keyboardHeight = 0;
-    let isKeyboardOpen = false;
-
-    // 防止整個頁面滾動
-    function preventPageScroll(e) {
-      // 如果正在輸入，阻止預設的滾動行為
-      if (document.activeElement === chatInput || document.activeElement === chatInput) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }
-    }
-
-    // 計算鍵盤高度
-    function calculateKeyboardHeight() {
-      const currentViewportHeight = window.innerHeight;
-      const heightDiff = initialViewportHeight - currentViewportHeight;
-      // 如果視口高度減少超過 150px，認為鍵盤彈出
-      if (heightDiff > 150) {
-        keyboardHeight = heightDiff;
-        return true;
-      }
-      return false;
-    }
-
-    // 獲取底部導覽列高度（動態計算）
-    function getBottomNavHeight() {
-      if (mobileNav && mobileNav.offsetParent !== null) {
-        return mobileNav.offsetHeight;
-      }
-      return 80; // 預設高度
-    }
-
-    // 獲取安全區域高度
-    function getSafeAreaBottom() {
-      const safeArea = getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-bottom');
-      if (safeArea) {
-        return parseInt(safeArea) || 0;
-      }
-      // 嘗試從 env() 獲取
-      const envSafeArea = getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-bottom)');
-      return parseInt(envSafeArea) || 0;
-    }
-
-    // 更新輸入區域位置
-    function updateInputAreaPosition() {
-      if (!inputArea) return;
-      
-      const navHeight = getBottomNavHeight();
-      const safeAreaBottom = getSafeAreaBottom();
-      
-      if (isKeyboardOpen) {
-        // 鍵盤彈出：只推動輸入區域向上
-        inputArea.style.bottom = `${keyboardHeight + navHeight + safeAreaBottom}px`;
-        inputArea.style.transform = 'translateY(0)';
-        
-        // 調整聊天訊息區域的 padding，確保輸入框不被遮擋
-        if (chatMessages) {
-          const inputHeight = inputArea.offsetHeight;
-          chatMessages.style.paddingBottom = `${inputHeight + keyboardHeight + 20}px`;
-        }
-      } else {
-        // 鍵盤收起：恢復輸入區域位置
-        inputArea.style.bottom = `${navHeight + safeAreaBottom}px`;
-        inputArea.style.transform = 'translateY(0)';
-        
-        // 恢復聊天訊息區域的 padding
-        if (chatMessages) {
-          chatMessages.style.paddingBottom = '';
-        }
-      }
-    }
-
-    // 監聽視窗大小變化（處理鍵盤彈出/收起）
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        const wasKeyboardOpen = isKeyboardOpen;
-        isKeyboardOpen = calculateKeyboardHeight();
-        
-        if (wasKeyboardOpen !== isKeyboardOpen) {
-          updateInputAreaPosition();
-          
-          // 防止頁面滾動
-          if (isKeyboardOpen) {
-            // 鍵盤彈出時，阻止頁面滾動 - 使用 class
-            if (mainContent) {
-              mainContent.classList.add('keyboard-open');
-              // 確保主內容區域不會被鍵盤推動
-              mainContent.style.top = '0';
-              mainContent.style.height = `${window.innerHeight}px`;
-            }
-            // 防止整個頁面滾動
-            document.body.style.overflow = 'hidden';
-            document.documentElement.style.overflow = 'hidden';
-          } else {
-            // 鍵盤收起時，恢復頁面滾動
-            if (mainContent) {
-              mainContent.classList.remove('keyboard-open');
-              mainContent.style.top = '';
-              mainContent.style.height = '';
-            }
-            document.body.style.overflow = '';
-            document.documentElement.style.overflow = '';
-            
-            keyboardHeight = 0;
-            initialViewportHeight = window.innerHeight;
-          }
-        }
-        
-        // 滾動到底部
-        scrollChatToBottom();
-      }, 100);
-    });
-
-    // 監聽輸入框聚焦事件
-    chatInput.addEventListener('focus', (e) => {
-      // 記錄初始視口高度
-      initialViewportHeight = window.innerHeight;
-      
-      // 防止頁面自動滾動
-      e.preventDefault();
-      
-      // 延遲一下，等待鍵盤彈出
-      setTimeout(() => {
-        isKeyboardOpen = calculateKeyboardHeight();
-        
-        if (isKeyboardOpen) {
-          updateInputAreaPosition();
-          
-          // 防止頁面滾動 - 使用 class
-          if (mainContent) {
-            mainContent.classList.add('keyboard-open');
-            mainContent.style.top = '0';
-            mainContent.style.height = `${window.innerHeight}px`;
-          }
-          // 防止整個頁面滾動
-          document.body.style.overflow = 'hidden';
-          document.documentElement.style.overflow = 'hidden';
-        }
-        
-        // 滾動到底部
-        scrollChatToBottom();
-      }, 300);
-    }, { passive: false });
-
-    // 監聽輸入框失焦事件
-    chatInput.addEventListener('blur', () => {
-      isKeyboardOpen = false;
-      keyboardHeight = 0;
-      
-      // 恢復輸入區域位置
-      updateInputAreaPosition();
-      
-      // 恢復頁面滾動
-      if (mainContent) {
-        mainContent.classList.remove('keyboard-open');
-        mainContent.style.top = '';
-        mainContent.style.height = '';
-      }
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-      
-      // 等待視口恢復
-      setTimeout(() => {
-        initialViewportHeight = window.innerHeight;
-      }, 300);
-    });
-
-    // 防止觸摸滾動導致整個頁面上移
-    let touchStartY = 0;
-    let touchEndY = 0;
-    
-    document.addEventListener('touchstart', (e) => {
-      if (document.activeElement === chatInput) {
-        touchStartY = e.touches[0].clientY;
-      }
-    }, { passive: true });
-
-    document.addEventListener('touchmove', (e) => {
-      if (document.activeElement === chatInput && isKeyboardOpen) {
-        // 如果正在輸入且鍵盤打開，阻止頁面滾動
-        e.preventDefault();
-      }
-    }, { passive: false });
-
-    // 初始化視口高度
-    initialViewportHeight = window.innerHeight;
-    
-    // 初始化輸入區域位置
-    updateInputAreaPosition();
-  }
-}
-
-// 修復 iPad Pro 底部白邊 - 動態計算視口高度並確保貼齊底部
-function fixViewportHeight() {
-  // 設置 CSS 變數用於安全區域
-  // 嘗試從 CSS env() 獲取安全區域
-  const computedStyle = getComputedStyle(document.documentElement);
-  let safeAreaBottom = 0;
-  
-  // 方法1: 從 CSS 變數獲取
-  const cssVar = computedStyle.getPropertyValue('--safe-area-inset-bottom');
-  if (cssVar) {
-    safeAreaBottom = parseInt(cssVar) || 0;
-  } else {
-    // 方法2: 計算視口差異（適用於有瀏覽器 UI 的情況）
-    const viewportHeight = window.innerHeight;
-    const screenHeight = window.screen.height;
-    // 如果視口高度明顯小於螢幕高度，可能有安全區域
-    if (screenHeight > viewportHeight && window.innerWidth <= 768) {
-      safeAreaBottom = Math.max(0, screenHeight - viewportHeight - 100); // 減去可能的瀏覽器 UI
-    }
-  }
-  
-  document.documentElement.style.setProperty('--safe-area-inset-bottom', `${safeAreaBottom}px`);
-  
-  // 計算實際視口高度（考慮安全區域）
-  const vh = window.innerHeight * 0.01;
-  document.documentElement.style.setProperty('--vh', `${vh}px`);
-  
-  // 確保底部導覽列貼齊最底端
-  const mobileNav = document.querySelector('.mobile-nav');
-  if (mobileNav && window.innerWidth <= 768) {
-    // 動態計算並設置底部導覽列高度
-    const navHeight = 80; // 基礎高度
-    const totalHeight = navHeight + safeAreaBottom;
-    mobileNav.style.height = `${totalHeight}px`;
-    mobileNav.style.minHeight = `${navHeight}px`;
-    mobileNav.style.paddingBottom = `${Math.max(8, safeAreaBottom)}px`;
-    mobileNav.style.bottom = '0'; // 確保貼齊最底端
-    mobileNav.style.marginBottom = '0'; // 確保沒有間隙
-  }
-  
-  // 確保輸入區域貼齊底部導覽列
+  if (!(window.innerWidth <= 768 && chatInput)) return;
+  const root = document.documentElement;
   const inputArea = document.querySelector('.chat-input-area');
-  if (inputArea && window.innerWidth <= 768) {
-    const navHeight = mobileNav ? mobileNav.offsetHeight : 80;
-    const safeArea = getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-bottom');
-    const safeAreaValue = parseInt(safeArea) || 0;
-    inputArea.style.bottom = `${navHeight + safeAreaValue}px`;
+  const mobileNav = document.querySelector('.mobile-nav');
+  const chatContainer = document.querySelector('.chat-container');
+  const chatHeader = document.querySelector('.chat-header');
+  const scrollEl = document.scrollingElement || document.documentElement;
+  let keyboardOpen = false;
+  const initialInnerHeight = window.innerHeight;
+  let focusLockRequested = false;
+
+  // 在聊天頁面手機模式下，避免整頁滾動（只允許 chatMessages 滾動）
+  document.body.style.overflow = 'hidden';
+  document.documentElement.style.overflow = 'hidden';
+
+  function updateVisualViewportHeightVar() {
+    // 讓聊天頁容器高度跟著「可視 viewport」縮放（鍵盤出現/收起會變）
+    if (window.visualViewport && window.visualViewport.height) {
+      root.style.setProperty('--chat-vv-height', `${Math.round(window.visualViewport.height)}px`);
+    } else {
+      root.style.setProperty('--chat-vv-height', `${window.innerHeight}px`);
+    }
   }
+
+  function computeKeyboardInset() {
+    // iOS/Android 新版瀏覽器：VisualViewport 更準
+    if (window.visualViewport) {
+      const vv = window.visualViewport;
+      // 注意：vv.offsetTop 會隨「可視視窗捲動/橡皮筋」變動，會造成輸入列跟著飄。
+      // 這裡只用高度差估算鍵盤佔用，避免 scroll 時抖動。
+      const raw = Math.max(0, window.innerHeight - vv.height);
+      const inset = Math.round(raw);
+      // 小於門檻視為 0，避免位址列顯示/隱藏造成誤判「鍵盤開啟」
+      return inset >= 50 ? inset : 0;
+    }
+    return 0;
+  }
+
+  function getNavHeight() {
+    if (mobileNav && mobileNav.offsetParent !== null) return mobileNav.offsetHeight;
+    return 80;
+  }
+
+  function updateLayoutVars() {
+    if (!inputArea) return;
+    updateVisualViewportHeightVar();
+    const inputH = inputArea.offsetHeight || 80;
+    const kb = computeKeyboardInset();
+    root.style.setProperty('--chat-keyboard-inset', `${kb}px`);
+    root.style.setProperty('--chat-input-area-height', `${inputH}px`);
+    if (chatHeader) {
+      root.style.setProperty('--chat-header-height', `${chatHeader.offsetHeight || 64}px`);
+    }
+
+    // 鍵盤彈出時：隱藏底部導覽列，讓輸入列直接貼齊鍵盤（並同步讓聊天區縮短）
+    // ✅ 修正：keyboard-open 只以「kb>0 或 input focus」判定，避免收鍵盤後仍被誤判為開啟
+    const isFocused = document.activeElement === chatInput;
+    const isKeyboardOpen = (kb > 0) || isFocused;
+    document.body.classList.toggle('keyboard-open', isKeyboardOpen);
+
+    // ✅ 終極修正：不要用 html/body position:fixed（不同瀏覽器副作用大）
+    // 改成：鍵盤開啟期間「強制 window scroll 在 0」，阻止 scroll-into-view 把 header/整頁推上去
+    keyboardOpen = isKeyboardOpen;
+    if (keyboardOpen) requestAnimationFrame(() => window.scrollTo(0, 0));
+
+    // 讓訊息區域在鍵盤/輸入框變動後保持最新訊息可見
+    requestAnimationFrame(scrollChatToBottom);
+  }
+
+  updateLayoutVars();
+  window.addEventListener('resize', () => setTimeout(updateLayoutVars, 50));
+  window.addEventListener('orientationchange', () => setTimeout(updateLayoutVars, 100));
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => setTimeout(updateLayoutVars, 0));
+    // 不監聽 visualViewport.scroll：它會在使用者滑動/橡皮筋時頻繁觸發，造成輸入列「跟著飄」
+  }
+
+  // 使用者點輸入框才會彈鍵盤：在 focus 當下立刻鎖定（比 resize 更早），避免 header/整頁先被頂起
+  chatInput.addEventListener('focus', () => {
+    focusLockRequested = true;
+    window.scrollTo(0, 0);
+    updateLayoutVars();
+  });
+  // blur 時給瀏覽器一點時間收鍵盤/恢復 viewport，再判定一次，確保 nav 會回來
+  chatInput.addEventListener('blur', () => {
+    focusLockRequested = false;
+    setTimeout(updateLayoutVars, 80);
+  });
+
+  // 只要鍵盤開啟，就禁止 window scroll（瀏覽器強制 scroll-into-view 也會被拉回）
+  const enforceTop = () => {
+    if (!keyboardOpen) return;
+    if ((window.scrollY || scrollEl.scrollTop || 0) !== 0) window.scrollTo(0, 0);
+  };
+  window.addEventListener('scroll', enforceTop, { passive: true });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('scroll', enforceTop, { passive: true });
+  }
+
+  // iOS/Safari 常見：即使外層 overflow hidden，仍可能發生「滾動鏈/橡皮筋」把整頁拖動，
+  // 導致 fixed 的 nav/input/header 被一起帶走再回彈。這裡強制只允許 chatMessages 區域的 touchmove。
+  const allowTouchMove = (el) => {
+    if (!el) return false;
+    if (chatMessages && chatMessages.contains(el)) return true;
+    if (inputArea && inputArea.contains(el)) return true;
+    if (chatContainer && chatContainer.contains(el) && el.tagName === 'TEXTAREA') return true;
+    return false;
+  };
+  const preventBodyScroll = (e) => {
+    if (allowTouchMove(e.target)) return;
+    e.preventDefault();
+  };
+  // 只在聊天頁手機模式啟用（passive:false 才能 preventDefault）
+  document.addEventListener('touchmove', preventBodyScroll, { passive: false });
 }
 
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
-  // 修復 iPad Pro 底部白邊
-  fixViewportHeight();
-  window.addEventListener('resize', fixViewportHeight);
-  window.addEventListener('orientationchange', () => {
-    setTimeout(fixViewportHeight, 100);
-  });
+  // 標記聊天頁（給 CSS 用）
+  document.body.classList.add('page-chat');
 
   // 檢查登入狀態
   if (!AuthService.isLoggedIn()) {
@@ -1173,13 +1075,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // 處理手機鍵盤
   handleMobileKeyboard();
-  
-  // 聚焦輸入框
-  if (chatInput) {
-    chatInput.focus();
+
+  // 載入瀏覽器保存的對話（不要自動 focus，避免進頁就彈鍵盤）
+  const persisted = loadPersistedChat();
+  if (persisted.length > 0) {
+    // 先清空預設歡迎訊息
+    chatMessages.innerHTML = '';
+    persisted.forEach((m) => {
+      const role = m?.role === 'user' ? 'user' : 'assistant';
+      addChatMessage(m?.content || '', role === 'user', null, null, null, null, { persist: false });
+    });
+  } else {
+    renderWelcomeMessage();
   }
-  
-  // 滾動到底部
+
+  // 讓 API 的 history 也有同樣的上下文（只保留最近 20 則）
+  chatHistory = persisted
+    .filter(m => m && (m.role === 'user' || m.role === 'assistant'))
+    .slice(-20)
+    .map(m => ({ role: m.role, content: String(m.content ?? '') }));
+
   scrollChatToBottom();
 });
 

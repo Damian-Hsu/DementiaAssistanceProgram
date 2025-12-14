@@ -1,0 +1,104 @@
+{
+  "功能編號": "1-3-1",
+  "功能名稱": "側邊欄",
+  "功能說明": "桌面版使用側邊欄提供主要頁面導覽（首頁、AI 助手、鏡頭、影片、事件、設定、登出），並依 active_page 標記目前頁面為高亮；管理員則使用管理員側邊欄（任務管理、使用者、音樂庫、設定、登出）。側邊欄在手機寬度下會被隱藏，改用底部導覽列。",
+  "程式名稱": "services/WebUIServer/app/template/partials/sidebar.html; services/WebUIServer/app/template/partials/sidebar_admin.html; services/WebUIServer/app/template/base.html; services/WebUIServer/app/static/js/init_user.js; services/WebUIServer/app/static/css/layout.css",
+  "輸入": [
+    "滑鼠",
+    "sidebar.html頁面",
+    "users資料表"
+  ],
+  "輸出": [
+    "螢幕"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入 base.html 時 include user/admin 版本的 sidebar（依 active_page 判斷）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點選側邊欄任一導覽項目（<a> 連結）以跳轉頁面"
+          },
+          {
+            "sub_no": "②",
+            "item": "點選「登出」按鈕（button id=logoutbtn）以觸發登出確認對話框"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "狀態標記",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "模板依 active_page 於對應 <li> 加上 active class 以高亮目前頁面"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "UI 切換",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "init_user.js 依使用者 role 切換顯示 user/admin sidebar（hidden class）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "RWD 樣式套用",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "當螢幕寬度小於 768px：CSS 將 #sidebar-container 設為 display:none（改用 mobile-nav）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "桌面顯示側邊欄；目前頁面項目呈現高亮"
+          },
+          {
+            "sub_no": "②",
+            "item": "手機模式隱藏側邊欄"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "導頁結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點選導覽項目後導向對應頁面"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  }
+}

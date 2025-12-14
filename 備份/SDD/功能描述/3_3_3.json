@@ -1,0 +1,143 @@
+{
+  "功能編號": "3-3-3",
+  "功能名稱": "編輯音樂資訊",
+  "功能說明": "管理員點擊音樂列可開啟詳情/編輯彈窗，修改音樂名稱、製作者、描述與 metadata（JSON）。儲存時前端會先驗證 metadata 為合法 JSON（若填寫），再以 PATCH /admin/music/{music_id} 更新資料庫 music 表。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_music.js; services/WebUIServer/app/template/admin_music.html; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Music/service.py; services/APIServer/app/router/Music/DTO.py; services/APIServer/app/DataAccess/tables/music.py",
+  "輸入": [
+    "music_id",
+    "name（必填）",
+    "composer（可選）",
+    "description（可選）",
+    "metadata（可選，JSON）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "MusicAdminRead（更新後資料）",
+    "更新成功/失敗提示",
+    "清單刷新"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊音樂列（tr.music-row）開啟 musicDetailModal"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊【儲存】送出更新"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "編輯名稱/製作者/描述/metadata"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "前端驗證",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "未填名稱：顯示錯誤提示"
+          },
+          {
+            "sub_no": "②",
+            "item": "metadata 非合法 JSON：顯示錯誤提示並停止送出"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 PATCH /api/v1/admin/music/{music_id}（JSON：name/composer/description/metadata）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端更新 music 表欄位並 commit（metadata 直接存 JSONB）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示更新結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示「更新成功」，關閉彈窗並重新載入清單"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示錯誤訊息"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "music",
+    "columns": [
+      {
+        "欄位": "name",
+        "中文": "音樂名稱",
+        "型態": "VARCHAR",
+        "長度": 255,
+        "空值": "否",
+        "預設值": null,
+        "備註": "music.name"
+      },
+      {
+        "欄位": "composer",
+        "中文": "製作者",
+        "型態": "VARCHAR",
+        "長度": 255,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.composer"
+      },
+      {
+        "欄位": "description",
+        "中文": "詳細資訊",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.description"
+      },
+      {
+        "欄位": "meta_data",
+        "中文": "Metadata(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "music.meta_data"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

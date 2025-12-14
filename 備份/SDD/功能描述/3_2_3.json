@@ -1,0 +1,108 @@
+{
+  "功能編號": "3-2-3",
+  "功能名稱": "啟用/停用使用者帳號",
+  "功能說明": "管理員可在使用者詳情視窗切換帳號啟用狀態（active）。儲存時若 active 有變更，前端會呼叫 PATCH /admin/users/{user_id} 更新 users.active。停用後使用者登入時會被拒絕（401：帳號已停用）。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_users.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/router/User/service.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入": [
+    "user_id",
+    "active（true/false）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "UserDetailDTO（更新後的 active）",
+    "儲存結果提示（已儲存/失敗）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "在詳情視窗下拉選單選擇帳號啟用（是/否）"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊【儲存】"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "變更判斷",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端比較 originalActive 與 wantActive；未變更則不呼叫 API"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若 active 變更：呼叫 PATCH /api/v1/admin/users/{user_id}（body: {active}）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端更新 users.active 並回傳 UserDetailDTO"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "後續影響",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "使用者 login 時若 active=false：回 401（帳號已停用）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示儲存結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示「已儲存」並關閉視窗"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示錯誤訊息並保留視窗"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users",
+    "columns": [
+      {
+        "欄位": "active",
+        "中文": "帳號啟用",
+        "型態": "BOOLEAN",
+        "長度": null,
+        "空值": "否",
+        "預設值": true,
+        "備註": "users.active"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

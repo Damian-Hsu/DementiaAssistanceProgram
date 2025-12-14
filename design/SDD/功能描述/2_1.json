@@ -1,0 +1,295 @@
+{
+  "功能編號": "2-1",
+  "功能名稱": "首頁",
+  "功能說明": "首頁提供以日期為核心的「今日日記 + 當日 Vlog」整合視圖：使用者可切換日期後查看該日的日記摘要與 Vlog 狀態；日記可手動刷新並可依事件變化自動刷新；Vlog 可查看進度、播放完成影片、生成新 Vlog 或刪除既有 Vlog。",
+  "程式名稱": "services/WebUIServer/app/template/home.html; services/WebUIServer/app/static/js/home.js; services/WebUIServer/app/static/js/diary.js; services/WebUIServer/app/static/js/vlog.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Chat/service.py; services/APIServer/app/router/Vlogs/service.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統",
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "首頁介面",
+      "日記介面",
+      "Vlog介面",
+      "diary資料表",
+      "events資料表",
+      "vlogs資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "首頁介面",
+      "日記介面",
+      "Vlog介面",
+      "diary資料表",
+      "vlogs資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "首頁介面"
+        ],
+        "text": "系統載入首頁介面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "取得目標日期並載入該日日記與 Vlog 資料。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "日記介面",
+          "Vlog介面"
+        ],
+        "text": "顯示當日日記內容與 Vlog 狀態",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "日期切換"
+        ],
+        "text": "滑鼠點選日期切換",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "更新目標日期並重新載入該日日記與 Vlog 資料。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [
+          "首頁介面"
+        ],
+        "text": "更新日期顯示並顯示該日內容",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【刷新日記】"
+        ],
+        "text": "滑鼠點選【刷新日記】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "送出日記生成/刷新請求並寫入 diary 資料表。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "diary資料表"
+        ],
+        "text": "更新日記內容",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❹",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【生成Vlog】"
+        ],
+        "text": "滑鼠點選【生成Vlog】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "事件選擇介面"
+        ],
+        "text": "跳出事件選擇介面",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❺",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【刪除Vlog】"
+        ],
+        "text": "滑鼠點選【刪除Vlog】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【取消】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【確認】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "刪除確認視窗"
+        ],
+        "text": "跳出刪除確認視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❺-①",
+      "parent_step_no": "❺",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【取消】"
+        ],
+        "text": "滑鼠點選【取消】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "刪除確認視窗"
+        ],
+        "text": "關閉刪除確認視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❺-②",
+      "parent_step_no": "❺",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【確認】"
+        ],
+        "text": "滑鼠點選【確認】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "刪除 vlogs 資料表記錄並同步移除相關資源。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "刪除",
+        "objects": [
+          "vlogs資料表"
+        ],
+        "text": "刪除 Vlog 記錄",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "users; diary; events; vlogs; vlog_segments; inference_jobs; music",
+    "columns": [
+      {
+        "欄位": "settings",
+        "中文": "使用者設定",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings（timezone/diary_auto_refresh_interval_minutes/LLM 等）"
+      },
+      {
+        "欄位": "diary_date",
+        "中文": "日記日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "diary.diary_date"
+      },
+      {
+        "欄位": "content",
+        "中文": "日記內容",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "diary.content"
+      },
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.start_time"
+      },
+      {
+        "欄位": "status",
+        "中文": "Vlog 狀態",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "vlogs.status"
+      }
+    ]
+  },
+  "備註": ""
+}

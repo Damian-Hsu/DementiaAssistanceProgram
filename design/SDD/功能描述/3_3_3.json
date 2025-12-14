@@ -1,0 +1,88 @@
+{
+  "功能編號": "3-3-3",
+  "功能名稱": "編輯音樂資訊",
+  "功能說明": "管理員編輯音樂資訊並儲存後，系統更新 music 資料表。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_music.js; services/WebUIServer/app/template/admin_music.html; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Music/service.py; services/APIServer/app/router/Music/DTO.py; services/APIServer/app/DataAccess/tables/music.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "音樂詳情視窗",
+      "music資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "資料庫"
+    ],
+    "資源名詞": [
+      "music資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【名稱】",
+          "【製作者】",
+          "【描述】",
+          "【metadata】"
+        ],
+        "text": "鍵盤輸入【名稱】、【製作者】、【描述】、【metadata】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存】"
+        ],
+        "text": "滑鼠點選【儲存】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "更新 music 資料表欄位。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "music資料表"
+        ],
+        "text": "更新音樂資訊",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "music",
+    "columns": []
+  },
+  "備註": ""
+}

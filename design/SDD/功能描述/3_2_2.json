@@ -1,0 +1,58 @@
+{
+  "功能編號": "3-2-2",
+  "功能名稱": "檢視單一使用者詳情",
+  "功能說明": "管理員點擊使用者後載入詳情並顯示於詳情視窗。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_users.js; services/WebUIServer/app/template/admin_users.html; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/users.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "使用者統計列表",
+      "users資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "使用者詳情視窗"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "使用者列"
+        ],
+        "text": "滑鼠點選使用者列",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "查詢 users 與 api_key_blacklist 並組合使用者詳情。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "使用者詳情視窗"
+        ],
+        "text": "跳出使用者詳情視窗",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "users; api_key_blacklist",
+    "columns": []
+  },
+  "備註": ""
+}

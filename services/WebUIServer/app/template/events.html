@@ -4,8 +4,7 @@
   {% include './partials/header.html'%}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/events.css') }}">
 
-  <div class="page-content">
-    <section class="search-bar">
+  <section class="search-bar">
       <div class="search-group">
         <label for="keywords">事件搜尋</label>
         <input id="keywords" type="text" placeholder="請輸入關鍵字" />
@@ -26,20 +25,22 @@
 
     <section class="events-section">
       <!-- 桌面版表格 -->
-      <table class="table">
-        <thead>
-          <tr>
-            <th data-sort="start_time">發生日期</th>
-            <th>紀錄時間</th>
-            <th>進行行為</th>
-            <th>發生地點</th>
-            <th>事件摘要</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody id="eventsList">
-        </tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th data-sort="start_time">發生日期</th>
+              <th>紀錄時間</th>
+              <th>進行行為</th>
+              <th>發生地點</th>
+              <th>事件摘要</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="eventsList">
+          </tbody>
+        </table>
+      </div>
       
       <!-- 手機版卡片列表 -->
       <div class="events-card-list"></div>
@@ -70,7 +71,6 @@
     <div id="dialogContent"></div>
   </div>
 </dialog>
-  </div>
 
 <script type="module" src="{{ url_for('static', filename='js/events.js') }}"></script>
 

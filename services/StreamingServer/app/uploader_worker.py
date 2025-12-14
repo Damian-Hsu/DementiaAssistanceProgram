@@ -429,14 +429,21 @@ async def _upload_and_create_job(p: Path, meta: Dict[str, Any], rclock: RemoteCl
     if not ok:
         raise RuntimeError(f"file not stable yet: {p}")
 
-    # 1) S3 上傳
-    await asyncio.to_thread(_s3.upload_file, str(p), settings.minio_bucket, meta["s3_key"])
-    _dbg(f"S3 PUT ok -> s3://{settings.minio_bucket}/{meta['s3_key']}")
-
+    # 1) S3 上傳（添加錯誤處理）
+    try:
+        await asyncio.to_thread(_s3.upload_file, str(p), settings.minio_bucket, meta["s3_key"])
+        _dbg(f"S3 PUT ok -> s3://{settings.minio_bucket}/{meta['s3_key']}")
+    except Exception as upload_error:
+        error_msg = f"S3 上傳失敗: {str(upload_error)}"
+        _dbg(f"ERROR: {error_msg}")
+        raise RuntimeError(error_msg) from upload_error
+    
     # 2) HEAD 確認存在（我保守：上傳後立即確認）
     exists = await _s3_object_exists(settings.minio_bucket, meta["s3_key"])
     if not exists:
-        raise RuntimeError(f"S3 object not visible yet: s3://{settings.minio_bucket}/{meta['s3_key']}")
+        error_msg = f"S3 object not visible yet: s3://{settings.minio_bucket}/{meta['s3_key']}"
+        _dbg(f"ERROR: {error_msg}")
+        raise RuntimeError(error_msg)
 
     # 3) 時間對齊 → 建 Job
     start_dt_local = _parse_iso_z(meta["start_iso"])

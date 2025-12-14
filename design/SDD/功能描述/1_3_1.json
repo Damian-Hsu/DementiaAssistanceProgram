@@ -1,0 +1,87 @@
+{
+  "功能編號": "1-3-1",
+  "功能名稱": "側邊欄",
+  "功能說明": "桌面版使用側邊欄提供主要頁面導覽，並依目前頁面狀態高亮導覽項目；管理員與一般使用者顯示不同的側邊欄項目。手機寬度下側邊欄會隱藏，改用底部導覽列。",
+  "程式名稱": "services/WebUIServer/app/template/partials/sidebar.html; services/WebUIServer/app/template/partials/sidebar_admin.html; services/WebUIServer/app/template/base.html; services/WebUIServer/app/static/js/init_user.js; services/WebUIServer/app/static/css/layout.css",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "側邊欄介面"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "側邊欄介面",
+      "目標功能介面"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "側邊欄介面"
+        ],
+        "text": "系統載入側邊欄介面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "依角色切換側邊欄版本，並依目前頁面狀態高亮對應導覽項目。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "側邊欄介面"
+        ],
+        "text": "顯示側邊欄介面並高亮目前頁面",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "導覽項目"
+        ],
+        "text": "滑鼠點選導覽項目",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "切換",
+        "objects": [
+          "目標功能介面"
+        ],
+        "text": "切換至目標功能介面",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  },
+  "備註": "登出按鈕會跳出是否登出視窗，流程請參考 1-2/1-2-1。"
+}

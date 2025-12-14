@@ -1,0 +1,116 @@
+{
+  "功能編號": "3-3-2",
+  "功能名稱": "上傳音樂",
+  "功能說明": "管理員選擇音樂檔並填寫資訊後上傳，系統上傳檔案並建立 music 記錄。",
+  "程式名稱": "services/WebUIServer/app/template/admin_music.html; services/WebUIServer/app/static/js/admin_music.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Music/service.py; services/APIServer/app/utils/s3_utils.py; services/APIServer/app/DataAccess/tables/music.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "檔案",
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "管理員音樂庫管理介面"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "資料庫",
+      "螢幕"
+    ],
+    "資源名詞": [
+      "music資料表",
+      "音樂清單"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "檔案",
+        "verb": "選擇",
+        "objects": [
+          "音樂檔"
+        ],
+        "text": "檔案選擇音樂檔",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【名稱】",
+          "【製作者】",
+          "【描述】",
+          "【metadata】"
+        ],
+        "text": "鍵盤輸入【名稱】、【製作者】、【描述】、【metadata】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【上傳音樂】"
+        ],
+        "text": "滑鼠點選【上傳音樂】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "上傳檔案並建立 music 資料表記錄。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "新增",
+        "objects": [
+          "music資料表"
+        ],
+        "text": "新增音樂資料",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "music",
+    "columns": []
+  },
+  "備註": ""
+}

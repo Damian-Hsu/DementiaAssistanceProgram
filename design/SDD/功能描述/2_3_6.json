@@ -1,0 +1,86 @@
+{
+  "功能編號": "2-3-6",
+  "功能名稱": "顯示影片事件列表",
+  "功能說明": "使用者選取影片後，系統載入該錄影的事件清單並顯示於播放器下方。",
+  "程式名稱": "services/WebUIServer/app/static/js/recordings.js; services/APIServer/app/router/Recordings/service.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統"
+    ],
+    "資源名詞": [
+      "影片管理介面",
+      "events資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "事件列表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "事件列表"
+        ],
+        "text": "系統載入事件列表",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "依 recording_id 查詢 events 並排序後渲染。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "事件列表"
+        ],
+        "text": "顯示影片事件列表",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "events",
+    "columns": [
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.recording_id"
+      },
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.start_time"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.summary"
+      }
+    ]
+  },
+  "備註": ""
+}

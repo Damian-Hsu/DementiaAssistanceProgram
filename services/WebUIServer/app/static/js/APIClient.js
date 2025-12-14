@@ -210,18 +210,18 @@ export const ApiClient = {
   },
 
   // 取得相機列表
-  getCameras: async (userId, status = null, q = null, page = 1, size = 20) => {
+  getCameras: async (userId = null, status = null, q = null, page = 1, size = 20) => {
     try {
       const token = localStorage.getItem('jwt');
       if (!token) {
         throw new Error('請先登入');
       }
 
-      const params = new URLSearchParams({
-        user_id: userId,
-        page: page,
-        size: size
-      });
+      const params = new URLSearchParams({ page: page, size: size });
+      // user_id 可省略：後端會以 JWT 的 current_user.id 作為預設
+      if (userId !== null && userId !== undefined && String(userId).trim() !== "") {
+        params.append('user_id', String(userId));
+      }
       
       if (status) params.append('status', status);
       if (q) params.append('q', q);
@@ -460,7 +460,7 @@ stopStream: async (cameraId) => {
 },
 
   // 取得 RTSP 推流 URL
-  getPublishRtspUrl: async (cameraId, ttl = 300) => {
+  getPublishRtspUrl: async (cameraId, ttl = 10800) => {
     try {
       const token = localStorage.getItem('jwt');
       if (!token) {
@@ -507,53 +507,6 @@ stopStream: async (cameraId) => {
     }
   },
 
-  // 取得 HLS 播放 URL
-  getPlayHlsUrl: async (cameraId, ttl = 300) => {
-    try {
-      const token = localStorage.getItem('jwt');
-      if (!token) {
-        throw new Error('請先登入');
-      }
-
-      const res = await fetch(`${BFF_ROOT}/camera/${cameraId}/play-hls-url?ttl=${ttl}`, {
-        method: "GET",
-        headers: { 
-          "Accept": "application/json",
-          "Authorization": `Bearer ${token}`
-        }
-      });
-      
-      if (!res.ok) {
-        let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
-        try {
-          const errorData = await res.json();
-          if (errorData.detail) {
-            if (Array.isArray(errorData.detail)) {
-              errorMessage = errorData.detail.map(err => `${err.loc?.join('.')}: ${err.msg}`).join(', ');
-            } else {
-              errorMessage = errorData.detail;
-            }
-          }
-        } catch (e) {
-          // 如果無法解析為 JSON，使用預設錯誤訊息
-        }
-        throw new Error(errorMessage);
-      }
-      
-      return await res.json();
-    } catch (error) {
-      console.error("Get play HLS URL error:", error);
-      
-      // 處理不同類型的錯誤
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        if (error.message.includes('Failed to fetch')) {
-          throw new Error('網路連接失敗：請檢查後端服務是否運行，或是否存在CORS跨域問題。請聯繫系統管理員。');
-        }
-      }
-      
-      throw error;
-    }
-  },
 
   // 取得串流狀態
   getStreamStatus: async (cameraId) => {
@@ -596,7 +549,7 @@ stopStream: async (cameraId) => {
   },
 
   // 取得 WebRTC 播放 URL
-  getPlayWebrtcUrl: async (cameraId, ttl = 300) => {
+  getPlayWebrtcUrl: async (cameraId, ttl = 180) => {
     try {
       const token = localStorage.getItem('jwt');
       if (!token) {
@@ -1059,13 +1012,13 @@ recordings: {
   },
 
   // 取得單一錄影的播放/下載連結
-  getUrl: async (recordingId, { ttl = 900, disposition = 'inline', filename = null, type = null } = {}) => {
+  getUrl: async (recordingId, { ttl = 900, disposition = 'inline', filename = null, asset_type = null } = {}) => {
     const token = localStorage.getItem('jwt');
     if (!token) throw new Error('請先登入');
 
     const usp = new URLSearchParams({ ttl, disposition });
     if (filename) usp.set('filename', filename);
-    if (type) usp.set('type', type);
+    if (asset_type) usp.set('asset_type', asset_type);
 
     const res = await fetch(`${BFF_ROOT}/recordings/${encodeURIComponent(recordingId)}?${usp.toString()}`, {
       method: 'GET',
@@ -1263,6 +1216,298 @@ admin: {
     }
   },
 
+  // 系統設定 API
+  settings: {
+    // 獲取預設 Google API Key
+    getDefaultGoogleApiKey: async () => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/settings/default-google-api-key`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    // 設置預設 Google API Key
+    setDefaultGoogleApiKey: async (apiKey, description = null) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/settings/default-google-api-key`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ api_key: apiKey, description })
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    }
+    ,
+    // 取得「系統預設 AI API Key」用量限制（RPM/RPD）
+    getDefaultAiKeyLimits: async () => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/settings/default-ai-key-limits`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    // 設置「系統預設 AI API Key」用量限制（RPM/RPD）
+    setDefaultAiKeyLimits: async ({ rpm, rpd, description = null }) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/settings/default-ai-key-limits`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ rpm, rpd, description })
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    }
+    ,
+    // 獲取系統預設 LLM（供應商/模型）
+    getDefaultLLM: async () => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/settings/default-llm`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    // 設置系統預設 LLM（供應商/模型）
+    setDefaultLLM: async ({ default_llm_provider, default_llm_model, description = null }) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/settings/default-llm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ default_llm_provider, default_llm_model, description })
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    }
+    ,
+    // 取得影片參數（切片長度等）
+    getVideoParams: async () => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/settings/video-params`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    // 設定影片參數（切片長度等）
+    setVideoParams: async ({ segment_seconds, description = null }) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/settings/video-params`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ segment_seconds, description })
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    }
+  },
+
+  // 任務列表 API
+  tasks: {
+    // 獲取任務列表
+    list: async (filters = {}) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const params = new URLSearchParams();
+      if (filters.task_type) params.append('task_type', filters.task_type);
+      if (filters.status_filter) params.append('status_filter', filters.status_filter);
+      if (filters.page) params.append('page', filters.page);
+      if (filters.size) params.append('size', filters.size);
+
+      const res = await fetch(`${BFF_ROOT}/admin/tasks?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    }
+  },
+
+  // 黑名單管理 API
+  blacklist: {
+    // 獲取黑名單列表
+    list: async () => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/blacklist`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    // 添加到黑名單
+    add: async (userId, reason = null) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/blacklist`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ user_id: userId, reason })
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    // 從黑名單移除
+    remove: async (userId) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/blacklist/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    }
+  },
+
+  // 使用者統計 API
+  users: {
+    // 獲取使用者統計
+    getStats: async (filters = {}) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const params = new URLSearchParams();
+      if (filters.page) params.append('page', filters.page);
+      if (filters.size) params.append('size', filters.size);
+
+      const url = `${BFF_ROOT}/admin/users/stats${params.toString() ? '?' + params.toString() : ''}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    // 取得單一使用者詳情（Admin；包含 password_hash）
+    getDetail: async (userId) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+      if (!userId) throw new Error('缺少 userId');
+
+      const res = await fetch(`${BFF_ROOT}/admin/users/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    // 更新使用者啟用狀態（Admin）
+    setActive: async (userId, active) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+      if (!userId) throw new Error('缺少 userId');
+
+      const res = await fetch(`${BFF_ROOT}/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ active: !!active })
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    }
+  },
+
   music: {
     list: async (skip = 0, limit = 100) => {
       const token = localStorage.getItem('jwt');
@@ -1291,6 +1536,24 @@ admin: {
           'Authorization': `Bearer ${token}`
         },
         body: formData
+      });
+
+      if (!res.ok) await handleApiError(res);
+      return await res.json();
+    },
+
+    update: async (musicId, updateData) => {
+      const token = localStorage.getItem('jwt');
+      if (!token) throw new Error('請先登入');
+
+      const res = await fetch(`${BFF_ROOT}/admin/music/${musicId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updateData)
       });
 
       if (!res.ok) await handleApiError(res);
@@ -1470,6 +1733,23 @@ settings: {
       }
     });
     
+    if (!res.ok) await handleApiError(res);
+    return await res.json();
+  },
+
+  // 取得系統預設 LLM（供使用者在「使用系統預設 API Key」時顯示）
+  getSystemDefaultLLM: async () => {
+    const token = localStorage.getItem('jwt');
+    if (!token) throw new Error('請先登入');
+
+    const res = await fetch(`${BFF_ROOT}/users/settings/system-default-llm`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
     if (!res.ok) await handleApiError(res);
     return await res.json();
   }

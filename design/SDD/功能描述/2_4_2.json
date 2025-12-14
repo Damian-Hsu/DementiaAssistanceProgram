@@ -1,0 +1,77 @@
+{
+  "功能編號": "2-4-2",
+  "功能名稱": "檢視單一事件內容",
+  "功能說明": "使用者點擊事件詳情後，系統載入單一事件資料並顯示詳情視窗，必要時提供跳轉至對應影片。",
+  "程式名稱": "services/WebUIServer/app/static/js/events.js; services/APIServer/app/router/Events/service.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "事件檢視介面",
+      "events資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "事件詳情視窗"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【詳情】"
+        ],
+        "text": "滑鼠點選【詳情】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "查詢 events 資料表取得單一事件內容。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "事件詳情視窗"
+        ],
+        "text": "跳出事件詳情視窗",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "events",
+    "columns": [
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "用於跳轉對應影片"
+      },
+      {
+        "欄位": "objects",
+        "中文": "物件清單",
+        "型態": "ARRAY(VARCHAR)",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "以標籤方式呈現"
+      }
+    ]
+  },
+  "備註": ""
+}

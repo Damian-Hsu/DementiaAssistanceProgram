@@ -4,12 +4,11 @@
   {% include './partials/header.html'%}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/user_profile.css') }}">
   
-  <div class="page-content">
-      <!-- 訊息提示 -->
-      <div id="successMessage" class="messagesuccess hidden"></div>
-      <div id="errorMessage" class="messageerror hidden"></div>
+  <!-- 訊息提示 -->
+  <div id="successMessage" class="messagesuccess hidden"></div>
+  <div id="errorMessage" class="messageerror hidden"></div>
 
-      <div class="settings-container">
+  <div class="settings-container">
         <!-- 使用者設定區塊 -->
         <section class="settings-section">
           <div class="settings-section-header">
@@ -84,10 +83,10 @@
               <p><strong>說明：</strong>設定系統自動刷新當天日記的間隔時間（範圍：5-1440 分鐘）。預設為 30 分鐘。系統預設啟用日記自動刷新功能。</p>
             </div>
 
-            <label for="setting_default_stream_ttl">預設串流 TTL（秒）</label>
-            <input id="setting_default_stream_ttl" type="number" min="30" max="3600" step="30" placeholder="300">
+            <label for="setting_default_stream_ttl">串流連結 TTL（秒）</label>
+            <input id="setting_default_stream_ttl" type="number" min="300" max="21600" step="60" placeholder="300">
             <div class="settings-note">
-              <p><strong>說明：</strong>設定相機串流的預設有效時間（範圍：30-3600 秒）。預設為 300 秒（5 分鐘）。此設定會作為建立新串流時的預設值。</p>
+              <p><strong>說明：</strong>設定相機<strong>串流連結</strong>（RTSP 推流連結/建立串流）的預設有效時間（範圍：300-21600 秒）。預設為 300 秒（5 分鐘）。</p>
             </div>
 
             <div class="button-group">
@@ -106,21 +105,38 @@
           </div>
 
           <div class="info-group">
-            <label for="setting_llm_provider">預設 LLM 供應商</label>
+            <label id="label_llm_provider" for="setting_llm_provider">預設 LLM 供應商</label>
             <select id="setting_llm_provider">
               <option value="google">Google (Gemini)</option>
             </select>
 
-            <label for="setting_llm_model">預設 LLM 模型</label>
-            <input id="setting_llm_model" type="text" placeholder="例如：gemini-2.0-flash-exp">
+            <label id="label_llm_model" for="setting_llm_model">預設 LLM 模型</label>
+            <input id="setting_llm_model" type="text" placeholder="例如：gemini-2.5-flash-lite">
 
-            <div class="settings-note">
-              <p><strong>注意：</strong>模型設定需要 API 金鑰。請在下方配置各供應商的 API 金鑰。</p>
-            </div>
+          
+
+            <!-- 使用預設 API Key 選項 -->
+            
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="use_default_api_key" checked>
+                <label class="form-check-label" for="use_default_api_key">
+                  使用系統預設 API Key
+                </label>
+              </div>
+              <div class="settings-note">
+                <p><strong>說明：</strong>勾選此選項將使用系統管理員設定的預設 Google API Key。如果管理員禁止您使用預設 API Key，此選項將自動取消勾選且無法啟用。</p>
+              </div>
+  
+            
+            
+
 
             <!-- LLM 供應商配置 -->
-            <div class="llm-providers-config">
+            <div class="llm-providers-config" id="llmProvidersConfig">
               <h3 class="llm-providers-title">供應商 API 金鑰</h3>
+              <div class="settings-note">
+                <p><strong>說明：</strong>當不使用預設 API Key 時，請在此處輸入您自己的 API 金鑰。</p>
+              </div>
               
               <div class="provider-config-group">
                 <label for="provider_google_api_key">Google API 金鑰</label>
@@ -135,7 +151,11 @@
             </div>
           </div>
         </section>
-    </div>
+
+        <!-- 設定頁面底部：登出按鈕（手機模式方便操作） -->
+        <div class="settings-logout">
+          <button type="button" class="danger" id="logoutbtn_settings">登出</button>
+        </div>
   </div>
 
   <!-- 修改密碼對話框 -->

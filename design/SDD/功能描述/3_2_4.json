@@ -1,0 +1,134 @@
+{
+  "功能編號": "3-2-4",
+  "功能名稱": "預設 API Key 黑名單管理",
+  "功能說明": "管理員可將使用者加入/移除預設 API Key 黑名單；加入時可填原因，並同步停用 users.settings.use_default_api_key。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_users.js; services/WebUIServer/app/template/admin_users.html; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "使用者詳情視窗",
+      "api_key_blacklist資料表",
+      "users資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "資料庫",
+      "螢幕"
+    ],
+    "資源名詞": [
+      "api_key_blacklist資料表",
+      "users資料表",
+      "使用者詳情視窗"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "切換",
+        "objects": [
+          "【黑名單】"
+        ],
+        "text": "滑鼠切換【黑名單】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【加入】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【移除】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【原因】"
+        ],
+        "text": "鍵盤輸入【原因】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存】"
+        ],
+        "text": "滑鼠點選【儲存】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【加入黑名單】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【移除黑名單】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "加入黑名單：寫入 api_key_blacklist 並將 users.settings.use_default_api_key 設為 false；移除黑名單：刪除 api_key_blacklist 記錄。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "api_key_blacklist資料表",
+          "users資料表"
+        ],
+        "text": "更新黑名單狀態",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "api_key_blacklist; users",
+    "columns": []
+  },
+  "備註": "加入黑名單會強制停用 use_default_api_key。"
+}

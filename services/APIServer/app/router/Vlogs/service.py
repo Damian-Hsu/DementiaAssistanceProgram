@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from ...DataAccess.Connect import get_session
 from ...DataAccess.tables import events, diary, vlogs, music as music_table
@@ -65,8 +65,17 @@ async def _remove_previous_daily_vlogs(db: AsyncSession, current_vlog: vlogs.Tab
 
 
 async def _perform_rag_selection(query: str, candidates: List[Dict[str, Any]], top_k: int = 20) -> List[str]:
-    """
-    本地執行 RAG 選擇邏輯 (當 Celery 結果後端未配置時使用)
+    """本地執行 RAG 選擇邏輯（當 Celery 結果後端未配置時使用）。
+    
+    使用 BM25 演算法進行文字檢索，找出與查詢最相關的候選項目。
+    
+    Args:
+        query: 查詢字串
+        candidates: 候選項目列表，每個項目包含 id 和 text
+        top_k: 返回前 k 個最相關的結果
+        
+    Returns:
+        List[str]: 最相關的候選項目 ID 列表
     """
     if not candidates:
         return []
@@ -86,7 +95,7 @@ async def _perform_rag_selection(query: str, candidates: List[Dict[str, Any]], t
             if not chunks:
                 return []
             
-            # 1. BM25 檢索
+            # BM25 檢索
             tokenized_chunks = [list(jieba.cut(chunk)) for chunk in chunks]
             bm25 = BM25Okapi(tokenized_chunks)
             tokenized_query = list(jieba.cut(query))
@@ -94,7 +103,7 @@ async def _perform_rag_selection(query: str, candidates: List[Dict[str, Any]], t
             bm25_ranked_indices = np.argsort(bm25_scores)[::-1]
             bm25_ranked_ids = [ids[i] for i in bm25_ranked_indices]
             
-            # 2. 向量相似度檢索 (如果有 embedding)
+            # 向量相似度檢索（如果有 embedding）
             has_embeddings = any(c.get('embedding') for c in candidates)
             
             if has_embeddings:
@@ -239,12 +248,36 @@ async def ai_select_vlog_clips(
     try:
         # 調用 Celery 任務但不等待結果,改為直接執行邏輯
         from ...DataAccess.task_producer import enqueue
+        from ...DataAccess.tables import inference_jobs
+        from ...DataAccess.tables.__Enumeration import JobStatus
         
-        # 方案 1: 使用 apply() 同步執行
+        # 任務管理追蹤：建立 inference_jobs（rag_highlights）
+        rag_job = inference_jobs.Table(
+            type="rag_highlights",
+            status=JobStatus.pending,
+            input_type="rag",
+            input_url=str(target_date),
+            output_url=None,
+            trace_id=f"rag-{current_user.id}-{target_date.isoformat()}",
+            params={
+                "user_id": int(current_user.id),
+                "limit": int(body.limit),
+                "candidates_count": int(len(candidates)),
+                "progress": 0.0,
+            },
+            metrics=None,
+        )
+        db.add(rag_job)
+        await db.commit()
+        await db.refresh(rag_job)
+
+        # 方案 1: 使用 Celery 同步取結果
         task_result = enqueue("tasks.suggest_vlog_highlights", {
             "query": query,
             "candidates": candidates,
-            "limit": body.limit
+            "limit": body.limit,
+            "job_id": str(rag_job.id),
+            "user_id": int(current_user.id),
         })
         
         # 嘗試獲取結果 (如果配置了結果後端)
@@ -403,6 +436,42 @@ async def create_vlog(
     
     await db.commit()
     
+    # ✅ 任務管理追蹤：建立 inference_jobs（vlog_generation），並把 job_id 存回 vlog.settings
+    # 這樣 /admin/tasks 就能從 inference_jobs 顯示 vlog 任務狀態。
+    try:
+        from ...DataAccess.tables import inference_jobs
+        from ...DataAccess.tables.__Enumeration import JobStatus
+
+        job = inference_jobs.Table(
+            type="vlog_generation",
+            status=JobStatus.pending,
+            input_type="vlog",
+            input_url=None,
+            output_url=None,
+            trace_id=str(new_vlog.id),
+            params={
+                "user_id": int(current_user.id),
+                "vlog_id": str(new_vlog.id),
+                "event_ids": list(body.event_ids or []),
+                "progress": 0.0,
+            },
+            metrics=None,
+        )
+        db.add(job)
+        await db.flush()
+        await db.refresh(job)
+
+        # 將 job_id 存到 settings（避免新增欄位，向後相容）
+        settings_dict = new_vlog.settings if isinstance(new_vlog.settings, dict) else {}
+        settings_dict = {**settings_dict, "job_id": str(job.id)}
+        new_vlog.settings = settings_dict
+        db.add(new_vlog)
+        await db.commit()
+        await db.refresh(new_vlog)
+    except Exception as e:
+        # 不影響主流程：即使任務追蹤寫入失敗，仍允許啟動 vlog 任務
+        print(f"[Vlog API] 建立 inference_jobs 追蹤失敗: {e}")
+
     # 發送到 Compute Server 進行處理
     try:
         task_settings = {
@@ -525,6 +594,41 @@ async def get_vlog_by_date(
             print(f"[Vlog API]   已完成 vlog: id={cv.id}, target_date={cv.target_date}, status={cv.status}")
         raise HTTPException(status_code=404, detail="該日期尚未生成 Vlog")
 
+    # 狀態同步：如果 vlog 處於 processing，但對應的 inference_jobs 已失敗，則同步更新
+    resolved_error_message = None
+    if vlog.status == 'processing':
+        from ...DataAccess.tables import inference_jobs
+        from ...DataAccess.tables.__Enumeration import JobStatus
+        
+        job_id = vlog.settings.get('job_id') if vlog.settings else None
+        if job_id:
+            job_stmt = select(inference_jobs.Table).where(inference_jobs.Table.id == job_id)
+            job_result = await db.execute(job_stmt)
+            job = job_result.scalar_one_or_none()
+            
+            if job and job.status == JobStatus.failed:
+                # inference_jobs 已失敗，同步更新 vlog 狀態
+                print(f"[Vlog API] 偵測到狀態不一致：vlog {vlog.id} 是 processing，但 job {job_id} 已失敗，同步更新")
+                vlog.status = 'failed'
+                resolved_error_message = job.error_message or "任務執行失敗"
+                vlog.status_message = resolved_error_message
+                # vlogs 表沒有 error_message 欄位：寫入 settings 以便前端取得
+                try:
+                    s = vlog.settings if isinstance(vlog.settings, dict) else {}
+                    s = {**s, "error_message": resolved_error_message, "job_id": str(job_id)}
+                    vlog.settings = s
+                except Exception:
+                    pass
+                await db.commit()
+                await db.refresh(vlog)
+
+    # 若未在同步流程取得，從 settings/status_message 取回錯誤資訊（避免 ORM 欄位不存在）
+    if resolved_error_message is None:
+        if isinstance(vlog.settings, dict):
+            resolved_error_message = vlog.settings.get("error_message")
+        if not resolved_error_message and vlog.status == "failed":
+            resolved_error_message = vlog.status_message
+
     return DailyVlogResponse(
         id=str(vlog.id),
         title=vlog.title,
@@ -535,6 +639,7 @@ async def get_vlog_by_date(
         thumbnail_s3_key=vlog.thumbnail_s3_key,
         progress=vlog.progress,
         status_message=vlog.status_message,
+        error_message=resolved_error_message,
         settings=vlog.settings,
         created_at=vlog.created_at,
         updated_at=vlog.updated_at
@@ -601,7 +706,8 @@ async def get_vlog_url(
     vlog_id: uuid.UUID = Path(..., description="Vlog ID"),
     ttl: int = Query(3600, ge=60, le=86400, description="URL 有效時間(秒)"),
     db: AsyncSession = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    request: Request = None
 ):
     """獲取 Vlog 播放 URL (預簽名 S3 URL)"""
     
@@ -632,7 +738,8 @@ async def get_vlog_url(
             normalized_key,
             ttl,
             content_type="video/mp4",
-            content_disposition=disposition
+            content_disposition=disposition,
+            request=request
         )
         expires_at = int(datetime.now(timezone.utc).timestamp()) + ttl
 
@@ -652,7 +759,8 @@ async def get_vlog_thumbnail_url(
     vlog_id: uuid.UUID = Path(..., description="Vlog ID"),
     ttl: int = Query(3600, ge=60, le=86400, description="URL 有效時間(秒)"),
     db: AsyncSession = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_user),
+    request: Request = None
 ):
     """獲取 Vlog 縮圖 URL (預簽名 S3 URL)"""
     
@@ -680,7 +788,8 @@ async def get_vlog_thumbnail_url(
             normalized_key,
             ttl,
             content_type="image/jpeg",
-            content_disposition=disposition
+            content_disposition=disposition,
+            request=request
         )
         expires_at = int(datetime.now(timezone.utc).timestamp()) + ttl
 
@@ -823,7 +932,7 @@ async def internal_update_vlog_status(
     
     # 記錄更新前的狀態（用於調試）
     print(f"[Vlog API] 更新 vlog 狀態: vlog_id={vlog_id}, 當前 target_date={vlog.target_date}, 當前 status={vlog.status}")
-    print(f"[Vlog API] 更新內容: status={body.status}, s3_key={body.s3_key}, duration={body.duration}")
+    print(f"[Vlog API] 更新內容: status={body.status}, s3_key={body.s3_key}, duration={body.duration}, thumbnail_s3_key={body.thumbnail_s3_key}")
     
     # 更新狀態
     if body.status:
@@ -835,6 +944,10 @@ async def internal_update_vlog_status(
     
     if body.thumbnail_s3_key:
         vlog.thumbnail_s3_key = body.thumbnail_s3_key
+        print(f"[Vlog API] 已設置縮圖路徑: {body.thumbnail_s3_key}")
+    elif body.thumbnail_s3_key is None and body.status == 'completed':
+        # 如果狀態是完成但沒有縮圖，記錄警告
+        print(f"[Vlog API] 警告: Vlog {vlog_id} 完成但沒有縮圖路徑")
     
     if body.duration is not None:
         vlog.duration = body.duration
@@ -845,14 +958,87 @@ async def internal_update_vlog_status(
     if body.status_message is not None:
         vlog.status_message = body.status_message
         
-    # 如果失敗,可以記錄錯誤信息 (目前 vlogs 表沒有 error_message 字段,暫時打印)
+    # 處理錯誤信息
     if body.error_message and (body.status == 'failed' or vlog.status == 'failed'):
         print(f"Vlog {vlog_id} 生成失敗: {body.error_message}")
+        # 將 error_message 寫入 vlog.status_message (因為 vlogs 表沒有 error_message 欄位)
+        if not vlog.status_message or "失敗" in body.error_message:
+            vlog.status_message = body.error_message
+        # 同時寫入 settings，供前端顯示更明確的錯誤原因
+        try:
+            s = vlog.settings if isinstance(vlog.settings, dict) else {}
+            vlog.settings = {**s, "error_message": body.error_message}
+        except Exception:
+            pass
     
     # 如果同一天已有舊影片，完成後清除舊檔
     if vlog.status == 'completed' and vlog.s3_key:
         await _remove_previous_daily_vlogs(db, vlog)
     
+    # ✅ 同步更新 inference_jobs（若此 vlog 有被追蹤）
+    try:
+        from ...DataAccess.tables import inference_jobs
+        from ...DataAccess.tables.__Enumeration import JobStatus
+        
+        # 優先使用 body.job_id，否則從 vlog.settings 中獲取
+        job_id = body.job_id
+        if not job_id and isinstance(vlog.settings, dict):
+            job_id = vlog.settings.get("job_id")
+        
+        if job_id:
+            try:
+                jid = uuid.UUID(str(job_id))
+            except Exception:
+                jid = None
+            if jid:
+                job_stmt = select(inference_jobs.Table).where(inference_jobs.Table.id == jid)
+                job_res = await db.execute(job_stmt)
+                job = job_res.scalar_one_or_none()
+                if job:
+                    # status 映射：vlog(pending/processing/completed/failed) -> inference_jobs(pending/processing/success/failed)
+                    vlog_status = (body.status or vlog.status or "").lower()
+                    mapped = {
+                        "pending": JobStatus.pending,
+                        "processing": JobStatus.processing,
+                        "completed": JobStatus.success,
+                        "failed": JobStatus.failed,
+                    }.get(vlog_status, job.status)
+                    job.status = mapped
+                    if vlog.s3_key:
+                        job.output_url = vlog.s3_key
+                    # params: progress / status_message / vlog_id
+                    params = job.params if isinstance(job.params, dict) else {}
+                    if body.progress is not None:
+                        params["progress"] = max(0.0, min(100.0, float(body.progress)))
+                    if body.status_message is not None:
+                        params["status_message"] = body.status_message
+                    params["vlog_id"] = str(vlog.id)
+                    params["user_id"] = int(vlog.user_id)
+                    job.params = params
+                    
+                    # 同步 progress
+                    if body.progress is not None:
+                        job.progress = body.progress
+                    elif vlog.progress is not None:
+                        job.progress = vlog.progress
+                    
+                    # 同步 error_message
+                    if body.error_message:
+                        job.error_message = body.error_message
+                    
+                    # 同步 duration
+                    if body.duration is not None:
+                        job.duration = body.duration
+                        metrics = job.metrics if isinstance(job.metrics, dict) else {}
+                        metrics["duration"] = float(body.duration)
+                        job.metrics = metrics
+                    
+                    job.updated_at = datetime.now(timezone.utc)
+                    db.add(job)
+                    print(f"[Vlog API] 同步更新 inference_jobs: job_id={jid}, status={mapped.value}, progress={job.progress}, error={job.error_message}")
+    except Exception as e:
+        print(f"[Vlog API] 更新 inference_jobs 追蹤失敗: {e}")
+
     await db.commit()
     await db.refresh(vlog)
     

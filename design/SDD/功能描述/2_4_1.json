@@ -1,0 +1,105 @@
+{
+  "功能編號": "2-4-1",
+  "功能名稱": "事件列表查詢",
+  "功能說明": "使用者依關鍵字與日期範圍查詢事件列表，並可切換排序與分頁。",
+  "程式名稱": "services/WebUIServer/app/static/js/events.js; services/APIServer/app/router/Events/service.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "事件檢視介面",
+      "events資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "事件列表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【關鍵字】",
+          "【日期範圍】"
+        ],
+        "text": "鍵盤輸入【關鍵字】、【日期範圍】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【篩選】"
+        ],
+        "text": "滑鼠點選【篩選】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "依條件查詢 events 資料表並回傳分頁列表。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "事件列表"
+        ],
+        "text": "顯示事件列表",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "events",
+    "columns": [
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "日期範圍查詢與排序"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "關鍵字搜尋"
+      }
+    ]
+  },
+  "備註": ""
+}

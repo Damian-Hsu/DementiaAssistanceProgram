@@ -1,0 +1,185 @@
+{
+  "功能編號": "3-2",
+  "功能名稱": "使用者管理",
+  "功能說明": "管理員可查看一般使用者的統計資訊（Token 使用量、聊天訊息數、是否使用系統預設 API Key、黑名單狀態），並可點擊查看單一使用者詳情、啟用/停用帳號，以及管理「預設 API Key 黑名單」（禁止該使用者使用系統預設 Google API Key；加入黑名單時會同步把 users.settings.use_default_api_key 設為 false）。",
+  "程式名稱": "services/WebUIServer/app/template/admin_users.html; services/WebUIServer/app/static/js/admin_users.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/users.py; services/APIServer/app/DataAccess/tables/llm_usage_logs.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統",
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "管理員使用者管理介面",
+      "users資料表",
+      "api_key_blacklist資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "管理員使用者管理介面",
+      "users資料表",
+      "api_key_blacklist資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "管理員使用者管理介面"
+        ],
+        "text": "系統載入管理員使用者管理介面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "查詢使用者統計並顯示列表。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "使用者統計列表"
+        ],
+        "text": "顯示使用者統計列表",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "使用者列"
+        ],
+        "text": "滑鼠點選使用者列",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "查詢單一使用者詳情並開啟詳情視窗。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "使用者詳情視窗"
+        ],
+        "text": "跳出使用者詳情視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存】"
+        ],
+        "text": "滑鼠點選【儲存】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "更新 users.active 或黑名單狀態，必要時同步停用 use_default_api_key。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "users資料表",
+          "api_key_blacklist資料表"
+        ],
+        "text": "更新使用者狀態與黑名單",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "users; llm_usage_logs; api_key_blacklist",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": "autoincrement",
+        "備註": "users.id"
+      },
+      {
+        "欄位": "active",
+        "中文": "帳號啟用",
+        "型態": "BOOLEAN",
+        "長度": null,
+        "空值": "否",
+        "預設值": true,
+        "備註": "users.active（啟用/停用）"
+      },
+      {
+        "欄位": "settings",
+        "中文": "使用者設定(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings.use_default_api_key"
+      },
+      {
+        "欄位": "total_tokens",
+        "中文": "總 Token 數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.total_tokens（聚合 sum）"
+      },
+      {
+        "欄位": "assistant_replies",
+        "中文": "AI 助手回覆次數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.assistant_replies（聚合；聊天訊息數取 chat source）"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "黑名單使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_key_blacklist.user_id（Primary Key）"
+      },
+      {
+        "欄位": "reason",
+        "中文": "黑名單原因",
+        "型態": "VARCHAR",
+        "長度": 500,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_key_blacklist.reason"
+      }
+    ]
+  },
+  "備註": "僅管理員可使用。"
+}

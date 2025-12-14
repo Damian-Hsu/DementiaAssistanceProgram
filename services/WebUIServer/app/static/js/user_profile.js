@@ -397,15 +397,105 @@ async function loadModelSettings() {
       return;
     }
     
-    // 填充模型設定
-    if (settings.default_llm_provider) {
-      const providerSelect = document.getElementById('setting_llm_provider');
-      if (providerSelect) providerSelect.value = settings.default_llm_provider;
+    // 獲取系統預設的 LLM provider 和 model
+    let systemDefaultLLM = null;
+    try {
+      systemDefaultLLM = await ApiClient.settings.getSystemDefaultLLM();
+    } catch (e) {
+      console.warn('[settings] 獲取系統預設 LLM 失敗：', e);
     }
     
-    if (settings.default_llm_model) {
-      const modelInput = document.getElementById('setting_llm_model');
-      if (modelInput) modelInput.value = settings.default_llm_model;
+    // 填充模型設定
+    const providerSelect = document.getElementById('setting_llm_provider');
+    const modelInput = document.getElementById('setting_llm_model');
+    const useDefaultApiKeyCheckbox = document.getElementById('use_default_api_key');
+    const llmProvidersConfig = document.getElementById('llmProvidersConfig');
+    const labelProvider = document.getElementById('label_llm_provider');
+    const labelModel = document.getElementById('label_llm_model');
+    
+    // 記住使用者自己的 provider/model（取消勾選時要還原）
+    const userOwnProvider = settings.default_llm_provider || 'google';
+    const userOwnModel = settings.default_llm_model || '';
+
+    // 更新標題和 UI 的函數
+    const updateUIForDefaultApiKey = (useDefault) => {
+      // 更新標題
+      if (labelProvider) {
+        labelProvider.textContent = useDefault ? '預設 LLM 供應商' : 'LLM 供應商';
+      }
+      if (labelModel) {
+        labelModel.textContent = useDefault ? '預設 LLM 模型' : 'LLM 模型';
+      }
+      
+      // 禁用/啟用 LLM provider 和 model 選擇
+      if (providerSelect) {
+        providerSelect.disabled = useDefault;
+      }
+      if (modelInput) {
+        modelInput.disabled = useDefault;
+      }
+      
+      // 根據是否使用預設 API Key 來顯示/隱藏供應商配置
+      if (llmProvidersConfig) {
+        llmProvidersConfig.style.display = useDefault ? 'none' : 'block';
+      }
+    };
+
+    // 填充 use_default_api_key 選項
+    if (useDefaultApiKeyCheckbox) {
+      useDefaultApiKeyCheckbox.checked = settings.use_default_api_key !== false; // 預設為 true
+      
+      // 根據是否使用預設 API Key 來控制 UI
+      const useDefault = useDefaultApiKeyCheckbox.checked;
+      
+      // 初始化 UI 狀態
+      updateUIForDefaultApiKey(useDefault);
+      
+      // 如果使用系統預設，填充系統預設值到顯示欄位（但不允許編輯）
+      if (useDefault && systemDefaultLLM) {
+        if (providerSelect) {
+          providerSelect.value = systemDefaultLLM.default_llm_provider || 'google';
+        }
+        if (modelInput) {
+          modelInput.value = systemDefaultLLM.default_llm_model || '';
+        }
+      } else {
+        // 如果不使用系統預設，填充使用者自己的設定
+        if (settings.default_llm_provider && providerSelect) {
+          providerSelect.value = settings.default_llm_provider;
+        }
+        if (settings.default_llm_model && modelInput) {
+          modelInput.value = settings.default_llm_model;
+        }
+      }
+      
+      // 綁定事件：當勾選狀態改變時，更新 UI
+      useDefaultApiKeyCheckbox.addEventListener('change', async () => {
+        const useDefault = useDefaultApiKeyCheckbox.checked;
+        
+        // 更新標題和 UI
+        updateUIForDefaultApiKey(useDefault);
+        
+        if (useDefault) {
+          // 重新獲取系統預設值
+          try {
+            const systemDefault = await ApiClient.settings.getSystemDefaultLLM();
+            // 更新顯示欄位
+            if (providerSelect) {
+              providerSelect.value = systemDefault.default_llm_provider || 'google';
+            }
+            if (modelInput) {
+              modelInput.value = systemDefault.default_llm_model || '';
+            }
+          } catch (e) {
+            console.warn('[settings] 獲取系統預設 LLM 失敗：', e);
+          }
+        } else {
+          // 取消勾選時，還原使用者自己的 provider/model（避免一直顯示系統預設）
+          if (providerSelect) providerSelect.value = userOwnProvider;
+          if (modelInput) modelInput.value = userOwnModel;
+        }
+      });
     }
     
     // 填充 LLM 供應商 API 金鑰（根據 API 格式：llm_model_api.providers）
@@ -445,19 +535,33 @@ async function saveModelSettings() {
 
     setBtnLoading(btn, true);
 
-    const updateData = {
-      default_llm_provider: document.getElementById('setting_llm_provider')?.value || undefined,
-      default_llm_model: document.getElementById('setting_llm_model')?.value || undefined,
-    };
+    // 獲取 use_default_api_key 選項
+    const useDefaultApiKeyCheckbox = document.getElementById('use_default_api_key');
+    const useDefault = !!useDefaultApiKeyCheckbox?.checked;
+
+    // 使用者勾選「使用系統預設 API Key」時，不允許指定模型/供應商：
+    // - 後端會強制使用系統預設 provider/model
+    // - 前端更新設定時也不送 default_llm_provider/default_llm_model，避免寫入或誤導
+    const updateData = {};
+    if (useDefaultApiKeyCheckbox) {
+      updateData.use_default_api_key = useDefault;
+    }
 
     // 構建 LLM 供應商配置（只支援 Google）
+    // 只有在不使用預設 API Key 時才需要設定
+    if (!useDefault) {
+      updateData.default_llm_provider = document.getElementById('setting_llm_provider')?.value || undefined;
+      updateData.default_llm_model = document.getElementById('setting_llm_model')?.value || undefined;
+
     const llmProviders = {};
     const googleKey = (document.getElementById('provider_google_api_key')?.value || '').trim();
 
     // 只發送 Google 的設定
+      if (googleKey) {
     llmProviders.google = { api_key: googleKey, model_names: [] };
-
     updateData.llm_providers = llmProviders;
+      }
+    }
 
     // 移除 undefined 值
     Object.keys(updateData).forEach(key => {

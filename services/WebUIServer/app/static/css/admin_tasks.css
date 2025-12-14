@@ -1,0 +1,894 @@
+@import url('./components.css');
+
+.events-section {
+  background: var(--bg-main, #F5EBDD);
+  border-radius: calc(var(--radius-lg, 16px) + 4px);
+  padding: var(--spacing-lg, 24px) 0;
+  margin-bottom: 0; /* 移除多餘的 margin-bottom */
+  overflow-y: visible;
+  overflow-x: hidden;
+  max-height: none;
+}
+
+/* --- 搜尋列：對齊事件列表的排版方式（桌面：同一行；小螢幕：垂直堆疊） --- */
+.search-bar {
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1.5fr 1.5fr auto; /* 任務類型、狀態、刷新 */
+  gap: 12px 16px;
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.search-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-group label {
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-accent, #6B4F4F);
+  flex-shrink: 0;
+}
+
+.search-group select {
+  width: 100%;
+  max-width: none;
+}
+
+/* 限制任務類型和狀態選單在桌面版的寬度 */
+@media (min-width: 1100px) {
+  .search-group:first-child select {
+    max-width: 200px; /* 任務類型選單不需要這麼長 */
+  }
+  .search-group:nth-child(2) select {
+    max-width: 200px; /* 狀態選單不需要這麼長 */
+  }
+}
+
+.search-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+  justify-content: flex-end;
+}
+
+/* 刷新圖示按鈕：固定為 44x44 */
+#refreshTasks.btn-primary {
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--radius-md, 12px);
+}
+
+@media (max-width: 1100px) {
+  .search-bar {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .search-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* --- 分頁：完整沿用事件列表的排版，避免 number input 被全域 width:100% 撐爆 --- */
+.pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  flex-wrap: wrap;
+}
+
+.pagination #pageInput {
+  width: 50px;
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  border: 2px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-sm, 8px);
+  font-size: var(--font-size-base, 16px);
+  background-color: #fff;
+  color: var(--color-text, #2E2E2E);
+  text-align: center;
+  box-sizing: border-box;
+  min-height: 36px;
+}
+
+.pagination #pageInput:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+}
+
+.pagination span {
+  font-size: var(--font-size-base, 16px);
+  color: var(--color-text, #2E2E2E);
+  white-space: nowrap;
+}
+
+.pagination .page-btn {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--color-border, #D3C0A8);
+  background: var(--bg-button, #F3F0EB);
+  color: var(--color-text, #2E2E2E);
+  font-size: var(--font-size-base, 16px);
+  cursor: pointer;
+  transition: all var(--transition-normal, 0.2s ease);
+  min-height: 36px;
+  min-width: 36px;
+  /* 覆蓋 components.css 的 button primary 外觀 */
+  box-shadow: none;
+}
+
+.pagination .page-btn:hover:not(:disabled) {
+  background: var(--color-accent, #6B4F4F);
+  color: #fff;
+  border-color: var(--color-accent, #6B4F4F);
+  transform: none;
+}
+
+.pagination .page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  margin-left: var(--spacing-md, 16px);
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text, #2E2E2E);
+}
+
+.pagination-info input {
+  width: 60px;
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  border: 2px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-sm, 8px);
+  font-size: var(--font-size-base, 16px);
+  background-color: #fff;
+  color: var(--color-text, #2E2E2E);
+  text-align: center;
+  box-sizing: border-box;
+  min-height: 36px;
+}
+
+.pagination-info input:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+}
+
+.admin-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 32px;
+}
+
+.admin-card {
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 12px 35px rgba(27, 46, 94, 0.08);
+  padding: 28px 32px;
+}
+
+.admin-card .section-header {
+  margin-bottom: 20px;
+}
+
+.admin-card h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 0;
+  color: #243654;
+}
+
+.section-subtitle {
+  margin-top: 6px;
+  color: #6b7a99;
+  font-size: 0.95rem;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.admin-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.admin-form .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: #314268;
+  /* 確保 form-field 包含所有子元素 */
+  box-sizing: border-box;
+  width: 100%;
+  overflow: visible;
+}
+
+/* 排除 form-check-label，讓 Bootstrap 處理 */
+.admin-form .form-field > label:not(.form-check-label) {
+  display: block;
+}
+
+.admin-form .form-field input:not([type="checkbox"]):not([type="radio"]):not(.form-check-input),
+.admin-form .form-field textarea {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #d7dce5;
+  background-color: #f9fbff;
+  font-size: 0.95rem;
+}
+
+.admin-form .form-field textarea {
+  resize: vertical;
+}
+
+.admin-form .file-field input[type="file"] {
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+}
+
+.admin-form .form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 統一按鈕樣式 - 使用標準圓角 */
+.admin-form .form-actions .btn,
+.admin-form .form-actions .btn-primary,
+.admin-form .form-actions .btn-secondary,
+.admin-form .form-actions .btn-danger {
+  padding: 10px 20px;
+  border-radius: 12px; /* 統一使用 --radius-md (12px) */
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  min-height: 44px; /* 無障礙最小點擊區域 */
+}
+
+.admin-form .form-actions .btn-primary,
+.admin-form .form-actions .btn.primary {
+  background-color: var(--color-accent, #6B4F4F);
+  color: #ffffff;
+}
+
+.admin-form .form-actions .btn-primary:hover,
+.admin-form .form-actions .btn.primary:hover {
+  background-color: var(--color-secondary, #A47148);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.admin-form .form-actions .btn-secondary {
+  background-color: var(--bg-button, #F3F0EB);
+  color: var(--color-text, #2E2E2E);
+}
+
+.admin-form .form-actions .btn-secondary:hover {
+  background-color: var(--bg-button-hover, #E2D7C5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.admin-form .form-actions .btn-danger {
+  background-color: #C45B5B;
+  color: #ffffff;
+}
+
+.admin-form .form-actions .btn-danger:hover {
+  background-color: #B04A4A;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.admin-form .form-actions .btn:disabled,
+.admin-form .form-actions .btn-primary:disabled,
+.admin-form .form-actions .btn-secondary:disabled,
+.admin-form .form-actions .btn-danger:disabled {
+  background-color: #D3C0A8;
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}
+
+.admin-form .form-hint {
+  font-size: 0.9rem;
+  color: #4a5c84;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: 18px;
+  border: 1px solid #e2e8f2;
+}
+
+/* Bootstrap 表格樣式覆蓋 - 保留自定義樣式 */
+.admin-table-container .table-responsive {
+  border-radius: 18px;
+  border: 1px solid #e2e8f2;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-table-container .table {
+  margin-bottom: 0;
+  min-width: 720px;
+}
+
+.admin-table-container .table thead th {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4a5c84;
+}
+
+.admin-table-container .table tbody td {
+  font-size: 0.95rem;
+  vertical-align: middle;
+}
+
+.admin-table-container .table .status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.admin-table-container .table .status-active {
+  background: rgba(64, 182, 95, 0.15);
+  color: #2a8c51;
+}
+
+.admin-table-container .table .status-inactive {
+  background: rgba(230, 95, 95, 0.15);
+  color: #c23c3c;
+}
+
+/* 任務狀態徽章樣式 */
+.status-pending {
+  background: rgba(255, 193, 7, 0.15);
+  color: #b8860b;
+}
+
+.status-processing {
+  background: rgba(33, 150, 243, 0.15);
+  color: #1976d2;
+}
+
+.status-running {
+  background: rgba(64, 182, 95, 0.15);
+  color: #2a8c51;
+}
+
+.status-starting {
+  background: rgba(156, 39, 176, 0.15);
+  color: #7b1fa2;
+}
+
+.status-success {
+  background: rgba(64, 182, 95, 0.15);
+  color: #2a8c51;
+}
+
+.status-failed {
+  background: rgba(230, 95, 95, 0.15);
+  color: #c23c3c;
+}
+
+.status-error {
+  background: rgba(244, 67, 54, 0.15);
+  color: #c62828;
+}
+
+.status-stopped {
+  background: rgba(158, 158, 158, 0.15);
+  color: #616161;
+}
+
+.status-reconnecting {
+  background: rgba(255, 152, 0, 0.15);
+  color: #e65100;
+}
+
+.status-unknown {
+  background: rgba(158, 158, 158, 0.15);
+  color: #616161;
+}
+
+.admin-table-container .table .table-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* API Key 表格行樣式 */
+.admin-table-container .table tbody tr.api-key-row {
+  transition: background-color 0.2s ease;
+}
+
+.admin-table-container .table tbody tr.api-key-row:hover {
+  background-color: #f8f9fa;
+  cursor: pointer;
+}
+
+.admin-table-container .table .empty-row td,
+.admin-table-container .table td.text-center {
+  text-align: center;
+  color: #7a8aa6;
+  padding: 28px 16px;
+}
+
+.music-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.music-item {
+  border: 1px solid #e2e8f2;
+  border-radius: 18px;
+  padding: 16px 18px;
+  background: #fafcff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.music-item header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.music-item h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #22345b;
+}
+
+.music-meta {
+  font-size: 0.85rem;
+  color: #65738c;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.music-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.empty-state {
+  padding: 22px;
+  background: #f5f7fb;
+  border-radius: 16px;
+  color: #6c7c96;
+  text-align: center;
+}
+
+/* 任務過濾器樣式 */
+.task-filters {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-group label {
+  font-size: 0.9rem;
+  color: #4a5c84;
+  font-weight: 500;
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #d7dce5;
+  background-color: #ffffff;
+  font-size: 0.9rem;
+  color: #314268;
+  cursor: pointer;
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+/* 任務表格行樣式 */
+.admin-table-container .table tbody tr.task-row {
+  transition: background-color 0.2s ease;
+}
+
+.admin-table-container .table tbody tr.task-row:hover {
+  background-color: #f8f9fa;
+  cursor: pointer;
+}
+
+/* 音樂表格行樣式 */
+.admin-table-container .table tbody tr.music-row {
+  transition: background-color 0.2s ease;
+}
+
+.admin-table-container .table tbody tr.music-row:hover {
+  background-color: #f8f9fa;
+  cursor: pointer;
+}
+
+/* 模態框樣式 - 使用與 vlog 對話框相同的樣式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-overlay.show {
+  display: flex;
+}
+
+.modal-container {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 2px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.modal-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.modal-close {
+  background: transparent !important;
+  font-size: 28px;
+  color: #6B4F4F;
+  cursor: pointer;
+  display: inline-block;
+  transition: color 0.2s;
+  user-select: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  outline: none;
+}
+
+.modal-close:hover {
+  background: transparent !important;
+  color: #A47148;
+}
+
+.modal-close:active {
+  background: transparent !important;
+  color: #6B4F4F;
+}
+
+.modal-close:focus {
+  background: transparent !important;
+  outline: none;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 2px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.modal-footer .btn {
+  min-width: 100px;
+}
+
+.task-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-section h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #243654;
+  font-weight: 600;
+}
+
+/* 詳情表格使用 Bootstrap 樣式 */
+.task-detail .table-responsive {
+  margin-top: 12px;
+}
+
+.task-detail .table th {
+  font-weight: 600;
+  color: #4a5c84;
+  width: 140px;
+  background-color: #f8f9fa;
+}
+
+.task-detail .table td {
+  font-size: 0.9rem;
+}
+
+.error-message {
+  padding: 12px;
+  background: rgba(244, 67, 54, 0.1);
+  border-left: 4px solid #c62828;
+  border-radius: 8px;
+  color: #c62828;
+  font-size: 0.9rem;
+}
+
+.detail-json {
+  background: #f5f7fb;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  font-family: 'Courier New', monospace;
+  color: #314268;
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* 編輯 API Key 對話框樣式 - 使用與 vlog 對話框相同的樣式 */
+#editApiKeyDialog.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+#editApiKeyDialog.modal-overlay.show {
+  display: flex;
+}
+
+#editApiKeyDialog .modal-container {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+#editApiKeyDialog .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 2px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+#editApiKeyDialog .modal-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+#editApiKeyDialog .modal-close {
+  background: transparent !important;
+  font-size: 28px;
+  color: #6B4F4F;
+  cursor: pointer;
+  display: inline-block;
+  transition: color 0.2s;
+  user-select: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  /* 確保可以點擊 */
+  pointer-events: auto !important;
+  z-index: 10;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  text-align: center;
+}
+
+#editApiKeyDialog .modal-close:hover {
+  background: transparent !important;
+  color: #A47148;
+}
+
+#editApiKeyDialog .modal-close:active {
+  background: transparent !important;
+  color: #6B4F4F;
+}
+
+#editApiKeyDialog .modal-close:focus {
+  background: transparent !important;
+  outline: none;
+}
+
+#editApiKeyDialog .modal-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#editApiKeyDialog .admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Scopes 複選框樣式 */
+.scopes-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #f9fbff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f2;
+  /* 確保容器包含所有子元素 */
+  box-sizing: border-box;
+  overflow: visible;
+  width: 100%;
+}
+
+/* Bootstrap form-check 樣式覆蓋 - 只覆蓋必要的樣式，保留 Bootstrap 的對齊 */
+.scopes-checkbox-group .form-check {
+  margin-bottom: 0.125rem; /* Bootstrap 默認值 */
+  /*
+    Bootstrap `.form-check-input` 會用 `margin-left: -1.5em` 來把 checkbox 拉到左側。
+    若 `.form-check` 左側 padding 不足，checkbox 會被負 margin 推到容器外。
+    這裡保留原本的上下/左右 padding，並把左側 padding 調整為 `1.5em + 6px`，
+    讓 checkbox 仍然在容器內且視覺上有一致的內距。
+  */
+  padding: 4px 6px 4px calc(1.5em + 6px);
+  border-radius: 6px;
+  transition: background-color 0.2s;
+  /* 確保使用 Bootstrap 的 display */
+  display: block;
+  pointer-events: auto;
+  /* 確保 label 正常顯示 */
+  min-height: 1.5em; /* Bootstrap 默認值 */
+  /* 確保 form-check 不會溢出容器 */
+  box-sizing: border-box;
+  width: 100%;
+  position: relative;
+}
+
+.scopes-checkbox-group .form-check:hover {
+  background-color: #f1f5fb;
+}
+
+.scopes-checkbox-group .form-check-input {
+  cursor: pointer;
+  /* 讓 Bootstrap 完全接管 checkbox 的外觀 */
+  /* 確保可以點擊 */
+  pointer-events: auto !important;
+}
+
+.scopes-checkbox-group .form-check-label {
+  font-size: 0.9rem;
+  color: #314268;
+  cursor: pointer;
+  user-select: none;
+  /* 確保可以點擊 */
+  pointer-events: auto;
+  /* 確保 label 正常顯示 - 使用 Bootstrap 默認的 display */
+  /* Bootstrap 默認是 inline-block，不需要額外設置 */
+  margin-bottom: 0;
+  /* 確保 label 文字可見 */
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .admin-card {
+    padding: 20px;
+  }
+
+  .admin-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-table-container .table {
+    min-width: 560px;
+  }
+
+  .music-list {
+    grid-template-columns: 1fr;
+  }
+}
+

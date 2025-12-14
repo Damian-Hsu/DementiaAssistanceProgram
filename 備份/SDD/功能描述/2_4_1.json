@@ -1,0 +1,104 @@
+{
+  "功能編號": "2-4-1",
+  "功能名稱": "事件列表查詢",
+  "功能說明": "使用者依關鍵字與日期範圍篩選事件列表，並可切換排序與分頁；前端呼叫 events 列表 API，後端依使用者時區將日期轉為 UTC 範圍查詢並回傳分頁資料。",
+  "程式名稱": "services/WebUIServer/app/static/js/events.js; services/APIServer/app/router/Events/service.py",
+  "輸入": [
+    "keywords（可選）",
+    "sr（可選）",
+    "start_time/end_time（可選）",
+    "sort",
+    "page/size",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "EventListResp",
+    "事件列表 UI",
+    "分頁資訊（page_total/totalCount）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "輸入事件搜尋 keywords"
+          },
+          {
+            "sub_no": "②",
+            "item": "選擇起始日期 start 與結束日期 end"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊「篩選」或操作分頁/排序"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /api/v1/events（keywords/start_time/end_time/sr/sort/page/size）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "畫面渲染",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "桌面以表格顯示；手機以卡片顯示；同步更新分頁 UI"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示事件列表或「沒有資料」提示"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "events",
+    "columns": [
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "日期範圍查詢與排序"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "關鍵字搜尋"
+      }
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "功能編號": "2-4-4",
+  "功能名稱": "刪除事件",
+  "功能說明": "使用者在事件列表點擊刪除並確認後，前端呼叫刪除事件 API；後端刪除 events 記錄並回傳 ok，前端刷新列表並在需要時將頁碼往前一頁避免空頁。",
+  "程式名稱": "services/WebUIServer/app/static/js/events.js; services/APIServer/app/router/Events/service.py",
+  "輸入": [
+    "event_id",
+    "使用者確認刪除",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "OkResp（ok=true）",
+    "事件列表刷新"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊事件列表「刪除」按鈕（data-action=delete）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "對話框確認",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "在 confirm 對話框選擇確定"
+          },
+          {
+            "sub_no": "②",
+            "item": "或取消刪除"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "分支處理",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "取消：不呼叫 API"
+          },
+          {
+            "sub_no": "②",
+            "item": "確定：呼叫 DELETE /api/v1/events/{event_id}"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "畫面更新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "刪除成功後重新載入列表；若刪除後該頁只剩 1 筆且 pageNow>1，則 pageNow--"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "事件從列表移除並顯示提示"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "events",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "事件ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "刪除目標"
+      }
+    ]
+  }
+}

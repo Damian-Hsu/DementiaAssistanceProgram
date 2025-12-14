@@ -34,7 +34,8 @@ services:
     image: redis:7
     container_name: demo_redis
     restart: always
-    ports: ["30600:6379"]
+    # 端口不直接暴露，這是內部服務
+    # ports: ["30600:6379"]
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     networks:
       - demo-network
@@ -54,9 +55,14 @@ services:
     #command: server --console-address ":9001" /data
     #volumes:
     #  - ../datas/minio/data:/data
+    # MinIO 端口配置
+    # 注意：presigned URLs 無法通過 Nginx 代理，因為簽名是基於完整路徑的
+    # Nginx 重寫路徑會導致簽名驗證失敗
+    # 因此，MinIO API 端口需要直接暴露，用於 presigned URLs
+    # MinIO Console 可以通過 Nginx 代理（/minio-console/）
     ports:
-      - "30300:9000"  # MinIO API
-      - "30301:9001"  # MinIO Console
+      - "30300:9000"  # MinIO API（必須直接暴露，用於 presigned URLs）
+    #   - "30301:9001"  # MinIO Console（可選，用於管理，可通過 Nginx 代理）
     healthcheck:
       test: ["CMD-SHELL", "curl --fail http://127.0.0.1:9000/minio/health/live || exit 1"]
       interval: 10s
@@ -92,11 +98,16 @@ services:
       - ../datas/streaming/recordings:/recordings
     environment:
       - MTX_PATH=/mediamtx.yml
+    # 端口配置：
+    # - RTSP: 通過 Nginx 的 8554 端口（stream 模組 TCP）
+    # - HLS: 通過 Nginx 的 /hls/ 路徑（HTTP 80/443）
+    # - WebRTC HTTP/WHEP: 通過 Nginx 的 /webrtc/ 路徑（HTTP 80/443）
+    # - WebRTC ICE/UDP: ✅ 建議「直接暴露」在宿主機 UDP（不要走 Nginx UDP proxy，ICE 會因來源位址/port 不一致而失敗）
     ports:
-      - "30201:8554/tcp" # RTSP（外部端口:內部端口）
-      - "30202:8888/tcp" # HLS（外部端口:內部端口）
-      - "30204:8889/tcp" # WebRTC (HTTP/WHEP)（外部端口:內部端口）
-      - "30205:8189/udp" # WebRTC (ICE/UDP)（外部端口:內部端口）
+    #   - "30201:8554/tcp" # RTSP（已通過 Nginx 8554 端口代理）
+    #   - "30202:8888/tcp" # HLS（已通過 Nginx /hls/ 路徑代理）
+    #   - "30204:8889/tcp" # WebRTC (HTTP/WHEP)（已通過 Nginx /webrtc/ 路徑代理）
+      - "30205:30205/udp" # WebRTC (ICE/UDP)（直接暴露，讓封包來源維持 192.168.191.20:30205）
     networks:
       - demo-network
   api:
@@ -110,8 +121,9 @@ services:
       - LOG_DIR=/var/log/api
     volumes:
       - ../datas/logs/api:/var/log/api
-    ports:
-      - "30000:30000"
+    # 端口不直接暴露，通過 Nginx 反向代理訪問（/api/）
+    # ports:
+    #   - "30000:30000"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:30000/api/v1/healthz || exit 1"]
       interval: 60s
@@ -164,8 +176,9 @@ services:
     volumes:
       - ../datas/streaming/recordings:/recordings
       - ../datas/logs/streaming:/var/log/streaming
-    ports:
-      - "30500:30500"
+    # 端口不直接暴露，這是內部服務，只供 API Server 調用
+    # ports:
+    #   - "30500:30500"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:30500/healthz || exit 1"]
       interval: 60s
@@ -185,14 +198,34 @@ services:
     container_name: webui_server
     restart: unless-stopped
     env_file: [.env]
-    environment:
-      - API_HOST=api  # Docker 服務名稱，用於內部通信
-      - API_PORT=30000
-    ports:
-      - "30100:30100"
+    # ports:
+    #   - "30100:30100"
     networks: [demo-network]
     depends_on:
       - api
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8554:8554"      # RTSP TCP 代理端口
+      # WebRTC ICE/UDP 不走 Nginx（改由 mediamtx 直接暴露 30205/udp）
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../datas/logs/nginx:/var/log/nginx
+    networks: [demo-network]
+    depends_on:
+      - api
+      - webui
+      - mediamtx
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   demo-network:

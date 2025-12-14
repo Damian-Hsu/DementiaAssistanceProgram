@@ -3,299 +3,298 @@
 {% block content %}
   {% include './partials/header.html'%}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/user_profile.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_tasks.css') }}">
   
-  <div class="page-content">
-      <!-- 訊息提示 -->
-      <div id="successMessage" class="messagesuccess hidden"></div>
-      <div id="errorMessage" class="messageerror hidden"></div>
+  <!-- 訊息提示 -->
+  <div id="successMessage" class="messagesuccess hidden"></div>
+  <div id="errorMessage" class="messageerror hidden"></div>
 
-      <div class="settings-container">
-        <!-- 使用者設定區塊 -->
+  <div class="settings-container">
+        <!-- 影片參數設定區塊 -->
         <section class="settings-section">
           <div class="settings-section-header">
-            <h2 class="settings-section-title">使用者設定</h2>
-            <p class="settings-section-desc">管理您的個人資料與基本偏好設定</p>
-          </div>
-
-          <div class="profile-container">
-            <!-- 左側：基本資料 -->
-            <div class="profile-left">
-              <div class="info-group">
-                <label for="user_account">帳號</label>
-                <input id="user_account" type="text" readonly>
-
-                <label for="user_birthday">生日</label>
-                <input id="user_birthday" type="date">
-
-                <label for="user_email">信箱</label>
-                <input id="user_email" type="email">
-
-                <label for="user_phone">電話</label>
-                <input id="user_phone" type="tel">
-              </div>
-
-              <div class="button-group">
-                <button id="btnSaveProfile" class="edit-btn">
-                  儲存個人資料
-                </button>
-                <button id="btnChangePassword" class="change-btn">
-                  變更密碼
-                </button>
-              </div>
-            </div>
-
-            <!-- 右側：系統資訊與 JWT -->
-            <div class="profile-right">
-              <div class="info-group">
-                <label for="user_name">姓名</label>
-                <input id="user_name" type="text">
-
-                <label for="user_gender">性別</label>
-                <select id="user_gender" name="gender">
-                  <option value="male">男性</option>
-                  <option value="female">女性</option>
-                </select>
-              </div>
-
-              <div class="token-card">
-                <h3>自動登出期限</h3>
-                <div id="current_jwt_display" class="jwt-display"></div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- 應用程式設定區塊 -->
-        <section class="settings-section">
-          <div class="settings-section-header">
-            <h2 class="settings-section-title">應用程式設定</h2>
-            <p class="settings-section-desc">調整系統行為與介面偏好</p>
+            <h2 class="settings-section-title">影片參數設定</h2>
+            <p class="settings-section-desc">配置影片處理相關的系統參數（未來會逐步增加）</p>
           </div>
 
           <div class="info-group">
-            <label for="setting_timezone">時區</label>
-            <select id="setting_timezone">
-              <option value="">載入中...</option>
-            </select>
-
-            <label for="setting_diary_auto_refresh_interval">日記刷新間隔（分鐘）</label>
-            <input id="setting_diary_auto_refresh_interval" type="number" min="5" max="1440" step="5" placeholder="30">
-            <div class="settings-note">
-              <p><strong>說明：</strong>設定系統自動刷新當天日記的間隔時間（範圍：5-1440 分鐘）。預設為 30 分鐘。系統預設啟用日記自動刷新功能。</p>
-            </div>
-
-            <div class="button-group">
-              <button id="btnSaveAppSettings" class="edit-btn">
-                儲存應用程式設定
-              </button>
-            </div>
+            <form id="videoParamsForm" onsubmit="return false;">
+              <label for="setting_segment_seconds">切片長度（秒）</label>
+              <input id="setting_segment_seconds" type="number" min="1" max="600" step="1" placeholder="30">
+              <div class="settings-note">
+                <p><strong>說明：</strong>錄影時每個影片切片的長度（秒）。預設 30 秒。範圍：1-600 秒。</p>
+              </div>
+              <div class="button-group">
+                <button id="btnLoadVideoParams" type="button" class="edit-btn">載入現有設定</button>
+                <button id="btnSaveVideoParams" type="button" class="edit-btn">儲存設定</button>
+              </div>
+              <span class="form-hint" id="videoParamsMessage" aria-live="polite"></span>
+            </form>
           </div>
         </section>
 
-        <!-- 模型設定區塊 -->
+        <!-- AI 模型設定區塊（合併系統預設 Google API Key） -->
         <section class="settings-section">
           <div class="settings-section-header">
             <h2 class="settings-section-title">AI 模型設定</h2>
-            <p class="settings-section-desc">配置 AI 助手使用的語言模型與供應商</p>
+            <p class="settings-section-desc">配置系統預設的 AI 模型與 Google API Key</p>
           </div>
 
           <div class="info-group">
-            <label for="setting_llm_provider">預設 LLM 供應商</label>
-            <select id="setting_llm_provider">
-              <option value="google">Google (Gemini)</option>
-            </select>
+            <form id="modelSettingsForm" onsubmit="return false;">
+              <label for="setting_llm_provider">預設 LLM 供應商</label>
+              <select id="setting_llm_provider">
+                <option value="google">Google (Gemini)</option>
+              </select>
 
-            <label for="setting_llm_model">預設 LLM 模型</label>
-            <input id="setting_llm_model" type="text" placeholder="例如：gemini-2.0-flash-exp">
+              <label for="setting_llm_model">預設 LLM 模型</label>
+              <input id="setting_llm_model" type="text" placeholder="例如：gemini-2.5-flash-lite">
 
-            <div class="settings-note">
-              <p><strong>注意：</strong>模型設定需要 API 金鑰。請在下方配置各供應商的 API 金鑰。</p>
-            </div>
-
-            <!-- LLM 供應商配置 -->
-            <div class="llm-providers-config">
-              <h3 class="llm-providers-title">供應商 API 金鑰</h3>
-              
-              <div class="provider-config-group">
-                <label for="provider_google_api_key">Google API 金鑰</label>
-                <input id="provider_google_api_key" type="text" placeholder="輸入 Google API 金鑰">
+              <div class="settings-note">
+                <p><strong>注意：</strong>模型設定需要 API 金鑰。請在下方配置 Google API 金鑰。</p>
               </div>
-            </div>
 
-            <div class="button-group">
-              <button id="btnSaveModelSettings" class="edit-btn">
-                儲存模型設定
-              </button>
+              <!-- 系統預設 Google API Key -->
+              <div class="provider-config-group">
+                <label for="default_google_api_key">系統預設 Google API Key</label>
+                <input id="default_google_api_key" type="password" placeholder="輸入 Google API Key（輸入後會遮罩顯示）">
+                <div class="settings-note">
+                  <p><strong>說明：</strong>此 API Key 將作為系統預設值，供未設定個人 API Key 且未被加入黑名單的使用者使用。</p>
+                </div>
+              </div>
+
+              <!-- 系統預設 AI API Key 用量限制（RPM/RPD） -->
+              <div class="provider-config-group">
+                <label>系統預設 API Key 使用量限制（每位使用者）</label>
+                <div class="form-grid">
+                  <label class="form-field">
+                    <span>每分鐘請求上限（RPM）</span>
+                    <input id="default_ai_key_rpm" type="number" min="1" max="300" step="1" placeholder="10">
+                  </label>
+                  <label class="form-field">
+                    <span>每日請求上限（RPD）</span>
+                    <input id="default_ai_key_rpd" type="number" min="1" max="10000" step="1" placeholder="20">
+                  </label>
+                </div>
+                <div class="settings-note">
+                  <p><strong>說明：</strong>僅針對「使用系統預設 API Key」的使用者進行限制（使用者自帶 API Key 不套用）。</p>
+                </div>
+              </div>
+
+              <div class="button-group">
+                <button id="btnLoadDefaultApiKey" type="button" class="edit-btn">載入現有設定</button>
+                <button id="btnSaveModelSettings" type="button" class="edit-btn">儲存設定</button>
+              </div>
+              <span class="form-hint" id="modelSettingsMessage" aria-live="polite"></span>
+            </form>
+
+            <!-- API Key 黑名單管理 -->
+            <div class="settings-subsection">
+              <h3 class="settings-subsection-title">API Key 黑名單管理</h3>
+              <p class="settings-section-desc">管理禁止使用預設 API Key 的使用者列表</p>
+
+              <div class="form-grid">
+                <label class="form-field">
+                  <span>使用者 ID *</span>
+                  <input type="number" id="blacklistUserId" placeholder="輸入使用者 ID" min="1">
+                </label>
+                <label class="form-field">
+                  <span>禁止原因（選填）</span>
+                  <input type="text" id="blacklistReason" placeholder="輸入禁止原因">
+                </label>
+              </div>
+
+              <div class="button-group">
+                <button id="btnAddToBlacklist" class="edit-btn">添加到黑名單</button>
+              </div>
+              <span class="form-hint" id="blacklistMessage" aria-live="polite"></span>
+
+              <div id="blacklistTable" class="admin-table-container" aria-live="polite">
+                <div class="table-responsive">
+                  <table class="table table-striped table-hover table-bordered">
+                    <thead class="table-light">
+                      <tr>
+                        <th scope="col">使用者 ID</th>
+                        <th scope="col">帳號</th>
+                        <th scope="col">姓名</th>
+                        <th scope="col">禁止原因</th>
+                        <th scope="col">加入時間</th>
+                        <th scope="col">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td colspan="6" class="text-center">載入中...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        <!-- API Key 管理區塊 -->
+        <!-- M2M API Key 管理區塊 -->
         <section class="settings-section">
           <div class="settings-section-header">
-            <h2 class="settings-section-title">API Key 管理</h2>
-            <p class="settings-section-desc">建立、查看與管理系統用的 API Key</p>
+            <h2 class="settings-section-title">M2M API Key 管理</h2>
+            <p class="settings-section-desc">管理機器對機器（M2M）API Key，用於服務間通信</p>
           </div>
 
-          <form id="apiKeyForm" class="admin-form">
-            <div class="form-grid">
-              <label class="form-field">
-                <span>名稱 *</span>
-                <input type="text" id="apiKeyName" placeholder="Key 名稱" required>
-              </label>
-              <label class="form-field">
-                <span>Owner ID *</span>
-                <input type="number" id="apiKeyOwner" placeholder="擁有者使用者 ID" required min="1">
-              </label>
-              <label class="form-field">
-                <span>每分鐘上限</span>
-                <input type="number" id="apiKeyRate" placeholder="可選" min="0">
-              </label>
-              <label class="form-field">
-                <span>每日額度</span>
-                <input type="number" id="apiKeyQuota" placeholder="可選" min="0">
-              </label>
-            </div>
-            <div class="form-field">
-              <span>允許的 Scopes *</span>
-              <div class="scopes-checkbox-group" id="apiKeyScopes">
-                <label class="scope-checkbox">
-                  <input type="checkbox" value="uploader">
-                  <span>uploader - 允許呼叫 /jobs 建任務</span>
+          <div class="info-group">
+            <!-- 建立新 API Key 表單 -->
+            <form id="apiKeyForm" class="admin-form">
+              <div class="form-grid">
+                <label class="form-field">
+                  <span>API Key 名稱 *</span>
+                  <input type="text" id="apiKeyName" required placeholder="例如：Compute Server Key">
                 </label>
-                <label class="scope-checkbox">
-                  <input type="checkbox" value="compute">
-                  <span>compute - 允許呼叫 /jobs/{id}/complete 回報</span>
-                </label>
-                <label class="scope-checkbox">
-                  <input type="checkbox" value="mediamtx">
-                  <span>mediamtx - 允許呼叫 /m2m/streams/auth</span>
-                </label>
-                <label class="scope-checkbox">
-                  <input type="checkbox" value="streaming">
-                  <span>streaming - 允許呼叫 /m2m/streams</span>
+                <label class="form-field">
+                  <span>擁有者 ID *</span>
+                  <input type="number" id="apiKeyOwner" required placeholder="使用者 ID" min="1">
                 </label>
               </div>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn primary">建立 API Key</button>
-              <span class="form-hint" id="apiKeyTokenMessage" aria-live="polite"></span>
-            </div>
-          </form>
 
-          <div class="table-wrapper">
-            <table class="admin-table" id="apiKeyTable" aria-live="polite">
-              <thead>
-                <tr>
-                  <th scope="col">名稱</th>
-                  <th scope="col">Owner</th>
-                  <th scope="col">狀態</th>
-                  <th scope="col">Scopes</th>
-                  <th scope="col">Flow</th>
-                  <th scope="col">每日額度</th>
-                  <th scope="col">建立時間</th>
-                  <th scope="col">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr class="empty-row">
-                  <td colspan="8">尚無 API Key，請建立新的 Key。</td>
-                </tr>
-              </tbody>
-            </table>
+              <div class="form-grid">
+                <label class="form-field">
+                  <span>速率限制（每分鐘）</span>
+                  <input type="number" id="apiKeyRate" placeholder="選填，例如：100" min="1">
+                </label>
+                <label class="form-field">
+                  <span>每日配額</span>
+                  <input type="number" id="apiKeyQuota" placeholder="選填，例如：10000" min="1">
+                </label>
+              </div>
+
+              <div class="form-field">
+                <span>作用域 (Scopes) *</span>
+                <div id="apiKeyScopes" class="scopes-checkbox-group">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="uploader" id="scope-uploader">
+                    <label class="form-check-label" for="scope-uploader">
+                      uploader - 允許呼叫 /jobs 建任務
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="compute" id="scope-compute">
+                    <label class="form-check-label" for="scope-compute">
+                      compute - 允許呼叫 /jobs/{id}/complete 回報
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="mediamtx" id="scope-mediamtx">
+                    <label class="form-check-label" for="scope-mediamtx">
+                      mediamtx - 允許呼叫 /m2m/streams/auth
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="streaming" id="scope-streaming">
+                    <label class="form-check-label" for="scope-streaming">
+                      streaming - 允許呼叫 /m2m/streams
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn primary">建立 API Key</button>
+                <span class="form-hint" id="apiKeyTokenMessage" aria-live="polite"></span>
+              </div>
+            </form>
+
+            <!-- API Key 列表表格 -->
+            <div id="apiKeyTable" class="admin-table-container" aria-live="polite">
+              <div class="table-responsive">
+                <table class="table table-striped table-hover table-bordered">
+                  <thead class="table-light">
+                    <tr>
+                      <th scope="col">名稱</th>
+                      <th scope="col">OID</th>
+                      <th scope="col">狀態</th>
+                      <th scope="col">作用域</th>
+                      <th scope="col">速率限制</th>
+                      <th scope="col">每日配額</th>
+                      <th scope="col">建立時間</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colspan="7" class="text-center">載入中...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
-    </div>
-  </div>
 
-  <!-- 修改密碼對話框 -->
-  <dialog id="changepassworddialog" aria-labelledby="cp-title">
-    <header class="dlg__header">
-      <h3 id="cp-title" class="dlg__title">修改密碼</h3>
-      <form method="dialog"><button class="dlg__close" aria-label="關閉">✕</button></form>
-    </header>
-
-    <div class="dlg__body">
-      <div class="dlg__panel">
-        <div id="successMessage" class="messagesuccess" style="display:none;"></div>
-        <div id="errorMessage" class="messageerror" style="display:none;"></div>
-        <div class="dlg__field">
-          <input id="current_password" type="password"
-                 inputmode="numeric"
-                 oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)"
-                 placeholder="請輸入舊密碼"
-                 pattern="\d{6}" minlength="6" maxlength="6"
-                 autocomplete="new-password" required>
-        </div>
-        <div class="dlg__field">
-          <input id="new_password" type="password"
-                 inputmode="numeric"
-                 oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)"
-                 placeholder="請輸入新密碼"
-                 pattern="\d{6}" minlength="6" maxlength="6"
-                 autocomplete="new-password" required>
-        </div>
-        <div class="dlg__footer">
-          <button type="button" class="btn-submit" id="btnSubmitChangePassword">
-            確認變更
-          </button>
-        </div>
-      </div>
-    </div>
-  </dialog>
-
-  <!-- 編輯 API Key 對話框 -->
-  <dialog id="editApiKeyDialog" aria-labelledby="edit-api-key-title">
-    <header class="dlg__header">
-      <h3 id="edit-api-key-title" class="dlg__title">編輯 API Key</h3>
-      <form method="dialog"><button class="dlg__close" aria-label="關閉">✕</button></form>
-    </header>
-
-    <div class="dlg__body">
-      <div class="dlg__panel">
-        <form id="editApiKeyForm">
-          <div class="dlg__field">
-            <label for="editApiKeyName">名稱 *</label>
-            <input type="text" id="editApiKeyName" required>
-          </div>
-          <div class="dlg__field">
-            <label for="editApiKeyRate">每分鐘上限</label>
-            <input type="number" id="editApiKeyRate" min="0">
-          </div>
-          <div class="dlg__field">
-            <label for="editApiKeyQuota">每日額度</label>
-            <input type="number" id="editApiKeyQuota" min="0">
-          </div>
-          <div class="dlg__field">
-            <label>允許的 Scopes *</label>
-            <div class="scopes-checkbox-group" id="editApiKeyScopes">
-              <label class="scope-checkbox">
-                <input type="checkbox" value="uploader">
-                <span>uploader - 允許呼叫 /jobs 建任務</span>
-              </label>
-              <label class="scope-checkbox">
-                <input type="checkbox" value="compute">
-                <span>compute - 允許呼叫 /jobs/{id}/complete 回報</span>
-              </label>
-              <label class="scope-checkbox">
-                <input type="checkbox" value="mediamtx">
-                <span>mediamtx - 允許呼叫 /m2m/streams/auth</span>
-              </label>
-              <label class="scope-checkbox">
-                <input type="checkbox" value="streaming">
-                <span>streaming - 允許呼叫 /m2m/streams</span>
-              </label>
+        <!-- 編輯 API Key 對話框 -->
+        <div class="modal-overlay" id="editApiKeyDialog">
+          <div class="modal-container">
+            <div class="modal-header">
+              <h3>編輯 API Key</h3>
+              <span class="modal-close" id="closeEditApiKeyDialog">&times;</span>
+            </div>
+            <div class="modal-body">
+              <form id="editApiKeyForm" class="admin-form">
+                <label class="form-field">
+                  <span>API Key 名稱 *</span>
+                  <input type="text" id="editApiKeyName" required>
+                </label>
+                <div class="form-grid">
+                  <label class="form-field">
+                    <span>速率限制（每分鐘）</span>
+                    <input type="number" id="editApiKeyRate" placeholder="選填" min="1">
+                  </label>
+                  <label class="form-field">
+                    <span>每日配額</span>
+                    <input type="number" id="editApiKeyQuota" placeholder="選填" min="1">
+                  </label>
+                </div>
+                <div class="form-field">
+                  <span>作用域 (Scopes) *</span>
+                  <div id="editApiKeyScopes" class="scopes-checkbox-group">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="uploader" id="edit-scope-uploader">
+                      <label class="form-check-label" for="edit-scope-uploader">
+                        uploader - 允許呼叫 /jobs 建任務
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="compute" id="edit-scope-compute">
+                      <label class="form-check-label" for="edit-scope-compute">
+                        compute - 允許呼叫 /jobs/{id}/complete 回報
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="mediamtx" id="edit-scope-mediamtx">
+                      <label class="form-check-label" for="edit-scope-mediamtx">
+                        mediamtx - 允許呼叫 /m2m/streams/auth
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="streaming" id="edit-scope-streaming">
+                      <label class="form-check-label" for="edit-scope-streaming">
+                        streaming - 允許呼叫 /m2m/streams
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button type="submit" id="btnSubmitEditApiKey" class="btn primary">儲存變更</button>
+                  <button type="button" id="btnRotateApiKey" class="btn-secondary">旋轉</button>
+                  <button type="button" id="btnDeleteApiKey" class="btn-danger">刪除</button>
+                </div>
+              </form>
             </div>
           </div>
-          <div class="dlg__footer">
-            <button type="button" class="btn-secondary" onclick="document.getElementById('editApiKeyDialog').close()">取消</button>
-            <button type="submit" class="btn-submit" id="btnSubmitEditApiKey">儲存</button>
-          </div>
-        </form>
+        </div>
       </div>
-    </div>
-  </dialog>
+
+      <!-- 設定頁面底部：登出按鈕（手機模式方便操作） -->
+      <div class="settings-logout">
+        <button type="button" class="danger" id="logoutbtn_settings">登出</button>
+      </div>
 
   <script type="module" src="{{ url_for('static', filename='js/admin_settings.js') }}"></script>
 {% endblock %}

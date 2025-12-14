@@ -1,0 +1,186 @@
+{
+  "功能編號": "3-4-5",
+  "功能名稱": "M2M API Key 管理",
+  "功能說明": "管理員可建立、更新、旋轉與停用 M2M API Key；建立/旋轉時 token 只回傳一次並提示管理員保存。",
+  "程式名稱": "services/WebUIServer/app/template/admin_settings.html; services/WebUIServer/app/static/js/admin_settings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/security/api_key_manager.py; services/APIServer/app/DataAccess/tables/api_keys.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "管理員系統設定介面",
+      "api_keys資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "API Key 列表",
+      "api_keys資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【名稱】",
+          "【擁有者ID】",
+          "【Scopes】",
+          "【速率限制】",
+          "【每日配額】"
+        ],
+        "text": "鍵盤輸入【名稱】、【擁有者ID】、【Scopes】、【速率限制】、【每日配額】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【建立 API Key】"
+        ],
+        "text": "滑鼠點選【建立 API Key】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "建立 api_keys 記錄並回傳一次性 token。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "新增",
+        "objects": [
+          "api_keys資料表"
+        ],
+        "text": "新增API Key",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【旋轉】"
+        ],
+        "text": "滑鼠點選【旋轉】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【取消】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【確認】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "旋轉確認視窗"
+        ],
+        "text": "跳出旋轉確認視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸-①",
+      "parent_step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【取消】"
+        ],
+        "text": "滑鼠點選【取消】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "旋轉確認視窗"
+        ],
+        "text": "關閉旋轉確認視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸-②",
+      "parent_step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【確認】"
+        ],
+        "text": "滑鼠點選【確認】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "旋轉 token 並更新 api_keys.token_hash。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "api_keys資料表"
+        ],
+        "text": "更新API Key Token",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "api_keys; users",
+    "columns": []
+  },
+  "備註": "token 明碼僅在建立/旋轉時回傳一次。"
+}

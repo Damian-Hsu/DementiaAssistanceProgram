@@ -1,0 +1,92 @@
+{
+  "功能編號": "2-2-6",
+  "功能名稱": "停止串流",
+  "功能說明": "使用者點擊停止串流後，系統先顯示確認對話框；確認停止後前端呼叫 stop 端點，後端轉呼叫 StreamingServer /streams/stop 停止 FFmpeg 拉流/切片，並在前端停止預覽與更新狀態。",
+  "程式名稱": "services/WebUIServer/app/template/partials/stop_stream_confirm_dialog.html; services/WebUIServer/app/static/js/camera.js; services/APIServer/app/router/Camera/service.py; services/StreamingServer/app/main.py",
+  "輸入": [
+    "camera_id",
+    "使用者操作（確認/取消/點擊外部/ESC）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "OkResp（ok=true）",
+    "串流狀態變為 stopped",
+    "預覽停止"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊「停止串流」（stopStreamBtn）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "對話框確認",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點擊「取消」或按 ESC 或點擊外部：關閉對話框並不停止"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊「確認停止」：關閉對話框並送出停止請求"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "確認停止：POST /api/v1/camera/{id}/stream/stop"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "服務呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端呼叫 StreamingServer POST /streams/stop（user_id/camera_id）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "狀態更新",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端更新串流狀態並停止預覽 stopPreview()"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "停止成功：顯示 toast「串流已停止」並更新狀態為未串流"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  }
+}

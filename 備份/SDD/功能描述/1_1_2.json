@@ -1,0 +1,347 @@
+{
+  "功能編號": "1-1-2",
+  "功能名稱": "註冊",
+  "功能說明": "使用者於註冊頁面輸入基本資料與密碼送出後，前端先進行格式驗證並送出註冊請求；後端檢查帳號/Email/手機唯一性並建立 users 記錄（含預設 settings），成功後簽發 JWT 並回傳，前端保存 token 後自動導向系統首頁。",
+  "程式名稱": "services/WebUIServer/app/template/auth.html; services/WebUIServer/app/static/js/sign_login.js; services/WebUIServer/app/static/js/APIClient.js; services/WebUIServer/app/static/js/AuthService.js; services/APIServer/app/router/Authentication/service.py; services/APIServer/app/router/Authentication/DTO.py; services/APIServer/app/router/User/service.py; services/APIServer/app/security/jwt_manager.py",
+  "輸入": [
+    "滑鼠",
+    "鍵盤",
+    "auth.html頁面",
+    "users資料表"
+  ],
+  "輸出": [
+    "螢幕",
+    "users資料表"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "輸入帳號 account"
+          },
+          {
+            "sub_no": "②",
+            "item": "輸入姓名 name"
+          },
+          {
+            "sub_no": "③",
+            "item": "選擇性別 gender"
+          },
+          {
+            "sub_no": "④",
+            "item": "選擇生日 birthday"
+          },
+          {
+            "sub_no": "⑤",
+            "item": "輸入手機號碼 phone"
+          },
+          {
+            "sub_no": "⑥",
+            "item": "輸入電子郵件 email"
+          },
+          {
+            "sub_no": "⑦",
+            "item": "輸入密碼 password"
+          },
+          {
+            "sub_no": "⑧",
+            "item": "再次輸入密碼 password_confirm"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點選「下一步 Next」送出註冊表單"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料驗證",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端檢查帳號格式（6~30 字元、僅允許英數字與 ._、不可含空白）"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端檢查密碼格式（8~30 字元、僅允許英數字與 ._、不可含空白）"
+          },
+          {
+            "sub_no": "③",
+            "item": "前端檢查 password 與 password_confirm 是否一致；不一致則顯示錯誤並停止送出"
+          },
+          {
+            "sub_no": "④",
+            "item": "前端檢查 Email 格式；手機號碼格式（09 開頭 10 碼）"
+          },
+          {
+            "sub_no": "⑤",
+            "item": "後端以 SignupRequestDTO 進行欄位驗證（account/password 格式、email 型態、birthday 型態）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端以 JSON 呼叫 POST /api/v1/auth/signup（body=SignupRequestDTO）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端檢查 users.account 是否已存在；存在則回傳 400（detail=「帳號已存在」）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端檢查 users.email 是否已存在；存在則回傳 400（detail=「Email 已被使用」）"
+          },
+          {
+            "sub_no": "③",
+            "item": "後端檢查 users.phone 是否已存在；存在則回傳 400（detail=「phone 已被使用」）"
+          }
+        ]
+      },
+      {
+        "step_no": 4,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端以 bcrypt 將 password hash 成 users.password_hash"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端建立 users 記錄（role=user、active=true、settings=預設使用者設定）並提交交易"
+          }
+        ]
+      },
+      {
+        "step_no": 5,
+        "title": "權杖簽發",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端建立 JWT（sub=user.id；payload 額外包含 account、role；有效期限預設 60 分鐘）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端回傳 LoginResponseDTO（access_token、token_type=bearer）"
+          }
+        ]
+      },
+      {
+        "step_no": 6,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端將 access_token 寫入 localStorage（key=jwt）"
+          }
+        ]
+      },
+      {
+        "step_no": 7,
+        "title": "導頁",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "註冊成功：導向 /home"
+          },
+          {
+            "sub_no": "②",
+            "item": "註冊失敗：停留註冊頁並顯示 signupError"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "API 回應",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：回傳 JSON（access_token、token_type）"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：回傳錯誤（400/422/500 等）與 detail"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：清空表單並導向 /home"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：於註冊區塊顯示錯誤訊息（signupError）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "儲存結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：localStorage.jwt 內保存 access_token"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": "autoincrement",
+        "備註": "Primary Key"
+      },
+      {
+        "欄位": "account",
+        "中文": "帳號",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": null,
+        "備註": "唯一；索引"
+      },
+      {
+        "欄位": "name",
+        "中文": "姓名",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "role",
+        "中文": "角色",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "user",
+        "備註": "RoleEnum（user/admin）"
+      },
+      {
+        "欄位": "gender",
+        "中文": "性別",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "GenderEnum（male/female）"
+      },
+      {
+        "欄位": "birthday",
+        "中文": "生日",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "phone",
+        "中文": "手機號碼",
+        "型態": "VARCHAR",
+        "長度": 20,
+        "空值": "否",
+        "預設值": null,
+        "備註": "唯一；索引"
+      },
+      {
+        "欄位": "email",
+        "中文": "電子郵件",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "唯一；索引"
+      },
+      {
+        "欄位": "headshot_url",
+        "中文": "頭像URL",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "password_hash",
+        "中文": "密碼雜湊",
+        "型態": "VARCHAR",
+        "長度": 256,
+        "空值": "否",
+        "預設值": null,
+        "備註": "bcrypt hash"
+      },
+      {
+        "欄位": "active",
+        "中文": "帳號啟用狀態",
+        "型態": "BOOLEAN",
+        "長度": null,
+        "空值": "否",
+        "預設值": true,
+        "備註": null
+      },
+      {
+        "欄位": "settings",
+        "中文": "使用者設定",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "建立時寫入預設設定"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

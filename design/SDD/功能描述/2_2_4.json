@@ -1,0 +1,77 @@
+{
+  "功能編號": "2-2-4",
+  "功能名稱": "取得 RTSP 推流 URL",
+  "功能說明": "使用者可取得指定鏡頭的 RTSP 推流 URL（含 JWT token 與 TTL），用於外部推流端（攝影機/OBS/模擬器）向 MediaMTX 發布串流；前端可一鍵複製連結到剪貼簿。",
+  "程式名稱": "services/WebUIServer/app/static/js/camera.js; services/WebUIServer/app/static/js/services/CameraService.js; services/APIServer/app/router/Camera/service.py; services/APIServer/app/security/jwt_manager.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "鏡頭介面",
+      "camera資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "RTSP推流URL"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【串流連結】"
+        ],
+        "text": "滑鼠點選【串流連結】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "取得 RTSP 推流 URL 並複製至剪貼簿。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "提示",
+        "objects": [
+          "複製結果"
+        ],
+        "text": "提示已複製串流連結或複製失敗",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "camera",
+    "columns": [
+      {
+        "欄位": "path",
+        "中文": "串流路徑",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "是",
+        "預設值": null,
+        "備註": "組成 RTSP URL 的 path"
+      },
+      {
+        "欄位": "token_version",
+        "中文": "Token版本",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "簽發 token ver"
+      }
+    ]
+  },
+  "備註": ""
+}

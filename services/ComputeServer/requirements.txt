@@ -16,6 +16,7 @@ redis
 pydantic
 openai
 google-generativeai
+google-genai
 torch
 torchvision
 --extra-index-url https://download.pytorch.org/whl/cu126

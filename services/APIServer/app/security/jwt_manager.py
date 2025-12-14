@@ -96,8 +96,8 @@ class CameraJWTManager:
         secret_key: Optional[str] = None,
         algorithm: Optional[str] = None,
         leeway_seconds: int = 60,
-        default_publish_ttl: int = 180,  # 秒
-        default_play_ttl: int = 300,     # 秒
+        default_publish_ttl: int = 10800,  # 秒（RTSP 推流預設 3 小時）
+        default_play_ttl: int = 180,        # 秒（WebRTC 播放預設 3 分鐘）
     ):
         self.secret_key = secret_key or os.getenv("STREAM_JWT_SECRET", os.getenv("JWT_SECRET_KEY"))
         if not self.secret_key:

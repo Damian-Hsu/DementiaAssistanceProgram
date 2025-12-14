@@ -1,0 +1,253 @@
+{
+  "功能編號": "3-4",
+  "功能名稱": "系統設定",
+  "功能說明": "管理員可在系統設定頁集中管理系統層級參數，包含：影片參數（切片長度）、系統預設 LLM、系統預設 Google API Key、系統預設 AI key 用量限制（RPM/RPD）、以及 M2M API Key 管理。此頁面會於載入時驗證使用者為 admin，並透過後端 Admin API 讀寫設定（settings 表）與 M2M API Key（api_keys 表）。",
+  "程式名稱": "services/WebUIServer/app/template/admin_settings.html; services/WebUIServer/app/static/js/admin_settings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/settings.py; services/APIServer/app/DataAccess/tables/api_keys.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入": [
+    "segment_seconds（影片切片長度）",
+    "default_llm_provider/default_llm_model（系統預設 LLM）",
+    "default_google_api_key（系統預設 Google API Key）",
+    "rpm/rpd（預設 AI key 用量限制）",
+    "M2M api-keys：name/owner_id/scopes/rate_limit_per_min/quota_per_day/key_id/active",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "系統設定頁各區塊表單與提示訊息",
+    "DefaultLLMResponse / DefaultGoogleApiKeyResponse / DefaultAiKeyLimitsResponse / VideoParamsResponse",
+    "ApiKeyOutDTO[] / ApiKeySecretOutDTO（建立/旋轉）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員進入 /admin/settings"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端檢查 localStorage JWT 是否存在；不存在則導回登入頁"
+          },
+          {
+            "sub_no": "③",
+            "item": "前端呼叫 /users/me 驗證角色為 admin；非 admin 導回首頁"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "影片參數：點擊【載入現有設定】或【儲存設定】"
+          },
+          {
+            "sub_no": "②",
+            "item": "AI 模型設定：點擊【載入現有設定】或【儲存設定】"
+          },
+          {
+            "sub_no": "③",
+            "item": "M2M API Key：點擊【建立 API Key】、點擊列表列開啟編輯、點擊【儲存變更/旋轉/刪除(停用)】"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "影片參數：輸入切片長度 segment_seconds"
+          },
+          {
+            "sub_no": "②",
+            "item": "AI 模型設定：輸入 default_llm_model、輸入 default_google_api_key、輸入 rpm/rpd"
+          },
+          {
+            "sub_no": "③",
+            "item": "M2M API Key：輸入 name/owner_id/rate_limit_per_min/quota_per_day，勾選 scopes"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "系統設定（settings 表）：GET/POST /api/v1/admin/settings/default-llm、/default-google-api-key、/default-ai-key-limits、/video-params"
+          },
+          {
+            "sub_no": "②",
+            "item": "M2M API Key（api_keys 表）：GET/POST/PATCH /api/v1/admin/api-keys 與 POST /api/v1/admin/api-keys/{key_id}/rotate"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料驗證與寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端以 ensure_admin 驗證管理員權限，不符回 403"
+          },
+          {
+            "sub_no": "②",
+            "item": "settings 寫入：以 key/value(JSON 字串) upsert 更新系統設定"
+          },
+          {
+            "sub_no": "③",
+            "item": "api_keys 寫入：建立/更新/旋轉 M2M API Key；token 以 sha256 寫入 token_hash 並僅回傳一次明碼"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "畫面顯示",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入成功：各區塊表單顯示目前系統設定與 API Key 列表"
+          },
+          {
+            "sub_no": "②",
+            "item": "儲存/更新成功：顯示成功提示並更新畫面狀態"
+          },
+          {
+            "sub_no": "③",
+            "item": "失敗：顯示錯誤提示（未授權/驗證失敗/伺服器錯誤）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "settings; api_keys; users",
+    "columns": [
+      {
+        "欄位": "key",
+        "中文": "設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key；Primary Key；用於 default_llm_provider/default_llm_model/default_google_api_key/default_ai_key_limits/video_segment_seconds"
+      },
+      {
+        "欄位": "value",
+        "中文": "設定值(JSON字串)",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value"
+      },
+      {
+        "欄位": "description",
+        "中文": "設定描述",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "settings.description"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "settings.created_at；TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "settings.updated_at；TimestampMixin；onupdate timezone('UTC', now())"
+      },
+      {
+        "欄位": "id",
+        "中文": "API Key ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "api_keys.id；Primary Key"
+      },
+      {
+        "欄位": "token_hash",
+        "中文": "Token 雜湊(sha256)",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_keys.token_hash；unique"
+      },
+      {
+        "欄位": "owner_id",
+        "中文": "擁有者使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_keys.owner_id；ForeignKey(users.id)"
+      },
+      {
+        "欄位": "scopes",
+        "中文": "作用域清單",
+        "型態": "ARRAY(VARCHAR)",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "api_keys.scopes"
+      },
+      {
+        "欄位": "active",
+        "中文": "是否啟用",
+        "型態": "BOOLEAN",
+        "長度": null,
+        "空值": "否",
+        "預設值": "true",
+        "備註": "api_keys.active"
+      },
+      {
+        "欄位": "id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.id；Primary Key"
+      },
+      {
+        "欄位": "account",
+        "中文": "帳號",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.account；unique；index"
+      },
+      {
+        "欄位": "role",
+        "中文": "角色",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "user",
+        "備註": "users.role"
+      }
+    ]
+  }
+}

@@ -1,31 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import Optional
-
-from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Integer, String, Text, Float, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from . import ORMBase, TimestampMixin, TimestampSchema
+from . import ORMBase, TimestampMixin
 from .__Function import create_uuid7
 
-__all__ = ["Schema", "Table"]
-
-
-class Schema(BaseModel):
-    name: str
-    uploader_user_id: int
-    composer: Optional[str] = None
-    description: Optional[str] = None
-    metadata: Optional[dict] = None
-    duration: Optional[float] = None
-    s3_key: str
-    content_type: Optional[str] = None
-
-    model_config = ConfigDict(from_attributes=True)
+__all__ = ["Table"]
 
 
 class MusicTable(ORMBase, TimestampMixin):

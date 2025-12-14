@@ -1,0 +1,226 @@
+{
+  "功能編號": "3-1",
+  "功能名稱": "任務管理",
+  "功能說明": "管理員可在任務管理頁查看全系統背景任務狀態，包含 Compute 任務（來源 inference_jobs）與串流任務（來源 StreamingServer /streams）。支援依狀態/類型篩選、分頁、手動刷新與自動刷新（每 10 秒），並可點擊任務列查看詳情（錯誤訊息、參數/metrics/輸入輸出等）。",
+  "程式名稱": "services/WebUIServer/app/template/admin_tasks.html; services/WebUIServer/app/static/js/admin_tasks.js; services/WebUIServer/app/static/css/admin_tasks.css; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/inference_jobs.py; services/StreamingServer/app/main.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "管理員任務管理介面",
+      "inference_jobs資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "管理員任務管理介面",
+      "任務詳情視窗"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "管理員任務管理介面"
+        ],
+        "text": "系統載入管理員任務管理介面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "查詢並整合 Compute/串流任務清單。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "任務列表"
+        ],
+        "text": "顯示任務列表",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "選擇",
+        "objects": [
+          "【任務類型】",
+          "【狀態】"
+        ],
+        "text": "滑鼠選擇【任務類型】、【狀態】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "依篩選條件重新載入任務列表。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [
+          "任務列表"
+        ],
+        "text": "更新任務列表",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "任務列"
+        ],
+        "text": "滑鼠點選任務列",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "任務詳情視窗"
+        ],
+        "text": "跳出任務詳情視窗",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "inference_jobs",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "任務ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "inference_jobs.id；Primary Key"
+      },
+      {
+        "欄位": "type",
+        "中文": "任務類型",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": "inference_jobs.type（會映射為 UI 的 task_type）"
+      },
+      {
+        "欄位": "status",
+        "中文": "狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "inference_jobs.status（JobStatusEnum）"
+      },
+      {
+        "欄位": "input_type",
+        "中文": "輸入類型",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": "inference_jobs.input_type"
+      },
+      {
+        "欄位": "input_url",
+        "中文": "輸入來源",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.input_url"
+      },
+      {
+        "欄位": "output_url",
+        "中文": "輸出來源",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.output_url"
+      },
+      {
+        "欄位": "trace_id",
+        "中文": "追蹤ID",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.trace_id；索引"
+      },
+      {
+        "欄位": "error_message",
+        "中文": "錯誤訊息",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.error_message"
+      },
+      {
+        "欄位": "params",
+        "中文": "參數(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.params（常見：user_id/camera_id/video_id/progress）"
+      },
+      {
+        "欄位": "metrics",
+        "中文": "度量(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.metrics（包含耗時/影片資訊/LLM token 等）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  },
+  "備註": "僅管理員可使用。"
+}

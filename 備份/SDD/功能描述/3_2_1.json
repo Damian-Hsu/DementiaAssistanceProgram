@@ -1,0 +1,124 @@
+{
+  "功能編號": "3-2-1",
+  "功能名稱": "使用者統計",
+  "功能說明": "管理員可在列表頁查看所有一般使用者的統計：Token 使用量（total_tokens 加總，以萬為單位顯示）、聊天訊息數（只統計 chat source 的 assistant_replies）、是否使用系統預設 API Key（users.settings.use_default_api_key）與黑名單狀態（api_key_blacklist）。",
+  "程式名稱": "services/WebUIServer/app/template/admin_users.html; services/WebUIServer/app/static/js/admin_users.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py",
+  "輸入": [
+    "GET /admin/users/stats",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "UserStatsDTO[]",
+    "統計表格列（user_id/account/name/total_token_usage/total_chat_messages/use_default_api_key/is_blacklisted）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入時呼叫 GET /api/v1/admin/users/stats"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端取得 users(role=user) 全部使用者"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端聚合 llm_usage_logs：sum(total_tokens) 作為 total_token_usage；sum(case source==chat 的 assistant_replies) 作為 total_chat_messages"
+          },
+          {
+            "sub_no": "③",
+            "item": "後端讀取 api_key_blacklist 以判斷 is_blacklisted；解析 users.settings 得到 use_default_api_key"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料呈現",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端將 total_token_usage 轉為「萬」顯示（/10000, 取小數 2 位）"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端將 is_blacklisted 以紅字顯示"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示統計",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示使用者統計表格（點擊列可進一步查看詳情）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users; llm_usage_logs; api_key_blacklist",
+    "columns": [
+      {
+        "欄位": "role",
+        "中文": "角色",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "user",
+        "備註": "users.role（僅統計 role=user）"
+      },
+      {
+        "欄位": "total_tokens",
+        "中文": "總 Token 數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.total_tokens（聚合 sum）"
+      },
+      {
+        "欄位": "assistant_replies",
+        "中文": "AI 助手回覆次數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.assistant_replies（chat source 聚合）"
+      },
+      {
+        "欄位": "settings",
+        "中文": "使用者設定(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings.use_default_api_key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "黑名單使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_key_blacklist.user_id"
+      }
+    ]
+  }
+}

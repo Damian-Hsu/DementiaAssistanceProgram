@@ -28,6 +28,24 @@ button:not(.secondary):not(.outline):not(.ghost):not(.nav-link) {
   box-shadow: var(--shadow-sm);
 }
 
+/* 危險按鈕（登出/刪除） */
+button.danger {
+  background-color: var(--color-danger, #C45B5B);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+button.danger:hover {
+  background-color: #B04A4A;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+button.danger:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
 button.primary:hover,
 button[type="submit"]:hover,
 button:not(.secondary):not(.outline):not(.ghost):not(.nav-link):hover {
@@ -121,7 +139,10 @@ button.loading::after {
 }
 
 /* ===== 表單輸入系統 - 增強互動反饋 ===== */
-input, select, textarea {
+/* 排除 Bootstrap form-check-input 和 checkbox/radio，讓 Bootstrap 處理 */
+input:not([type="checkbox"]):not([type="radio"]):not(.form-check-input), 
+select, 
+textarea {
   font-family: inherit;
   font-size: var(--font-size-base);
   padding: var(--spacing-sm) var(--spacing-md);
@@ -135,13 +156,13 @@ input, select, textarea {
   line-height: var(--line-height-normal);
 }
 
-input:hover,
+input:not([type="checkbox"]):not([type="radio"]):not(.form-check-input):hover,
 select:hover,
 textarea:hover {
   border-color: var(--color-hover);
 }
 
-input:focus,
+input:not([type="checkbox"]):not([type="radio"]):not(.form-check-input):focus,
 select:focus,
 textarea:focus {
   outline: none;
@@ -150,35 +171,35 @@ textarea:focus {
   transform: translateY(-1px);
 }
 
-input:focus-visible,
+input:not([type="checkbox"]):not([type="radio"]):not(.form-check-input):focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.25);
 }
 
 /* 錯誤狀態 */
-input.error,
+input:not([type="checkbox"]):not([type="radio"]):not(.form-check-input).error,
 select.error,
 textarea.error {
   border-color: var(--color-danger);
   background-color: rgba(196, 91, 91, 0.05);
 }
 
-input.error:focus,
+input:not([type="checkbox"]):not([type="radio"]):not(.form-check-input).error:focus,
 select.error:focus,
 textarea.error:focus {
   box-shadow: 0 0 0 3px rgba(196, 91, 91, 0.2);
 }
 
 /* 成功狀態 */
-input.success,
+input:not([type="checkbox"]):not([type="radio"]):not(.form-check-input).success,
 select.success,
 textarea.success {
   border-color: var(--color-success);
 }
 
 /* 禁用狀態 */
-input:disabled,
+input:not([type="checkbox"]):not([type="radio"]):not(.form-check-input):disabled,
 select:disabled,
 textarea:disabled {
   opacity: 0.6;
@@ -247,6 +268,14 @@ textarea {
 }
 
 /* ===== 表格系統 - 增強視覺層次 ===== */
+.table-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

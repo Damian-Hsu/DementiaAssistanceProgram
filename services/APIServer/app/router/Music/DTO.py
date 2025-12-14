@@ -36,3 +36,9 @@ class MusicUrlResponse(BaseModel):
     ttl: int
     expires_at: int
 
+
+class MusicUpdate(BaseModel):
+    name: Optional[str] = None
+    composer: Optional[str] = None
+    description: Optional[str] = None
+    metadata: Optional[dict] = None

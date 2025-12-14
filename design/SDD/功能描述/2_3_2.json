@@ -1,0 +1,86 @@
+{
+  "功能編號": "2-3-2",
+  "功能名稱": "事件關鍵字搜尋",
+  "功能說明": "使用者輸入關鍵字後，系統以 events 欄位比對關鍵字，過濾出包含相關事件的錄影清單。",
+  "程式名稱": "services/WebUIServer/app/static/js/recordings.js; services/APIServer/app/router/Recordings/service.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "影片管理介面",
+      "events資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "影片管理介面"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【關鍵字】"
+        ],
+        "text": "鍵盤輸入【關鍵字】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "依關鍵字查詢 events 並過濾 recordings 清單。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [
+          "錄影清單"
+        ],
+        "text": "更新搜尋結果列表",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "recordings; events",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "recordings.id"
+      },
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.recording_id（關聯到 recordings.id）"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.summary"
+      }
+    ]
+  },
+  "備註": ""
+}

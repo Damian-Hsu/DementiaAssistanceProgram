@@ -51,6 +51,54 @@ h1 {
   letter-spacing: -0.02em; /* 字距微調 */
 }
 
+/* ==== 登入頁品牌列（Logo + 回憶拾光 / LifeLog.ai）==== */
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md, 16px);
+  margin-bottom: var(--spacing-xl, 24px);
+}
+
+.auth-brand-logo {
+  width: 130px;
+  height: 90px;
+  flex: 0 0 auto;
+}
+
+.auth-brand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+
+.auth-brand-title {
+  font-size: 32px;
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-accent, #6B4F4F);
+  letter-spacing: -0.02em;
+}
+
+.auth-brand-subtitle {
+  margin-top: 4px;
+  font-size: 16px;
+  color: var(--text-muted-light, #666);
+}
+
+@media (max-width: 480px) {
+  .auth-brand-logo {
+    width: 72px;
+    height: 72px;
+  }
+  .auth-brand-title {
+    font-size: 28px;
+  }
+  .auth-brand-subtitle {
+    font-size: 15px;
+  }
+}
+
 /* ==== 副標題（小字說明）- 優化可讀性 ==== */
 p.subtitle {
   text-align: center; /* 文字置中 */

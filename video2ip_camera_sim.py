@@ -1,6 +1,7 @@
 """
-python video2ip_camera_sim.py --video video_samples/4.mp4 --rtsp-url        
+python video2ip_camera_sim.py --video video_samples/5.mp4 --rtsp-url 
 """
+
 import argparse
 import cv2
 import sys
@@ -11,6 +12,8 @@ import threading
 
 from typing import Optional
 
+OUTPUT_FPS = 30.0   # <<< 固定輸出 FPS
+
 def seconds_to_hhmmss(sec: float) -> str:
     sec = max(0, int(sec))
     h = sec // 3600
@@ -20,9 +23,6 @@ def seconds_to_hhmmss(sec: float) -> str:
         return f"{h:02d}:{m:02d}:{s:02d}"
     return f"{m:02d}:{s:02d}"
 
-# def draw_hud(frame, text, pos=(10, 28)):
-#     cv2.putText(frame, text, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (8, 255, 8), 2, cv2.LINE_AA)
-
 def print_progress_bar(curr_sec, total_sec, width=42):
     if total_sec <= 0:
         return
@@ -30,16 +30,16 @@ def print_progress_bar(curr_sec, total_sec, width=42):
     done = int(ratio * width)
     bar = "█" * done + "·" * (width - done)
     print(f"\r[{bar}] {seconds_to_hhmmss(curr_sec)} / {seconds_to_hhmmss(total_sec)}", end="", flush=True)
+
 class RtspPusher:
     def __init__(self, w: int, h: int, fps: float, rtsp_url: str, bitrate: str = "1500k", gop: int = 30):
-        self.w, self.h, self.fps = w, h, max(1, int(round(fps or 30)))
+        self.w, self.h, self.fps = w, h, int(round(fps))
         self.rtsp_url = rtsp_url
         self.bitrate = bitrate
         self.gop = gop
         self.proc: Optional[subprocess.Popen] = None
 
-        # 新增：背景推流用 queue & thread
-        self._queue: queue.Queue[bytes] = queue.Queue(maxsize=self.fps * 2)  # 約 2 秒緩衝
+        self._queue: queue.Queue[bytes] = queue.Queue(maxsize=self.fps * 2)
         self._writer_thread: Optional[threading.Thread] = None
         self._stop_flag = threading.Event()
 
@@ -50,7 +50,7 @@ class RtspPusher:
             "-re",
             "-f", "rawvideo",
             "-pix_fmt", "bgr24",
-            f"-s", f"{self.w}x{self.h}",
+            "-s", f"{self.w}x{self.h}",
             "-r", str(self.fps),
             "-i", "-",
             "-an",
@@ -69,16 +69,14 @@ class RtspPusher:
         try:
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
             self._stop_flag.clear()
-            # 啟動背景 writer
             self._writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
             self._writer_thread.start()
-            print(f"\n[RTSP] 推流啟動：{self.rtsp_url} ({self.w}x{self.h}@{self.fps} • {self.bitrate} • gop={self.gop})")
+            print(f"\n[RTSP] 推流啟動：{self.rtsp_url} ({self.w}x{self.h}@{self.fps}fps)")
         except FileNotFoundError:
-            print("[ERR] 找不到 ffmpeg（請先安裝或加入 PATH）。", file=sys.stderr)
+            print("[ERR] 找不到 ffmpeg", file=sys.stderr)
             sys.exit(1)
 
     def _writer_loop(self):
-        """在背景 thread、阻塞地寫入 ffmpeg stdin，主線程不被卡住。"""
         if self.proc is None or self.proc.stdin is None:
             return
         try:
@@ -102,20 +100,17 @@ class RtspPusher:
         return self.proc is not None and self.proc.poll() is None
 
     def write(self, frame) -> bool:
-        """主迴圈只負責把 frame 丟進 queue；滿了就丟掉。"""
         if not self.alive():
             return False
         if self._queue.full():
-            # 丟掉最舊一個，保留較新的（維持即時性）
             try:
-                _ = self._queue.get_nowait()
+                self._queue.get_nowait()
             except queue.Empty:
                 pass
         try:
             self._queue.put_nowait(frame.tobytes())
             return True
         except queue.Full:
-            # 萬一還是滿，就乾脆放棄這一幀
             return True
 
     def stop(self):
@@ -139,96 +134,83 @@ class RtspPusher:
             with self._queue.mutex:
                 self._queue.queue.clear()
 
-
 def open_source(video_path: str = "", camera: Optional[int] = None) -> cv2.VideoCapture:
-    if camera is not None:
-        cap = cv2.VideoCapture(int(camera))
-    else:
-        cap = cv2.VideoCapture(video_path)
-    return cap
+    return cv2.VideoCapture(int(camera)) if camera is not None else cv2.VideoCapture(video_path)
 
 def main():
-    ap = argparse.ArgumentParser(description="將影片/攝影機模擬為 IP Cam：視窗顯示 + RTSP 推流（ffmpeg）")
+    ap = argparse.ArgumentParser(description="將影片/攝影機模擬為 IP Cam（固定 30 FPS RTSP）")
     src = ap.add_mutually_exclusive_group(required=True)
-    src.add_argument("--video", help="影片檔路徑，例如 sample.mp4")
-    src.add_argument("--camera", type=int, help="攝影機索引（0=預設相機）")
-    ap.add_argument("--rtsp-url", required=True, help="RTSP 目標位址，例如 rtsp://127.0.0.1:30201/mystream")
-    ap.add_argument("--max-width", type=int, default=0, help="視窗最大寬度（0=不縮放）")
-    ap.add_argument("--bitrate", default="4000k", help="推流碼率，例如 800k / 1500k / 3M")
-    ap.add_argument("--gop", type=int, default=0, help="關鍵幀間距（0 代表自動=FPS）")
-    ap.add_argument("--repeat-loop", action="store_true", help="影片播完自動循環（僅 --video 時生效）")
+    src.add_argument("--video")
+    src.add_argument("--camera", type=int)
+    ap.add_argument("--rtsp-url", required=True)
+    ap.add_argument("--max-width", type=int, default=0)
+    ap.add_argument("--bitrate", default="4000k")
+    ap.add_argument("--gop", type=int, default=0)
+    ap.add_argument("--repeat-loop", action="store_true")
     args = ap.parse_args()
 
     cap = open_source(args.video, args.camera)
     if not cap.isOpened():
-        print("無法開啟來源", file=sys.stderr); sys.exit(1)
+        print("無法開啟來源", file=sys.stderr)
+        sys.exit(1)
 
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    if fps < 1: fps = 30.0
-    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)  or 640)
+    src_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    if src_fps < 1:
+        src_fps = 30.0
+
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 640)
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 480)
+
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-    total_duration = (total_frames / fps) if total_frames > 0 else 0.0
+    total_duration = total_frames / src_fps if total_frames > 0 else 0.0
 
-    gop = args.gop if args.gop > 0 else int(round(fps))
+    drop_ratio = max(1, round(src_fps / OUTPUT_FPS))
+    frame_interval = 1.0 / OUTPUT_FPS
 
-    pusher = RtspPusher(width, height, fps, args.rtsp_url, bitrate=args.bitrate, gop=gop)
+    gop = args.gop if args.gop > 0 else int(OUTPUT_FPS)
+    pusher = RtspPusher(width, height, OUTPUT_FPS, args.rtsp_url, bitrate=args.bitrate, gop=gop)
     pusher.start()
 
-    window = "IPCam 模擬串流"
-    cv2.namedWindow(window, cv2.WINDOW_NORMAL)
-    print(f"[INFO] 來源: {'camera:'+str(args.camera) if args.camera is not None else args.video}")
-    if total_duration > 0:
-        print(f"[INFO] 長度：{seconds_to_hhmmss(total_duration)}，FPS={fps:.2f}，解析度={width}x{height}")
-    else:
-        print(f"[INFO] FPS={fps:.2f}，解析度={width}x{height}（即時來源或無法取得總長）")
-    print("按 q 離開。")
-    print_progress_bar(0, total_duration)
+    cv2.namedWindow("IPCam 模擬串流", cv2.WINDOW_NORMAL)
+    print(f"[INFO] Source FPS={src_fps:.2f} → Output FPS={OUTPUT_FPS}")
+    print("按 q 離開")
 
-    frame_interval = 1.0 / fps
-    next_show_time = time.perf_counter()
+    next_time = time.perf_counter()
+    frame_count = 0
 
     while True:
         ret, frame = cap.read()
         if not ret:
             if args.video and args.repeat_loop:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                frame_count = 0
                 continue
             break
 
-        # 目前秒數（用 frame index 估算；對相機來源則無總長、僅顯示流逝時間）
-        frame_idx = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-        curr_sec = (frame_idx / fps) if total_duration > 0 else (frame_idx / fps)
+        frame_count += 1
+        if frame_count % drop_ratio != 0:
+            continue
 
-        # # 疊字 HUD
-        # if total_duration > 0:
-        #     hud = f"{seconds_to_hhmmss(curr_sec)} / {seconds_to_hhmmss(total_duration)}"
-        # else:
-        #     hud = f"{seconds_to_hhmmss(curr_sec)}"
-        # draw_hud(frame, hud, (10, 28))
+        now = time.perf_counter()
+        if now < next_time:
+            time.sleep(next_time - now)
 
-        # 視窗縮放顯示
         show = frame
         if args.max_width and width > args.max_width:
             scale = args.max_width / width
-            show = cv2.resize(frame, (int(width*scale), int(height*scale)), interpolation=cv2.INTER_AREA)
+            show = cv2.resize(frame, (int(width * scale), int(height * scale)))
 
-        # 節奏控制，盡量貼合原 fps
-        now = time.perf_counter()
-        if now < next_show_time:
-            time.sleep(max(0, next_show_time - now))
-        cv2.imshow(window, show)
-        next_show_time = time.perf_counter() + frame_interval
+        cv2.imshow("IPCam 模擬串流", show)
+        next_time = time.perf_counter() + frame_interval
 
-        # 推流；若 ffmpeg 掛了就嘗試重啟
-        ok = pusher.write(frame)
-        if not ok:
-            print("\n[RTSP] 偵測到 ffmpeg 中斷，3 秒後嘗試重連...")
+        if not pusher.write(frame):
+            print("\n[RTSP] ffmpeg 中斷，3 秒後重連")
             pusher.stop()
             time.sleep(3)
             pusher.start()
 
         if total_duration > 0:
+            curr_sec = (frame_count * drop_ratio) / src_fps
             print_progress_bar(curr_sec, total_duration)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -237,7 +219,7 @@ def main():
     cap.release()
     cv2.destroyAllWindows()
     pusher.stop()
-    print("\n串流結束。")
+    print("\n串流結束")
 
 if __name__ == "__main__":
     main()

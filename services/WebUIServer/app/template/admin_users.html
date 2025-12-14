@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% include './partials/header.html'%}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_tasks.css') }}">
+
+  <section class="events-section">
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>使用者 ID</th>
+            <th>帳號</th>
+            <th>姓名</th>
+            <th>Token 使用量（萬）</th>
+            <th>聊天訊息數</th>
+            <th>使用預設 API Key</th>
+            <th>黑名單狀態</th>
+          </tr>
+        </thead>
+        <tbody id="usersStatsList">
+          <tr>
+            <td colspan="7" class="text-center">載入中...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <button id="prevBtn" class="page-btn">&lt;</button>
+      <span>第</span>
+      <input id="pageInput" type="number" min="1" value="1" />
+      <span id="pageTotal">/ 1</span>
+      <span>頁</span>
+      <button id="nextBtn" class="page-btn">&gt;</button>
+      <span class="pagination-info">
+        <span>每頁</span>
+        <input id="pageSize" type="number" min="1" max="100" value="20" />
+        <span>筆, 共</span>
+        <span id="totalCount">0</span>
+        <span>筆</span>
+      </span>
+    </div>
+  </section>
+
+  <!-- 使用者詳情/編輯彈出視窗（參考音樂庫管理樣式） -->
+  <div class="modal-overlay" id="userDetailModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>使用者詳情</h3>
+        <span class="modal-close" id="closeUserDetailModal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <form id="userDetailForm" class="admin-form">
+          <input type="hidden" id="detailUserId">
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="detailAccount">帳號</label>
+              <input type="text" id="detailAccount" readonly style="background-color:#f5f5f5;">
+            </div>
+            <div class="form-field">
+              <label for="detailName">姓名</label>
+              <input type="text" id="detailName" readonly style="background-color:#f5f5f5;">
+            </div>
+            <div class="form-field">
+              <label for="detailRole">角色</label>
+              <input type="text" id="detailRole" readonly style="background-color:#f5f5f5;">
+            </div>
+            <div class="form-field">
+              <label for="detailActive">帳號啟用</label>
+              <select id="detailActive">
+                <option value="true">是（啟用）</option>
+                <option value="false">否（停用）</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="detailGender">性別</label>
+              <input type="text" id="detailGender" readonly style="background-color:#f5f5f5;">
+            </div>
+            <div class="form-field">
+              <label for="detailBirthday">生日</label>
+              <input type="text" id="detailBirthday" readonly style="background-color:#f5f5f5;">
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="detailPhone">電話</label>
+              <input type="text" id="detailPhone" readonly style="background-color:#f5f5f5;">
+            </div>
+            <div class="form-field">
+              <label for="detailEmail">Email</label>
+              <input type="text" id="detailEmail" readonly style="background-color:#f5f5f5;">
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="detailPasswordHash">密碼雜湊（password_hash）</label>
+            <textarea id="detailPasswordHash" rows="3" readonly style="background-color:#f5f5f5;"></textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="detailBlacklist">黑名單（禁止使用預設 API Key）</label>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <input type="checkbox" id="detailBlacklist">
+              <span id="detailBlacklistState">-</span>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="detailBlacklistReason">黑名單原因（選填）</label>
+            <input type="text" id="detailBlacklistReason" placeholder="例如：濫用 API / 異常行為">
+          </div>
+
+          <div class="form-hint" id="userDetailMessage" aria-live="polite"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" id="cancelUserDetail">取消</button>
+        <button type="button" class="btn-primary" id="saveUserDetail">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="{{ url_for('static', filename='js/admin_users.js') }}"></script>
+{% endblock %}
+

@@ -1,0 +1,106 @@
+{
+  "功能編號": "1-3",
+  "功能名稱": "導覽與版面",
+  "功能說明": "系統採用共用 base 版面，桌面版顯示側邊欄導覽、行動版顯示底部導覽列；頁面載入時依 JWT 取得使用者資訊並根據角色切換一般使用者/管理員導覽元件，同時以 active_page 控制目前頁面高亮，並在未登入時導回登入頁。",
+  "程式名稱": "services/WebUIServer/app/template/base.html; services/WebUIServer/app/template/partials/sidebar.html; services/WebUIServer/app/template/partials/sidebar_admin.html; services/WebUIServer/app/template/partials/mobile_nav.html; services/WebUIServer/app/template/partials/mobile_nav_admin.html; services/WebUIServer/app/static/js/init_user.js; services/WebUIServer/app/static/js/mobile_nav.js; services/WebUIServer/app/static/css/layout.css; services/WebUIServer/app/static/css/mobile_nav.css",
+  "輸入": [
+    "滑鼠",
+    "base.html頁面",
+    "users資料表"
+  ],
+  "輸出": [
+    "螢幕"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "使用者透過瀏覽器進入任一功能頁面（以 base.html 為 layout）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "模板渲染",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端渲染 base.html，依 active_page 判斷是否載入 admin 版或 user 版的 sidebar/mobile_nav"
+          },
+          {
+            "sub_no": "②",
+            "item": "同時 include 登出確認對話框 partial，供各頁共用"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端 init_user.js 檢查 localStorage.jwt；若不存在則導向 /auth"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 token 存在，呼叫 GET /api/v1/users/me 取得 user.role 並快取於 window.__CURRENT_USER 與 localStorage.user_role"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "UI 切換",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "若 role=admin 且不在 /admin 頁：切換顯示 admin 版本的 sidebar/mobile_nav，隱藏 user 版本"
+          },
+          {
+            "sub_no": "②",
+            "item": "若 role!=admin：顯示 user 版本，隱藏 admin 版本"
+          },
+          {
+            "sub_no": "③",
+            "item": "若位於 /admin 且 role!=admin：導向 /home"
+          }
+        ]
+      },
+      {
+        "step_no": 4,
+        "title": "RWD 樣式套用",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "CSS 於桌面顯示側邊欄；於手機寬度（max-width:768px）隱藏 sidebar 並顯示 mobile-nav"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呈現一致的頁面版面（導覽列 + 主內容區）且目前頁面高亮"
+          },
+          {
+            "sub_no": "②",
+            "item": "未登入：導向登入頁 /auth"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  }
+}

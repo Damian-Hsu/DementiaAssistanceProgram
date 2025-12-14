@@ -1,0 +1,111 @@
+{
+  "功能編號": "2-6-2",
+  "功能名稱": "變更密碼",
+  "功能說明": "使用者輸入舊密碼與新密碼後送出，系統驗證舊密碼並更新密碼雜湊。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/css/user_profile.css; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/User/service.py; services/APIServer/app/router/User/DTO.py; services/APIServer/app/DataAccess/tables/users.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "變更密碼視窗",
+      "users資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "使用者設定介面",
+      "users資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【舊密碼】",
+          "【新密碼】",
+          "【確認新密碼】"
+        ],
+        "text": "鍵盤輸入【舊密碼】、【新密碼】、【確認新密碼】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【舊密碼】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【新密碼】"
+          },
+          {
+            "sub_no": "③",
+            "text": "【確認新密碼】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【確認變更】"
+        ],
+        "text": "滑鼠點選【確認變更】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "驗證舊密碼正確後更新 users.password_hash。",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "成功：更新密碼"
+          },
+          {
+            "sub_no": "②",
+            "text": "失敗：顯示舊密碼錯誤或格式錯誤"
+          }
+        ]
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "users資料表"
+        ],
+        "text": "更新密碼雜湊",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "users",
+    "columns": []
+  },
+  "備註": ""
+}

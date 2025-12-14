@@ -15,34 +15,36 @@ from sqlalchemy import select, func, and_
 
 from ...DataAccess.Connect import get_session
 from ...DataAccess.tables import camera as camera_table  # camera.Table
+from ...DataAccess.tables import settings as settings_table
+from ...DataAccess.tables import users as users_table
 from ...DataAccess.tables.__Enumeration import CameraStatus, Role
 
 from .DTO import (
     CameraCreate, CameraUpdate, CameraRead, CameraListResp, CameraStatusReq,
-    OkResp, TokenVersionResp, GenerateTokenReq, PlayHLSURLResp,
+    OkResp, TokenVersionResp, GenerateTokenReq,
     RefreshTokenResp,PublishRTSPURLResp,StreamConnectResp,PlayWebRTCURLResp,
     StreamStatusResp
 )
 from ...security.jwt_manager import CameraJWTManager
 from ...config.path import (CAMERA_PREFIX)
+from ...config.public_domain import (
+    get_public_domain,
+    get_rtsp_url,
+    get_webrtc_url,
+)
 
 # ====== 設定 ======
-# 外部端口（用於外部推流端和前端播放）
-# Docker 映射：外部 30201 → 容器內部 8554
-RTSP_PUBLIC_HOST = os.getenv("RTSP_PUBLIC_HOST", "127.0.0.1")
-RTSP_PORT = int(os.getenv("RTSP_PORT", "30201"))  # 外部端口，給外部推流端使用
-
 # StreamingServer 與 MediaMTX 在 docker network 內可互通的位址
-# 注意：使用容器內部端口 8554，不是外部端口 30201（內網對內網）
+# 注意：使用容器內部端口 8554，不是外部端口（內網對內網）
 STREAMING_BASE = os.getenv("STREAMING_BASE", "http://streaming:30500")
 STREAMING_INTERNAL_TOKEN = os.getenv("INTERNAL_TOKEN", "")         # 給 StreamingServer 的 X-Internal-Token
 MEDIAMTX_INTERNAL_RTSP = os.getenv("MEDIAMTX_RTSP_BASE", "rtsp://mediamtx:8554")  # 內部端口 8554（內網對內網）
 
-# 其他外部端口（用於前端播放）
-HLS_PUBLIC_HOST = os.getenv("HLS_PUBLIC_HOST", RTSP_PUBLIC_HOST)
-HLS_PORT = int(os.getenv("HLS_PORT", "30202"))  # 外部端口，映射到容器內部 8888
-WEBRTC_PUBLIC_HOST = os.getenv("WEBRTC_PUBLIC_HOST", RTSP_PUBLIC_HOST)
-WEBRTC_PORT = int(os.getenv("WEBRTC_PORT", "30204"))  # 外部端口，映射到容器內部 8889
+# 向後兼容：保留舊的環境變數名稱
+RTSP_PUBLIC_HOST = os.getenv("RTSP_PUBLIC_HOST", "")
+RTSP_PORT = int(os.getenv("RTSP_PORT", "8554"))  # 預設使用 Nginx 代理的端口
+WEBRTC_PUBLIC_HOST = os.getenv("WEBRTC_PUBLIC_HOST", "")
+WEBRTC_PORT = int(os.getenv("WEBRTC_PORT", "80"))  # 預設使用 HTTP 端口
 WEBRTC_SCHEME = os.getenv("WEBRTC_SCHEME", "http")  # https 若你有 TLS
 
 
@@ -67,29 +69,31 @@ def _camera_path(cam: camera_table.Table) -> str:
     return path or _make_path_from_id(cam.id)
 
 
-def _build_public_rtsp(cam: camera_table.Table, token: str) -> str:
+def _build_public_rtsp(cam: camera_table.Table, token: str, request: Optional[Request] = None) -> str:
     """
     構建外部 RTSP URL（給外部推流端使用，如 video2ip_camera_sim.py）
-    使用外部端口 30201（映射到容器內部 8554）
+    使用公開網域配置或 Request Host header
     """
-    return f"rtsp://{RTSP_PUBLIC_HOST}:{RTSP_PORT}/{_camera_path(cam)}?token={token}"
+    # 獲取公開網域（優先使用環境變數，否則從 Request 獲取）
+    rtsp_domain = get_public_domain("rtsp", request, default_scheme="rtsp", default_port=8554)
+    path = _camera_path(cam)
+    return get_rtsp_url(rtsp_domain, path, token)
 
 
 def _build_internal_rtsp_for_streaming(cam: camera_table.Table, token: str) -> str:
     """
     構建內部 RTSP URL（給 StreamingServer 在 Docker 網絡內拉流用）
-    使用容器內部端口 8554（不是外部端口 30201）
+    使用容器內部端口 8554（不是外部端口）
     例如 "rtsp://mediamtx:8554/<path>?token=xxx"
     """
     return f"{MEDIAMTX_INTERNAL_RTSP.rstrip('/')}/{_camera_path(cam)}?token={token}"
 
-def _build_public_hls(cam, play_token: str) -> str:
-    path = _camera_path(cam)
-    return f"http://{HLS_PUBLIC_HOST}:{HLS_PORT}/{path}/index.m3u8?token={play_token}"
 
-def _build_public_webrtc(cam, webrtc_token: str) -> str:
+def _build_public_webrtc(cam, webrtc_token: str, request: Optional[Request] = None) -> str:
+    """構建外部 WebRTC URL，使用公開網域配置"""
+    webrtc_domain = get_public_domain("webrtc", request, default_scheme=WEBRTC_SCHEME, default_port=80)
     path = _camera_path(cam)
-    return f"{WEBRTC_SCHEME}://{WEBRTC_PUBLIC_HOST}:{WEBRTC_PORT}/{path}/whep?token={webrtc_token}"
+    return get_webrtc_url(webrtc_domain, path, webrtc_token)
 async def _get_camera_or_404(db: AsyncSession, id_: uuid.UUID) -> camera_table.Table:
     
     stmt = select(camera_table.Table).where(camera_table.Table.id == id_)
@@ -104,13 +108,28 @@ async def _get_camera_or_404(db: AsyncSession, id_: uuid.UUID) -> camera_table.T
 
 # ====== 路由 ======
 @camera_router.post("/", response_model=CameraRead, status_code=status.HTTP_201_CREATED)
-async def create_camera(req: CameraCreate, db: AsyncSession = Depends(get_session)):
+async def create_camera(request: Request, req: CameraCreate, db: AsyncSession = Depends(get_session)):
     """
     新增相機：預設 active、token_version=1。
     若模型上存在 rtsp_path 欄位，會在取得 id 後自動填入。
     """
+    current_user = request.state.current_user
+
+    # 權限：一般使用者只能建立自己的相機；管理員可指定 user_id
+    if current_user.role != Role.admin:
+        target_user_id = int(current_user.id)
+    else:
+        if req.user_id is None:
+            raise HTTPException(status_code=400, detail="user_id is required for admin")
+        target_user_id = int(req.user_id)
+
+    # 檢查使用者是否存在（避免 FK violation 500）
+    ures = await db.execute(select(users_table.Table.id).where(users_table.Table.id == target_user_id))
+    if ures.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail=f"使用者不存在：user_id={target_user_id}")
+
     cam = camera_table.Table(
-        user_id=req.user_id,
+        user_id=target_user_id,
         name=req.name,
         status=CameraStatus.active,
         # allow_ip=req.allow_ip,
@@ -172,7 +191,7 @@ async def delete_camera(request: Request,
 @camera_router.get("/", response_model=CameraListResp)
 async def list_cameras(
     request: Request,
-    user_id: int = Query(...),
+    user_id: Optional[int] = Query(None),
     status: Optional[CameraStatus] = Query(None),
     q: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -181,9 +200,13 @@ async def list_cameras(
 ):  
     """列出某使用者的相機（管理員可看所有人，一般使用者只能看自己的）。"""
     current_user = request.state.current_user
-    if current_user.role != Role.admin and current_user.id != user_id:
+    # 若未提供 user_id：一般使用者預設看自己；管理員預設看自己（避免一次列出全站）
+    target_user_id = int(user_id) if user_id is not None else int(current_user.id)
+
+    if current_user.role != Role.admin and int(current_user.id) != target_user_id:
         raise HTTPException(status_code=403, detail="沒有權限查看此使用者的相機")
-    conds = [camera_table.Table.user_id == user_id]
+
+    conds = [camera_table.Table.user_id == target_user_id]
     if status:
         conds.append(camera_table.Table.status == status)
     if q:
@@ -289,7 +312,7 @@ async def connect_stream(
     db: AsyncSession = Depends(get_session),
 ):
     """
-    建立 RTSP 推流與 HLS 播放：
+    建立 RTSP 推流：
     1) 簽 publisher token → 給客戶端推流。
     2) 簽 player token → StreamingServer 拉流（內部用）。
     3) 呼叫 /streams/start 開錄。
@@ -300,7 +323,7 @@ async def connect_stream(
         raise HTTPException(status_code=403, detail="沒有權限操作此相機")
     if cam.status != CameraStatus.active:
         raise HTTPException(status_code=403, detail=f"camera status={cam.status} not allowed")
-    _ttl = max(req.ttl or 60, 60)
+    _ttl = max(req.ttl or 10800, 300)  # RTSP 推流：預設 10800 秒，最少 300 秒
     # internal token (StreamingServer 拉流用)
     internal_rtsp_token = stream_jwt.issue(
         camera_id=str(cam.id),
@@ -312,11 +335,30 @@ async def connect_stream(
     internal_play_url = _build_internal_rtsp_for_streaming(cam, internal_rtsp_token)
 
     # 呼叫 StreamingServer 開錄
+    # 影片切片長度：優先用 request 指定；否則讀取系統設定（管理員可在管理員設定頁調整）；最後 fallback 30
+    segment_seconds = getattr(req, "segment_seconds", None)
+    if not segment_seconds:
+        try:
+            import json
+            stmt = select(settings_table.Table).where(settings_table.Table.key == "video_segment_seconds")
+            result = await db.execute(stmt)
+            setting = result.scalar_one_or_none()
+            if setting:
+                value = json.loads(setting.value)
+                if isinstance(value, dict) and value.get("segment_seconds") is not None:
+                    segment_seconds = int(value["segment_seconds"])
+                elif isinstance(value, (int, float, str)):
+                    segment_seconds = int(value)
+        except Exception:
+            segment_seconds = None
+    if not segment_seconds:
+        segment_seconds = 30
+
     payload = {
         "user_id": str(cam.user_id),
         "camera_id": str(cam.id),
         "rtsp_url": internal_play_url,
-        "segment_seconds": req.segment_seconds or 30,
+        "segment_seconds": int(segment_seconds),
         "align_first_cut": bool(getattr(req, "align_first_cut", True)),
         "startup_deadline_ts": _ttl
     }
@@ -370,7 +412,7 @@ async def stop_stream(
 async def get_publish_rtsp_url(
     id: uuid.UUID,
     request: Request,
-    ttl: Optional[int] = Query(60, ge=30, le=3600),
+    ttl: Optional[int] = Query(10800, ge=300, le=21600),
     db: AsyncSession = Depends(get_session)
 ):
     """
@@ -390,44 +432,11 @@ async def get_publish_rtsp_url(
         ttl=ttl,
         aud="rtsp"
     )
-    public_publish_url = _build_public_rtsp(cam, publish_rtsp_token)
+    public_publish_url = _build_public_rtsp(cam, publish_rtsp_token, request)
 
     now = int(datetime.now(timezone.utc).timestamp())
     return PublishRTSPURLResp(
         publish_rtsp_url=public_publish_url,
-        ttl=ttl,
-        expires_at=now + ttl,
-    )
-
-@camera_router.get("/{id}/play-hls-url", response_model=PlayHLSURLResp)
-async def get_play_hls_url(
-    id: uuid.UUID,
-    request: Request,
-    ttl: Optional[int] = Query(60, ge=30, le=3600),
-    db: AsyncSession = Depends(get_session)
-):
-    """
-    發 HLS 播放用的 JWT，回傳帶 token 的 URL。
-    """
-    cam = await _get_camera_or_404(db, id)
-    current_user = request.state.current_user
-    if current_user.role != Role.admin and current_user.id != cam.user_id:
-        raise HTTPException(status_code=403, detail="沒有權限操作此相機")
-    if cam.status != CameraStatus.active:
-        raise HTTPException(status_code=403, detail=f"camera status={cam.status} not allowed")
-
-    player_token_public = stream_jwt.issue(
-        camera_id=str(cam.id),
-        action="read",
-        token_version=int(cam.token_version),
-        ttl=ttl,
-        aud="hls"
-    )
-    public_play_hls_url = _build_public_hls(cam, player_token_public)
-
-    now = int(datetime.now(timezone.utc).timestamp())
-    return PlayHLSURLResp(
-        play_hls_url=public_play_hls_url,
         ttl=ttl,
         expires_at=now + ttl,
     )
@@ -481,7 +490,7 @@ async def get_stream_status(
 async def get_play_webrtc_url(
     id: uuid.UUID,
     request: Request,
-    ttl: Optional[int] = Query(60, ge=30, le=3600),
+    ttl: Optional[int] = Query(180, ge=30, le=10800),
     db: AsyncSession = Depends(get_session)
 ):
     """
@@ -501,7 +510,7 @@ async def get_play_webrtc_url(
         ttl=ttl,
         aud="webrtc"
     )
-    public_play_webrtc_url = _build_public_webrtc(cam, webrtc_token_public)
+    public_play_webrtc_url = _build_public_webrtc(cam, webrtc_token_public, request)
 
     now = int(datetime.now(timezone.utc).timestamp())
     return PlayWebRTCURLResp(
@@ -514,7 +523,7 @@ async def get_play_webrtc_url(
 async def refresh_token(
     id: uuid.UUID,
     request: Request, # 這裡面有 current_user
-    audience: Literal["rtsp", "hls", "webrtc"] = Path(..., description="指定要重新簽發的 token 用途"),
+    audience: Literal["rtsp", "webrtc"] = Path(..., description="指定要重新簽發的 token 用途"),
     token : str = Query(description="還在有效期內的舊 token"),
     db: AsyncSession = Depends(get_session)
 ):

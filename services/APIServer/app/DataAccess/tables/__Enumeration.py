@@ -9,12 +9,6 @@ class Role(str, Enum):
 class Gender(str, Enum):
     male = "male"
     female = "female"
-
-class DementiaLevel(str, Enum):
-    normal = "normal"
-    mild = "mild"
-    moderate = "moderate"
-    severe = "severe"
 # =============== Compute_Jobs Tabel usage ===============
 class JobStatus(str, Enum):
     pending = "pending"
@@ -24,7 +18,6 @@ class JobStatus(str, Enum):
 
 RoleEnum = SAEnum(Role, name="role_enum")
 GenderEnum = SAEnum(Gender, name="gender_enum")
-DementiaLevelEnum = SAEnum(DementiaLevel, name="dementia_level_enum")
 JobStatusEnum = SAEnum(JobStatus, name="job_status_enum")
 
 # =============== Recordings Tabel usage ===============

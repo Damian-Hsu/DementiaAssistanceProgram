@@ -1,0 +1,124 @@
+{
+  "功能編號": "2-3-1",
+  "功能名稱": "錄影列表查詢",
+  "功能說明": "使用者在影片管理頁載入或調整篩選條件時，前端呼叫錄影列表查詢端點取得錄影清單（含縮圖路徑、時間、長度等），並渲染列表；列表會過濾掉缺少有效 start_time 的項目避免顯示「未知時間」影片。",
+  "程式名稱": "services/WebUIServer/app/static/js/recordings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Recordings/service.py",
+  "輸入": [
+    "keywords（可選）",
+    "start_time/end_time（可選，YYYY-MM-DD）",
+    "sort/page/size",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "RecordingListResp（items/total）",
+    "影片列表 UI"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "進入影片管理頁，觸發首次載入錄影列表"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "輸入條件",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "輸入關鍵字 keywords（防抖 300ms）"
+          },
+          {
+            "sub_no": "②",
+            "item": "選擇起始/結束日期 start/end"
+          },
+          {
+            "sub_no": "③",
+            "item": "選擇排序 sortOrder"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "呼叫 GET /api/v1/recordings 取得清單（keywords/start_time/end_time/sort/page/size）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "前端過濾",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "過濾 start_time 無效的錄影，避免顯示未知時間"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "畫面渲染",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "渲染錄影列表（時間作為標題、顯示長度、可顯示縮圖）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "顯示符合條件的錄影清單或空狀態提示"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "recordings",
+    "columns": [
+      {
+        "欄位": "start_time",
+        "中文": "開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "recordings.start_time（排序/篩選）"
+      },
+      {
+        "欄位": "duration",
+        "中文": "影片長度",
+        "型態": "FLOAT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "recordings.duration"
+      },
+      {
+        "欄位": "thumbnail_s3_key",
+        "中文": "縮圖S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "recordings.thumbnail_s3_key"
+      }
+    ]
+  }
+}

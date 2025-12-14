@@ -1,0 +1,135 @@
+{
+  "功能編號": "2-6-6",
+  "功能名稱": "LLM 設定",
+  "功能說明": "使用者可設定是否使用系統預設 API Key，或改用自帶 API Key 與模型設定；儲存後更新 users.settings 並可能清除模型快取。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/User/service.py; services/APIServer/app/router/User/settings.py; services/APIServer/app/router/Chat/llm_tools.py; services/APIServer/app/DataAccess/tables/users.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py; services/APIServer/app/DataAccess/tables/settings.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠",
+      "鍵盤"
+    ],
+    "資源名詞": [
+      "使用者設定介面",
+      "users資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "使用者設定介面",
+      "users資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "切換",
+        "objects": [
+          "【使用系統預設API Key】"
+        ],
+        "text": "滑鼠切換【使用系統預設API Key】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【啟用】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【停用】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "依勾選狀態切換表單可編輯欄位。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [
+          "模型設定表單"
+        ],
+        "text": "更新模型設定表單",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【Provider】",
+          "【Model】",
+          "【Google API Key】"
+        ],
+        "text": "鍵盤輸入【Provider】、【Model】、【Google API Key】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【儲存模型設定】"
+        ],
+        "text": "滑鼠點選【儲存模型設定】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "更新 users.settings 的 LLM 設定；若在黑名單則拒絕啟用系統預設 key。",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "成功：更新設定"
+          },
+          {
+            "sub_no": "②",
+            "text": "失敗：提示需改用自帶 Key"
+          }
+        ]
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "users資料表"
+        ],
+        "text": "更新LLM設定",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "users; api_key_blacklist; settings",
+    "columns": []
+  },
+  "備註": ""
+}

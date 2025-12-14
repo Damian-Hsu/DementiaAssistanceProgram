@@ -1,0 +1,127 @@
+{
+  "功能編號": "3-3-4",
+  "功能名稱": "刪除音樂",
+  "功能說明": "管理員刪除音樂時需確認；確認後系統刪除 music 資料並嘗試刪除對應檔案。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_music.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Music/service.py; services/APIServer/app/utils/s3_utils.py; services/APIServer/app/DataAccess/tables/music.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "音樂詳情視窗",
+      "music資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "資料庫",
+      "螢幕"
+    ],
+    "資源名詞": [
+      "music資料表",
+      "音樂清單"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【刪除】"
+        ],
+        "text": "滑鼠點選【刪除】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【取消】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【確認】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "刪除確認視窗"
+        ],
+        "text": "跳出刪除確認視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-①",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【取消】"
+        ],
+        "text": "滑鼠點選【取消】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "刪除確認視窗"
+        ],
+        "text": "關閉刪除確認視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❶-②",
+      "parent_step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【確認】"
+        ],
+        "text": "滑鼠點選【確認】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "刪除 music 資料並嘗試刪除對應檔案。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "刪除",
+        "objects": [
+          "music資料表"
+        ],
+        "text": "刪除音樂資料",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "music",
+    "columns": []
+  },
+  "備註": ""
+}

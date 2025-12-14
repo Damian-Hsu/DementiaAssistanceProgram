@@ -1,0 +1,258 @@
+{
+  "功能編號": "2-6",
+  "功能名稱": "使用者設定",
+  "功能說明": "使用者設定頁提供個人資料維護（姓名/性別/生日/電話/信箱）、變更密碼，以及應用程式偏好（時區、日記自動刷新間隔、串流連結 TTL）與 AI 模型設定（是否使用系統預設 API Key、預設 LLM provider/model、Google API Key）。所有偏好設定統一存放於 users.settings（JSONB），後端會在更新 LLM 設定時清理 Chat 的模型快取，並在使用者被列入預設 key 黑名單時禁止啟用 use_default_api_key。",
+  "程式名稱": "services/WebUIServer/app/template/user_profile.html; services/WebUIServer/app/static/js/user_profile.js; services/WebUIServer/app/static/css/user_profile.css; services/WebUIServer/app/static/js/APIClient.js; services/WebUIServer/app/static/js/AuthService.js; services/APIServer/app/router/User/service.py; services/APIServer/app/router/User/settings.py; services/APIServer/app/router/User/DTO.py; services/APIServer/app/DataAccess/tables/users.py; services/APIServer/app/DataAccess/tables/api_key_blacklist.py; services/APIServer/app/DataAccess/tables/settings.py",
+  "輸入": [
+    "GET /users/me（載入個人資料）",
+    "PATCH /users/me（更新個人資料）",
+    "PUT /users/me/password（變更密碼）",
+    "GET/PATCH /users/settings（應用程式與模型設定）",
+    "GET /users/settings/timezones（時區選單）",
+    "GET /users/settings/system-default-llm（顯示系統預設 provider/model）",
+    "Bearer JWT"
+  ],
+  "輸出": [
+    "使用者資料更新結果（msg/user）",
+    "密碼變更結果（msg）",
+    "UserSettingsResponse（settings/message）",
+    "設定頁 UI（成功/錯誤提示 + JWT 剩餘時間顯示）"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "進入使用者設定頁（/user_profile），載入個人資料/應用程式設定/模型設定區塊"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端讀取 localStorage.jwt，若不存在則提示並導回登入或首頁"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "使用者操作",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "編輯個人資料並點擊【儲存個人資料】"
+          },
+          {
+            "sub_no": "②",
+            "item": "點擊【變更密碼】開啟對話框並送出"
+          },
+          {
+            "sub_no": "③",
+            "item": "調整時區/日記刷新間隔/串流 TTL 並點擊【儲存應用程式設定】"
+          },
+          {
+            "sub_no": "④",
+            "item": "調整 LLM 設定（use_default_api_key、provider/model、Google API key）並點擊【儲存模型設定】"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "資料查詢",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端呼叫 GET /users/me 取得個人資料並填入表單，同時保存 user_id 到 localStorage"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端呼叫 GET /users/settings 取得 users.settings 並填入時區/間隔/TTL/模型設定"
+          },
+          {
+            "sub_no": "③",
+            "item": "前端呼叫 GET /users/settings/timezones 載入時區選單"
+          },
+          {
+            "sub_no": "④",
+            "item": "前端呼叫 GET /users/settings/system-default-llm 取得系統預設 provider/model（僅用於顯示）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "個人資料：PATCH /users/me（更新 users 表欄位）"
+          },
+          {
+            "sub_no": "②",
+            "item": "變更密碼：PUT /users/me/password（驗證舊密碼後更新 password_hash）"
+          },
+          {
+            "sub_no": "③",
+            "item": "偏好設定：PATCH /users/settings（更新 users.settings JSONB；含欄位驗證範圍）"
+          },
+          {
+            "sub_no": "④",
+            "item": "若更新包含 LLM 設定：後端會清理該使用者的 LLM 模型快取（force_cleanup_user）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示成功訊息（showSuccess），並可重新載入最新設定"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示錯誤訊息（showError），例如欄位驗證失敗/黑名單禁止使用預設 key"
+          },
+          {
+            "sub_no": "③",
+            "item": "顯示 JWT 剩餘時間與到期時間（解析 token.exp 倒數更新）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "users; api_key_blacklist; settings",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": "autoincrement",
+        "備註": "users.id；Primary Key"
+      },
+      {
+        "欄位": "account",
+        "中文": "帳號",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.account（unique/index）"
+      },
+      {
+        "欄位": "name",
+        "中文": "姓名",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.name"
+      },
+      {
+        "欄位": "gender",
+        "中文": "性別",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.gender（GenderEnum）"
+      },
+      {
+        "欄位": "birthday",
+        "中文": "生日",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.birthday"
+      },
+      {
+        "欄位": "phone",
+        "中文": "電話",
+        "型態": "VARCHAR",
+        "長度": 20,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.phone（unique/index）"
+      },
+      {
+        "欄位": "email",
+        "中文": "信箱",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.email（unique/index）"
+      },
+      {
+        "欄位": "password_hash",
+        "中文": "密碼雜湊",
+        "型態": "VARCHAR",
+        "長度": 256,
+        "空值": "否",
+        "預設值": null,
+        "備註": "users.password_hash"
+      },
+      {
+        "欄位": "settings",
+        "中文": "使用者設定(JSON)",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "users.settings（timezone/diary_auto_refresh_interval_minutes/default_stream_ttl/default_llm_* / llm_model_api / use_default_api_key）"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "黑名單使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "api_key_blacklist.user_id；Primary Key；ForeignKey(users.id)"
+      },
+      {
+        "欄位": "key",
+        "中文": "系統設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key（default_llm_provider/default_llm_model/default_google_api_key 等）"
+      },
+      {
+        "欄位": "value",
+        "中文": "系統設定值",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value（JSON 字串）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  }
+}

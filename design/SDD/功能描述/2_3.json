@@ -1,0 +1,270 @@
+{
+  "功能編號": "2-3",
+  "功能名稱": "影片管理",
+  "功能說明": "影片管理頁提供錄影清單查詢、關鍵字搜尋（依事件內容過濾）、播放影片、取得下載連結、顯示影片內事件列表與刪除錄影；前端透過 recordings/events API 取得資料與 presigned URL，並以 HTML5 video 播放。",
+  "程式名稱": "services/WebUIServer/app/template/recordings.html; services/WebUIServer/app/static/js/recordings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Recordings/service.py; services/APIServer/app/router/Recordings/DTO.py; services/APIServer/app/DataAccess/tables/recordings.py; services/APIServer/app/DataAccess/tables/events.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統",
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "影片管理介面",
+      "recordings資料表",
+      "events資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "影片管理介面",
+      "recordings資料表",
+      "events資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "影片管理介面"
+        ],
+        "text": "系統載入影片管理介面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "查詢錄影清單並顯示列表。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "錄影清單"
+        ],
+        "text": "顯示錄影清單",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "錄影項目"
+        ],
+        "text": "滑鼠點選錄影項目",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "取得播放連結並載入事件列表。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "播放",
+        "objects": [
+          "錄影畫面"
+        ],
+        "text": "播放錄影並顯示事件列表",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【刪除影片】"
+        ],
+        "text": "滑鼠點選【刪除影片】",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "【取消】"
+          },
+          {
+            "sub_no": "②",
+            "text": "【確認】"
+          }
+        ]
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "跳出",
+        "objects": [
+          "刪除確認視窗"
+        ],
+        "text": "跳出刪除確認視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸-①",
+      "parent_step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【取消】"
+        ],
+        "text": "滑鼠點選【取消】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "關閉",
+        "objects": [
+          "刪除確認視窗"
+        ],
+        "text": "關閉刪除確認視窗",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸-②",
+      "parent_step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【確認】"
+        ],
+        "text": "滑鼠點選【確認】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "刪除 recordings 與關聯 events 資料。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "刪除",
+        "objects": [
+          "recordings資料表",
+          "events資料表"
+        ],
+        "text": "刪除錄影與事件資料",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "recordings; events",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "recordings.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "recordings.user_id"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "影片S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "recordings.s3_key"
+      },
+      {
+        "欄位": "thumbnail_s3_key",
+        "中文": "縮圖S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "recordings.thumbnail_s3_key"
+      },
+      {
+        "欄位": "start_time",
+        "中文": "開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "recordings.start_time"
+      },
+      {
+        "欄位": "end_time",
+        "中文": "結束時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "recordings.end_time"
+      },
+      {
+        "欄位": "id",
+        "中文": "事件ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "events.id"
+      },
+      {
+        "欄位": "recording_id",
+        "中文": "錄影ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.recording_id"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.summary（關鍵字搜尋來源）"
+      }
+    ]
+  },
+  "備註": ""
+}

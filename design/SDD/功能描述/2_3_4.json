@@ -1,0 +1,68 @@
+{
+  "功能編號": "2-3-4",
+  "功能名稱": "下載影片",
+  "功能說明": "使用者下載影片時，系統取得下載連結並觸發瀏覽器下載。",
+  "程式名稱": "services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Recordings/service.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "影片管理介面",
+      "recordings資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "檔案"
+    ],
+    "資源名詞": [
+      "影片檔"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【下載】"
+        ],
+        "text": "滑鼠點選【下載】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "取得下載連結並導向連結以觸發下載。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "檔案",
+        "verb": "下載",
+        "objects": [
+          "影片檔"
+        ],
+        "text": "下載影片檔",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "recordings",
+    "columns": [
+      {
+        "欄位": "s3_key",
+        "中文": "影片S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "用於生成下載 URL"
+      }
+    ]
+  },
+  "備註": ""
+}

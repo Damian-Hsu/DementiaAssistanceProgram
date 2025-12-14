@@ -1,0 +1,159 @@
+{
+  "功能編號": "3-4-1",
+  "功能名稱": "系統預設 LLM",
+  "功能說明": "管理員可在系統設定頁設定全系統共用的預設 LLM 供應商與模型。前端於載入時讀取目前設定並填入表單；管理員在儲存時將供應商/模型寫入 settings 表（default_llm_provider、default_llm_model），供使用者未指定個人 LLM 設定時作為預設值使用。",
+  "程式名稱": "services/WebUIServer/app/template/admin_settings.html; services/WebUIServer/app/static/js/admin_settings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/settings.py; services/APIServer/app/router/User/settings.py",
+  "輸入": [
+    "default_llm_provider（下拉選擇）",
+    "default_llm_model（文字輸入）",
+    "description（選填）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "DefaultLLMResponse（default_llm_provider/default_llm_model/updated_at）",
+    "表單欄位顯示（供應商/模型）",
+    "成功/失敗提示訊息"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員進入 /admin/settings，前端 boot() 驗證角色為 admin"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端自動載入系統預設 LLM 設定並準備表單（供應商下拉/模型輸入框）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員在「預設 LLM 模型」輸入框輸入模型名稱"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員在「預設 LLM 供應商」下拉選擇供應商"
+          },
+          {
+            "sub_no": "②",
+            "item": "管理員點擊【儲存設定】送出更新"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入：前端呼叫 GET /api/v1/admin/settings/default-llm 取得 DefaultLLMResponse"
+          },
+          {
+            "sub_no": "②",
+            "item": "儲存：前端呼叫 POST /api/v1/admin/settings/default-llm（default_llm_provider/default_llm_model）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端將 default_llm_provider、default_llm_model 以 upsert 方式寫入 settings 表（key=default_llm_provider/default_llm_model；value={\"value\":...}）"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端提交交易並回傳 DefaultLLMResponse（updated_at 取兩筆更新時間較新者）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "畫面顯示",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入成功：表單顯示目前系統預設供應商/模型"
+          },
+          {
+            "sub_no": "②",
+            "item": "儲存成功：顯示「系統預設模型設定已更新」提示"
+          },
+          {
+            "sub_no": "③",
+            "item": "儲存失敗：顯示錯誤提示（未授權/參數缺漏/伺服器錯誤）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "settings",
+    "columns": [
+      {
+        "欄位": "key",
+        "中文": "設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key；Primary Key；本功能使用 key=default_llm_provider、default_llm_model"
+      },
+      {
+        "欄位": "value",
+        "中文": "設定值(JSON字串)",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value；JSON 字串（例：{\"value\":\"google\"}、{\"value\":\"gemini-2.5-flash-lite\"}）"
+      },
+      {
+        "欄位": "description",
+        "中文": "設定描述",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "settings.description（選填）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；onupdate timezone('UTC', now())"
+      }
+    ]
+  }
+}

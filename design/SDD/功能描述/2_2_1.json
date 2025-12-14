@@ -1,0 +1,178 @@
+{
+  "功能編號": "2-2-1",
+  "功能名稱": "新增鏡頭",
+  "功能說明": "使用者在鏡頭頁輸入鏡頭名稱並提交後，前端呼叫後端建立鏡頭；後端依角色決定 user_id（一般使用者只能建立自己的鏡頭，管理員可指定），並建立 camera 記錄（預設 status=active，並自動生成 path），成功後前端重新載入鏡頭資訊與控制區塊。",
+  "程式名稱": "services/WebUIServer/app/template/camera.html; services/WebUIServer/app/static/js/camera.js; services/WebUIServer/app/static/js/services/CameraService.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Camera/service.py; services/APIServer/app/router/Camera/DTO.py; services/APIServer/app/DataAccess/tables/camera.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "鍵盤",
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "鏡頭介面",
+      "camera資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "鏡頭介面",
+      "camera資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "鍵盤",
+        "verb": "輸入",
+        "objects": [
+          "【鏡頭名稱】"
+        ],
+        "text": "鍵盤輸入【鏡頭名稱】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": false,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [],
+        "text": "",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【建立鏡頭】"
+        ],
+        "text": "滑鼠點選【建立鏡頭】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "送出建立請求並在後端建立 camera 記錄。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "新增",
+        "objects": [
+          "camera資料表"
+        ],
+        "text": "新增鏡頭資料",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "camera",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "鏡頭ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "ForeignKey(users.id)；索引"
+      },
+      {
+        "欄位": "name",
+        "中文": "鏡頭名稱",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "status",
+        "中文": "鏡頭狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "inactive",
+        "備註": "CameraStatusEnum"
+      },
+      {
+        "欄位": "path",
+        "中文": "串流路徑",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "是",
+        "預設值": null,
+        "備註": "唯一；索引"
+      },
+      {
+        "欄位": "token_version",
+        "中文": "Token版本",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": null
+      },
+      {
+        "欄位": "last_seen_at",
+        "中文": "最後上線時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": null
+      },
+      {
+        "欄位": "max_publishers",
+        "中文": "最大推流者數量",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 1,
+        "備註": null
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  },
+  "備註": ""
+}

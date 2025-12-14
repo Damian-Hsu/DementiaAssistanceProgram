@@ -1,0 +1,114 @@
+{
+  "功能編號": "1-1",
+  "功能名稱": "權限控管",
+  "功能說明": "提供系統的登入與註冊入口，負責切換登入與登出介面。",
+  "程式名稱": "services/WebUIServer/app/template/auth.html; services/WebUIServer/app/static/js/sign_login.js;",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "登入/註冊頁面"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "登入頁面",
+      "註冊頁面"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "停留在",
+        "objects": [
+          "登入頁面"
+        ],
+        "text": "滑鼠停留在登入頁面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": false,
+        "text": "",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "登入頁面"
+        ],
+        "text": "顯示登入頁面",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❷",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【註冊】"
+        ],
+        "text": "滑鼠點選【註冊】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "切換頁面",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "註冊頁面"
+        ],
+        "text": "顯示註冊頁面",
+        "sub_steps": []
+      }
+    },
+    {
+      "step_no": "❸",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【Log in】"
+        ],
+        "text": "滑鼠點選【Log in】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "切換頁面",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "登入頁面"
+        ],
+        "text": "顯示登入頁面",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  },
+  "備註": ""
+}

@@ -1,0 +1,162 @@
+{
+  "功能編號": "3-4-2",
+  "功能名稱": "系統預設 Google API Key",
+  "功能說明": "管理員可在系統設定頁設定系統預設的 Google API Key。此金鑰會存放於 settings 表（key=default_google_api_key），供未設定個人 API Key 且未被加入黑名單的使用者作為預設金鑰使用。讀取時後端會以遮罩形式回傳，前端以 placeholder 顯示；儲存時前端以密碼欄位輸入明碼並送出後清空輸入框以降低外洩風險。",
+  "程式名稱": "services/WebUIServer/app/template/admin_settings.html; services/WebUIServer/app/static/js/admin_settings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/settings.py",
+  "輸入": [
+    "api_key（密碼欄位輸入）",
+    "description（選填）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "DefaultGoogleApiKeyResponse（遮罩後 api_key/updated_at）",
+    "輸入框 placeholder 顯示遮罩值或未設定",
+    "成功/失敗提示訊息"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員進入 /admin/settings，前端 boot() 驗證角色為 admin"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端自動載入目前系統預設 Google API Key（遮罩）並更新輸入框 placeholder"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員點擊【載入現有設定】重新讀取遮罩後的 API Key"
+          },
+          {
+            "sub_no": "②",
+            "item": "管理員點擊【儲存設定】觸發儲存（與模型設定同一儲存按鈕）"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員在「系統預設 Google API Key」密碼欄位輸入 API Key（輸入後遮罩顯示）"
+          },
+          {
+            "sub_no": "②",
+            "item": "若欄位留空則代表不更新（保留現有設定）"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入：前端呼叫 GET /api/v1/admin/settings/default-google-api-key 取得 DefaultGoogleApiKeyResponse（遮罩值）"
+          },
+          {
+            "sub_no": "②",
+            "item": "儲存：前端呼叫 POST /api/v1/admin/settings/default-google-api-key（api_key/description）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端將 api_key 以 upsert 方式寫入 settings 表（key=default_google_api_key；value={\"api_key\":...}）"
+          },
+          {
+            "sub_no": "②",
+            "item": "讀取時後端遮罩 API Key（前 8 碼...後 8 碼）後回傳"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "畫面顯示",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入成功：輸入框 placeholder 顯示遮罩後的 API Key；輸入框 value 保持空白"
+          },
+          {
+            "sub_no": "②",
+            "item": "儲存成功：前端清空輸入框並顯示「已儲存」提示"
+          },
+          {
+            "sub_no": "③",
+            "item": "儲存失敗：顯示錯誤提示（未授權/後端驗證失敗/伺服器錯誤）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "settings",
+    "columns": [
+      {
+        "欄位": "key",
+        "中文": "設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key；Primary Key；本功能使用 key=default_google_api_key"
+      },
+      {
+        "欄位": "value",
+        "中文": "設定值(JSON字串)",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value；JSON 字串（例：{\"api_key\":\"<google_api_key>\"}）"
+      },
+      {
+        "欄位": "description",
+        "中文": "設定描述",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "settings.description（選填）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；onupdate timezone('UTC', now())"
+      }
+    ]
+  }
+}

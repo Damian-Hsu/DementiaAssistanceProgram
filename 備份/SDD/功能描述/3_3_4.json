@@ -1,0 +1,107 @@
+{
+  "功能編號": "3-3-4",
+  "功能名稱": "刪除音樂",
+  "功能說明": "管理員可在音樂詳情彈窗刪除音樂。前端會先二次確認，確認後呼叫 DELETE /admin/music/{music_id}；後端會先嘗試刪除 S3 物件（失敗僅記錄不阻斷），再刪除 music 表紀錄並回傳 ok。",
+  "程式名稱": "services/WebUIServer/app/static/js/admin_music.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Music/service.py; services/APIServer/app/utils/s3_utils.py; services/APIServer/app/DataAccess/tables/music.py",
+  "輸入": [
+    "music_id",
+    "刪除確認（confirm）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "{ ok: true }",
+    "刪除成功/失敗提示",
+    "清單刷新"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "在音樂詳情彈窗點擊【刪除】"
+          },
+          {
+            "sub_no": "②",
+            "item": "在瀏覽器 confirm 對話框選擇【確定】或【取消】"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "分支處理",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "取消：不呼叫 API，保持彈窗開啟"
+          },
+          {
+            "sub_no": "②",
+            "item": "確定：呼叫 DELETE /api/v1/admin/music/{music_id}"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "後端刪除",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "後端查詢 music 記錄；不存在回 404"
+          },
+          {
+            "sub_no": "②",
+            "item": "嘗試 delete_object(s3_key) 刪除 S3 物件；失敗只記錄 log，不阻斷資料庫刪除"
+          },
+          {
+            "sub_no": "③",
+            "item": "刪除 music 表紀錄並 commit，回傳 {ok:true}"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示刪除結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "成功：顯示「刪除成功」，關閉彈窗並重新載入清單"
+          },
+          {
+            "sub_no": "②",
+            "item": "失敗：顯示錯誤訊息"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "music",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "音樂ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "music.id"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "S3 物件鍵",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "music.s3_key（刪除 S3 用）"
+      }
+    ]
+  }
+}

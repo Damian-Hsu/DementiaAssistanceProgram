@@ -1,0 +1,60 @@
+{
+  "功能編號": "3-2-1",
+  "功能名稱": "使用者統計",
+  "功能說明": "管理員查看一般使用者的 Token 使用量、聊天訊息數、是否使用系統預設 API Key 與黑名單狀態。",
+  "程式名稱": "services/WebUIServer/app/template/admin_users.html; services/WebUIServer/app/static/js/admin_users.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統"
+    ],
+    "資源名詞": [
+      "管理員使用者管理介面",
+      "users資料表",
+      "llm_usage_logs資料表",
+      "api_key_blacklist資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "使用者統計列表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "使用者統計列表"
+        ],
+        "text": "系統載入使用者統計列表",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "查詢 users 並聚合 llm_usage_logs，同步查詢 api_key_blacklist 狀態。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "使用者統計列表"
+        ],
+        "text": "顯示使用者統計列表",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "users; llm_usage_logs; api_key_blacklist",
+    "columns": []
+  },
+  "備註": ""
+}

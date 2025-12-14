@@ -73,21 +73,23 @@ async def get_current_user(
 
 async def get_current_user_schema(
     user: users.Table = Depends(get_current_user),
-) -> users.Schema:
+):
     """
     可選：若某些路由想直接回傳 Pydantic Schema。
+    注意：此函數已棄用，請直接使用 UserResponseDTO。
     """
-    return users.Schema(
+    from ..router.User.DTO import UserResponseDTO
+    return UserResponseDTO(
         id=user.id,
         account=user.account,
         name=user.name,
         role=user.role,
         gender=user.gender,
-        dementia_level=user.dementia_level,
         birthday=user.birthday,
         phone=user.phone,
         email=user.email,
-        password_hash=user.password_hash,  # 不想外傳就移除
+        headshot_url=user.headshot_url,
+        active=user.active,
     )
 
 

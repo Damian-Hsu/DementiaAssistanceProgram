@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from uuid import UUID
 from datetime import datetime 
+from ...DataAccess.tables.__Enumeration import JobStatus
 
 # 目前數值從這裡生效
 class JobParams(BaseModel):
@@ -36,12 +37,12 @@ class JobCreateDTO(BaseModel):
 class JobCreatedRespDTO(BaseModel):
     job_id: UUID
     trace_id: str | None = None
-    status: str = "pending"
+    status: JobStatus = JobStatus.pending
 
 class JobGetRespDTO(BaseModel):
     job_id: UUID
     type: str
-    status: str
+    status: JobStatus
     input_type: str
     input_url: str
     output_url: str | None
@@ -53,12 +54,12 @@ class JobGetRespDTO(BaseModel):
     metrics: dict | None
 
 class JobStatusRespDTO(BaseModel):
-    status: str
+    status: JobStatus
 
 class JobCompleteDTO(BaseModel):
     job_id: UUID
     trace_id: str | None = None
-    status: str
+    status: JobStatus
     video_start_time: str | None = None  # ISO 格式
     video_end_time: str | None = None
     error_code: str | None = None
@@ -66,6 +67,16 @@ class JobCompleteDTO(BaseModel):
     duration: float | None = None
     metrics: dict | None = None
     events: list | None = None
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _normalize_status(cls, v):
+        # 僅做最小正規化：去空白 + 小寫（不做別名映射，強制使用 JobStatus enum 內的字）
+        if v is None:
+            return v
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
 class JobListRespDTO(BaseModel):
     items: list[JobGetRespDTO]
     total: int

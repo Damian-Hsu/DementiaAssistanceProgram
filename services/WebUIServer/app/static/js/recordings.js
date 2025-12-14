@@ -59,10 +59,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     try {
       // 嘗試獲取縮圖 URL（使用 type=thumbnail 參數）
-      const urlData = await ApiClient.recordings.getUrl(recordingId, { 
-        ttl: 3600, 
+      const urlData = await ApiClient.recordings.getUrl(recordingId, {
+        ttl: 3600,
         disposition: 'inline',
-        type: 'thumbnail'
+        asset_type: 'thumbnail'
       });
       
       // 使用返回的 URL
@@ -164,24 +164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         item.addEventListener('click', () => selectRecording(rec));
         
         recordingsList.appendChild(item);
-        
-        // 如果這是目標 recording_id，自動選擇
-        if (targetRecordingId && rec.id === targetRecordingId) {
-          selectRecording(rec, false); // 不更新 URL，因為已經在 URL 中
-        }
       });
-      
-      // 如果沒有找到目標 recording，但 URL 中有參數，嘗試直接載入
-      if (targetRecordingId && !document.querySelector(`[data-id="${targetRecordingId}"]`)) {
-        try {
-          const targetRec = validRecordings.find(r => r.id === targetRecordingId);
-          if (targetRec) {
-            selectRecording(targetRec, false); // 不更新 URL，因為已經在 URL 中
-          }
-        } catch (e) {
-          console.warn('無法載入目標影片:', e);
-        }
-      }
       
       // 返回 validRecordings 供外部使用
       return validRecordings;
@@ -463,25 +446,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 初始化
   await loadRecordingsWithFilters();
   
-  // 如果 URL 中有 recording_id 參數，自動選擇對應的影片
+  // 第一次進入頁面：只自動選取一次，避免重複呼叫 selectRecording 造成競態
   if (targetRecordingId) {
-    // 等待列表載入完成後再選擇
-    setTimeout(async () => {
-      const targetItem = document.querySelector(`[data-id="${targetRecordingId}"]`);
-      if (targetItem) {
-        const targetRec = validRecordings.find(r => r.id === targetRecordingId);
-        if (targetRec) {
-          await selectRecording(targetRec, false); // 不更新 URL，因為已經在 URL 中
-        }
-      }
-    }, 500);
-  } else {
-    // 如果沒有 recording_id 參數，預載入最新的影片（不更新 URL）
-    setTimeout(async () => {
-      if (validRecordings && validRecordings.length > 0) {
-        // 使用已載入的列表中的第一個（最新的）
-        await selectRecording(validRecordings[0], false); // 預載入但不更新 URL
-      }
-    }, 500);
+    const targetRec = validRecordings.find(r => r.id === targetRecordingId);
+    if (targetRec) {
+      await selectRecording(targetRec, false); // 不更新 URL，因為已經在 URL 中
+    }
+  } else if (validRecordings && validRecordings.length > 0) {
+    // 沒有指定 recording_id：預載入最新的影片（不更新 URL）
+    await selectRecording(validRecordings[0], false);
   }
 });

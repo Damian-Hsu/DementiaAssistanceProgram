@@ -1,0 +1,380 @@
+{
+  "功能編號": "2-1-3",
+  "功能名稱": "生成/刷新日記",
+  "功能說明": "使用者於首頁點擊日記刷新按鈕後，前端以 force_refresh=true 呼叫後端日記摘要生成端點；後端依日期查詢事件、計算 events_hash，必要時呼叫 LLM 生成摘要並寫入 diary，同時建立/更新 inference_jobs（diary_generation）供管理端追蹤，並記錄 llm_usage_logs 使用量。",
+  "程式名稱": "services/WebUIServer/app/template/home.html; services/WebUIServer/app/static/js/diary.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Chat/service.py; services/APIServer/app/utils/llm_usage.py; services/APIServer/app/DataAccess/tables/diary.py; services/APIServer/app/DataAccess/tables/events.py; services/APIServer/app/DataAccess/tables/inference_jobs.py; services/APIServer/app/DataAccess/tables/llm_usage_logs.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "日記介面",
+      "diary資料表",
+      "events資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕",
+      "資料庫"
+    ],
+    "資源名詞": [
+      "日記介面",
+      "diary資料表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "【刷新日記】"
+        ],
+        "text": "滑鼠點選【刷新日記】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "送出日記生成/刷新請求，後端查詢 events 並生成摘要後寫入 diary 資料表。",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "text": "成功：更新/新增 diary 記錄"
+          },
+          {
+            "sub_no": "②",
+            "text": "失敗：回傳錯誤（含配額限制）"
+          }
+        ]
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "資料庫",
+        "verb": "更新",
+        "objects": [
+          "diary資料表"
+        ],
+        "text": "更新日記內容",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "diary; events; inference_jobs; llm_usage_logs",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "日記ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "diary.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "diary.user_id；ForeignKey(users.id)；索引"
+      },
+      {
+        "欄位": "diary_date",
+        "中文": "日記日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "diary.diary_date；索引"
+      },
+      {
+        "欄位": "content",
+        "中文": "日記內容",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "diary.content"
+      },
+      {
+        "欄位": "events_hash",
+        "中文": "事件列表雜湊",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "是",
+        "預設值": null,
+        "備註": "diary.events_hash；索引"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "diary.created_at；TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "diary.updated_at；TimestampMixin；更新時由資料庫 onupdate"
+      },
+
+      {
+        "欄位": "id",
+        "中文": "事件ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "events.id；Primary Key"
+      },
+      {
+        "欄位": "start_time",
+        "中文": "事件開始時間",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.start_time（用於日期範圍查詢）"
+      },
+      {
+        "欄位": "summary",
+        "中文": "摘要",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "events.summary（生成日記摘要的來源之一）"
+      },
+
+      {
+        "欄位": "id",
+        "中文": "任務ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "inference_jobs.id；Primary Key"
+      },
+      {
+        "欄位": "type",
+        "中文": "任務類型",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": "inference_jobs.type（diary_generation）"
+      },
+      {
+        "欄位": "status",
+        "中文": "任務狀態",
+        "型態": "ENUM",
+        "長度": null,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "inference_jobs.status（JobStatusEnum）"
+      },
+      {
+        "欄位": "input_type",
+        "中文": "輸入類型",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "否",
+        "預設值": null,
+        "備註": "inference_jobs.input_type（diary）"
+      },
+      {
+        "欄位": "input_url",
+        "中文": "輸入位置",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.input_url（日期字串）"
+      },
+      {
+        "欄位": "trace_id",
+        "中文": "追蹤ID",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.trace_id"
+      },
+      {
+        "欄位": "error_message",
+        "中文": "錯誤訊息",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.error_message"
+      },
+      {
+        "欄位": "params",
+        "中文": "任務參數",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.params（包含 user_id/diary_date/progress）"
+      },
+      {
+        "欄位": "metrics",
+        "中文": "任務量測",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.metrics"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "inference_jobs.created_at；TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "inference_jobs.updated_at；TimestampMixin；更新時由資料庫 onupdate"
+      },
+
+      {
+        "欄位": "id",
+        "中文": "用量紀錄ID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "llm_usage_logs.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "llm_usage_logs.user_id；ForeignKey(users.id)；索引"
+      },
+      {
+        "欄位": "source",
+        "中文": "來源",
+        "型態": "VARCHAR",
+        "長度": 32,
+        "空值": "否",
+        "預設值": null,
+        "備註": "llm_usage_logs.source（diary）"
+      },
+      {
+        "欄位": "provider",
+        "中文": "供應商",
+        "型態": "VARCHAR",
+        "長度": 32,
+        "空值": "是",
+        "預設值": null,
+        "備註": "llm_usage_logs.provider"
+      },
+      {
+        "欄位": "model_name",
+        "中文": "模型名稱",
+        "型態": "VARCHAR",
+        "長度": 128,
+        "空值": "是",
+        "預設值": null,
+        "備註": "llm_usage_logs.model_name"
+      },
+      {
+        "欄位": "prompt_tokens",
+        "中文": "提示詞Token數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.prompt_tokens"
+      },
+      {
+        "欄位": "completion_tokens",
+        "中文": "回覆Token數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.completion_tokens"
+      },
+      {
+        "欄位": "total_tokens",
+        "中文": "總Token數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.total_tokens"
+      },
+      {
+        "欄位": "assistant_replies",
+        "中文": "助手回覆次數",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0,
+        "備註": "llm_usage_logs.assistant_replies（日記生成不計回覆，為 0）"
+      },
+      {
+        "欄位": "trace_id",
+        "中文": "追蹤ID",
+        "型態": "VARCHAR",
+        "長度": 64,
+        "空值": "是",
+        "預設值": null,
+        "備註": "llm_usage_logs.trace_id"
+      },
+      {
+        "欄位": "meta",
+        "中文": "附加資訊",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "llm_usage_logs.meta"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "llm_usage_logs.created_at；TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "llm_usage_logs.updated_at；TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  },
+  "備註": "可能受 LLM 配額影響。"
+}

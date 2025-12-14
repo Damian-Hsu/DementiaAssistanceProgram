@@ -1,0 +1,61 @@
+{
+  "功能編號": "2-1-1",
+  "功能名稱": "切換日期",
+  "功能說明": "使用者在首頁可透過日期選擇器或左右翻頁切換顯示日期；系統會同步更新日期狀態並重新載入該日日記內容與 Vlog 狀態。",
+  "程式名稱": "services/WebUIServer/app/template/home.html; services/WebUIServer/app/static/js/home.js; services/WebUIServer/app/static/js/diary.js; services/WebUIServer/app/static/js/vlog.js",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "首頁介面"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "首頁介面",
+      "日記介面",
+      "Vlog介面"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "點選",
+        "objects": [
+          "日期選擇器",
+          "上一天",
+          "下一天"
+        ],
+        "text": "滑鼠點選日期選擇器/上一天/下一天",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "更新目標日期並重新載入該日的日記與 Vlog 資料。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [
+          "首頁介面"
+        ],
+        "text": "更新日期顯示並顯示該日內容",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  },
+  "備註": ""
+}

@@ -1,0 +1,110 @@
+{
+  "功能編號": "1-3-2",
+  "功能名稱": "行動版底部導覽",
+  "功能說明": "行動版以底部導覽列提供主要功能入口（首頁、AI 助手、鏡頭、影片、事件、設定、登出），並依 active_page 以 active class 高亮目前頁面；管理員則顯示管理員版本導覽列。底部導覽列在桌面模式隱藏，並由側邊欄取代。",
+  "程式名稱": "services/WebUIServer/app/template/partials/mobile_nav.html; services/WebUIServer/app/template/partials/mobile_nav_admin.html; services/WebUIServer/app/template/base.html; services/WebUIServer/app/static/js/init_user.js; services/WebUIServer/app/static/js/mobile_nav.js; services/WebUIServer/app/static/css/mobile_nav.css; services/WebUIServer/app/static/css/layout.css",
+  "輸入": [
+    "active_page（由後端渲染傳入）",
+    "使用者角色 role（由 init_user.js 取得並切換顯示）",
+    "使用者點選導覽項目（含登出按鈕 mobileLogoutBtn）"
+  ],
+  "輸出": [
+    "導向對應頁面（href 跳轉）",
+    "目前頁面導覽項目高亮（active class）",
+    "桌面模式下底部導覽列隱藏"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入 base.html 時 include user/admin 版本的 mobile_nav（依 active_page 判斷）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "觸控點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點選底部導覽列任一導覽項目（<a> 連結）以跳轉頁面"
+          },
+          {
+            "sub_no": "②",
+            "item": "點選「登出」按鈕（button id=mobileLogoutBtn）以觸發登出確認對話框"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "狀態標記",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "模板依 active_page 於對應 <li> 加上 active class 以高亮目前頁面"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "UI 切換",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "init_user.js 依使用者 role 切換顯示 user/admin mobile_nav（hidden class）"
+          },
+          {
+            "sub_no": "②",
+            "item": "若含可展開子選單（mobile_nav.js）：點擊展開按鈕可展開/收合，點擊外部自動收合"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "RWD 樣式套用",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "當螢幕寬度小於 768px：顯示底部導覽列；桌面則隱藏"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "顯示結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "手機顯示底部導覽列；目前頁面項目呈現高亮"
+          },
+          {
+            "sub_no": "②",
+            "item": "桌面模式隱藏底部導覽列"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "導頁結果",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "點選導覽項目後導向對應頁面"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": null,
+    "columns": []
+  }
+}

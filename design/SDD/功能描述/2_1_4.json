@@ -1,0 +1,167 @@
+{
+  "功能編號": "2-1-4",
+  "功能名稱": "顯示當日 Vlog",
+  "功能說明": "首頁會依目前選擇日期載入該日最新 Vlog（若存在），並顯示其狀態、進度、訊息與影片/縮圖；當 Vlog 完成後可取得縮圖與播放 URL 進行預覽，若處理中則顯示 spinner 與進度條並定期輪詢更新狀態。",
+  "程式名稱": "services/WebUIServer/app/template/home.html; services/WebUIServer/app/static/js/vlog.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Vlogs/service.py; services/APIServer/app/DataAccess/tables/vlogs.py; services/APIServer/app/DataAccess/tables/inference_jobs.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "系統"
+    ],
+    "資源名詞": [
+      "Vlog介面",
+      "vlogs資料表"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "Vlog介面"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "系統",
+        "verb": "載入",
+        "objects": [
+          "Vlog介面"
+        ],
+        "text": "系統載入Vlog介面",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "依目標日期查詢 vlogs 狀態；若處理中則輪詢更新，完成後取得縮圖與影片連結。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "顯示",
+        "objects": [
+          "Vlog狀態"
+        ],
+        "text": "顯示Vlog狀態、進度與預覽",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "vlogs; inference_jobs",
+    "columns": [
+      {
+        "欄位": "id",
+        "中文": "VlogID",
+        "型態": "UUID",
+        "長度": null,
+        "空值": "否",
+        "預設值": "uuid7",
+        "備註": "vlogs.id；Primary Key"
+      },
+      {
+        "欄位": "user_id",
+        "中文": "使用者ID",
+        "型態": "INTEGER",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlogs.user_id；ForeignKey(users.id)；索引"
+      },
+      {
+        "欄位": "target_date",
+        "中文": "目標日期",
+        "型態": "DATE",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "vlogs.target_date"
+      },
+      {
+        "欄位": "status",
+        "中文": "狀態",
+        "型態": "VARCHAR",
+        "長度": 50,
+        "空值": "否",
+        "預設值": "pending",
+        "備註": "vlogs.status（pending/processing/completed/failed）"
+      },
+      {
+        "欄位": "progress",
+        "中文": "進度",
+        "型態": "FLOAT",
+        "長度": null,
+        "空值": "否",
+        "預設值": 0.0,
+        "備註": "vlogs.progress（0~100）"
+      },
+      {
+        "欄位": "status_message",
+        "中文": "狀態訊息",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.status_message"
+      },
+      {
+        "欄位": "s3_key",
+        "中文": "影片S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.s3_key"
+      },
+      {
+        "欄位": "thumbnail_s3_key",
+        "中文": "縮圖S3路徑",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.thumbnail_s3_key"
+      },
+      {
+        "欄位": "duration",
+        "中文": "影片長度",
+        "型態": "FLOAT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.duration"
+      },
+      {
+        "欄位": "settings",
+        "中文": "設定",
+        "型態": "JSONB",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.settings（含 job_id/error_message 等）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "vlogs.created_at；TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "vlogs.updated_at；TimestampMixin；更新時由資料庫 onupdate"
+      }
+    ]
+  },
+  "備註": ""
+}

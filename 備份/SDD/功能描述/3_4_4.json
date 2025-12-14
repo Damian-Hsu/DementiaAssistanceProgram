@@ -1,0 +1,158 @@
+{
+  "功能編號": "3-4-4",
+  "功能名稱": "影片參數",
+  "功能說明": "管理員可在系統設定頁配置影片處理的系統參數（目前為錄影切片長度 segment_seconds）。前端可載入現有設定並顯示；儲存時會先做範圍檢核（1-600 秒）後呼叫後端更新。後端將設定寫入 settings 表（key=video_segment_seconds），供串流錄影切片流程使用。",
+  "程式名稱": "services/WebUIServer/app/template/admin_settings.html; services/WebUIServer/app/static/js/admin_settings.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py; services/APIServer/app/router/Admin/DTO.py; services/APIServer/app/DataAccess/tables/settings.py",
+  "輸入": [
+    "segment_seconds（切片長度，1-600）",
+    "description（選填）",
+    "Bearer JWT（admin）"
+  ],
+  "輸出": [
+    "VideoParamsResponse（segment_seconds/updated_at）",
+    "表單欄位顯示（切片長度）",
+    "成功/失敗提示訊息"
+  ],
+  "INPUT_PROCESS_OUTPUT": {
+    "INPUT": [
+      {
+        "step_no": 1,
+        "title": "頁面載入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員進入 /admin/settings，前端 boot() 驗證角色為 admin"
+          },
+          {
+            "sub_no": "②",
+            "item": "前端自動載入影片參數（segment_seconds）並填入欄位（預設 30）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "滑鼠點選",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員點擊【載入現有設定】重新讀取影片參數"
+          },
+          {
+            "sub_no": "②",
+            "item": "管理員點擊【儲存設定】送出更新"
+          }
+        ]
+      },
+      {
+        "step_no": 3,
+        "title": "鍵盤輸入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "管理員在「切片長度（秒）」輸入數值"
+          }
+        ]
+      }
+    ],
+    "PROCESS": [
+      {
+        "step_no": 1,
+        "title": "API 呼叫",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入：前端呼叫 GET /api/v1/admin/settings/video-params 取得 VideoParamsResponse"
+          },
+          {
+            "sub_no": "②",
+            "item": "儲存：前端呼叫 POST /api/v1/admin/settings/video-params（segment_seconds）"
+          }
+        ]
+      },
+      {
+        "step_no": 2,
+        "title": "資料驗證與寫入",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "前端驗證 segment_seconds 為數字且介於 1-600；不符則顯示錯誤"
+          },
+          {
+            "sub_no": "②",
+            "item": "後端再次驗證範圍（1-600），並以 upsert 寫入 settings（key=video_segment_seconds；value={\"segment_seconds\":...}）"
+          }
+        ]
+      }
+    ],
+    "OUTPUT": [
+      {
+        "step_no": 1,
+        "title": "畫面顯示",
+        "sub_steps": [
+          {
+            "sub_no": "①",
+            "item": "載入成功：切片長度欄位顯示目前設定值"
+          },
+          {
+            "sub_no": "②",
+            "item": "儲存成功：顯示「影片參數設定已更新」提示"
+          },
+          {
+            "sub_no": "③",
+            "item": "儲存失敗：顯示錯誤提示（範圍錯誤/未授權/伺服器錯誤）"
+          }
+        ]
+      }
+    ]
+  },
+  "資料表": {
+    "table_name": "settings",
+    "columns": [
+      {
+        "欄位": "key",
+        "中文": "設定鍵",
+        "型態": "VARCHAR",
+        "長度": 100,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.key；Primary Key；本功能使用 key=video_segment_seconds"
+      },
+      {
+        "欄位": "value",
+        "中文": "設定值(JSON字串)",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "否",
+        "預設值": null,
+        "備註": "settings.value；JSON 字串（例：{\"segment_seconds\":30}）"
+      },
+      {
+        "欄位": "description",
+        "中文": "設定描述",
+        "型態": "TEXT",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "settings.description（選填）"
+      },
+      {
+        "欄位": "created_at",
+        "中文": "建立時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "否",
+        "預設值": "timezone('UTC', now())",
+        "備註": "TimestampMixin"
+      },
+      {
+        "欄位": "updated_at",
+        "中文": "更新時間(UTC)",
+        "型態": "TIMESTAMP WITH TIME ZONE",
+        "長度": null,
+        "空值": "是",
+        "預設值": null,
+        "備註": "TimestampMixin；onupdate timezone('UTC', now())"
+      }
+    ]
+  }
+}

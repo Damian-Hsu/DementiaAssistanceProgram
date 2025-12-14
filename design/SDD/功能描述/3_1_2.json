@@ -1,0 +1,58 @@
+{
+  "功能編號": "3-1-2",
+  "功能名稱": "依狀態/類型篩選",
+  "功能說明": "管理員選擇任務類型與狀態後，系統依條件重新載入任務列表。",
+  "程式名稱": "services/WebUIServer/app/template/admin_tasks.html; services/WebUIServer/app/static/js/admin_tasks.js; services/WebUIServer/app/static/js/APIClient.js; services/APIServer/app/router/Admin/service.py",
+  "輸入摘要": {
+    "觸發名詞": [
+      "滑鼠"
+    ],
+    "資源名詞": [
+      "管理員任務管理介面"
+    ]
+  },
+  "輸出摘要": {
+    "觸發名詞": [
+      "螢幕"
+    ],
+    "資源名詞": [
+      "任務列表"
+    ]
+  },
+  "步驟表": [
+    {
+      "step_no": "❶",
+      "INPUT": {
+        "required": true,
+        "trigger": "滑鼠",
+        "verb": "選擇",
+        "objects": [
+          "【任務類型】",
+          "【狀態】"
+        ],
+        "text": "滑鼠選擇【任務類型】、【狀態】",
+        "sub_steps": []
+      },
+      "PROCESS": {
+        "present": true,
+        "text": "依篩選條件重新查詢任務清單。",
+        "sub_steps": []
+      },
+      "OUTPUT": {
+        "present": true,
+        "trigger": "螢幕",
+        "verb": "更新",
+        "objects": [
+          "任務列表"
+        ],
+        "text": "更新任務列表",
+        "sub_steps": []
+      }
+    }
+  ],
+  "資料表": {
+    "table_name": "inference_jobs",
+    "columns": []
+  },
+  "備註": ""
+}

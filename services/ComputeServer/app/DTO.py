@@ -12,7 +12,7 @@ class JobStatus(str, Enum):
 
 class JobType(str, Enum):
     VIDEO_DESCRIPTION = "video_description_extraction" #影像轉描述任務
-    ECHO_AND_CHECK = "echo_and_check" #測試任務
+    
 
 class JobBase(BaseModel):
     job_id: str
