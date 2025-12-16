@@ -22,7 +22,7 @@ webrtcIPsFromInterfaces: no   # 避免回傳 127.0.0.1/172.18.x.x 這類內網�
 
 # 設定 API Server 的 HTTP 認證
 authMethod: http
-authHTTPAddress: http://api:30000/api/v1/m2m/check-stream-pwd?api-key=dKMAes-gFnOhtkWC2L6eMKKS4cZ3k5fuStSiwG-TTTVyEiW340n2A8XM0DA4O70q
+authHTTPAddress: http://api:30000/api/v1/m2m/check-stream-pwd?api-key=78gKSEhxXLmQqepclQOLWJssQtMSZa9PchBikri-BTWJ6KP8l36_G0O23OR3Fm6p
 authHTTPExclude:
   - action: api
   - action: metrics
