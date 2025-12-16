@@ -55,6 +55,7 @@
   - `birthday` (date)
   - `phone` (varchar(20), unique, index)
   - `email` (varchar(100), unique, index)
+  - `headshot_url` (text, nullable)
   - `password_hash` (varchar(256))
   - `active` (bool)
   - `settings` (jsonb, nullable)
@@ -66,7 +67,7 @@
 - **主要欄位**：
   - `name` (varchar(128))
   - `status` (enum: inactive/active/deleted, index)
-  - `path` (varchar(64), unique, index)
+  - `path` (varchar(64), unique, index, nullable)
   - `token_version` (int)
   - `last_seen_at` (timestamptz, nullable)
   - `max_publishers` (int)
@@ -114,18 +115,9 @@
   - `events_hash` (varchar(64), nullable, index)
   - `created_at/updated_at`
 
-#### 5.2.6 `daily_summaries`
+#### 5.2.6 `diary_chunks`
 - **PK**：`id` (uuid)
-- **FK**：`user_id` → `users.id` (index)
-- **約束**：unique(user_id, date)
-- **主要欄位**：
-  - `date` (date)
-  - `summary_text` (text, nullable)
-  - `created_at/updated_at`
-
-#### 5.2.7 `diary_chunks`
-- **PK**：`id` (uuid)
-- **FK**：`daily_summary_id` → `daily_summaries.id` (index, ondelete=cascade)
+- **FK**：`diary_id` → `diary.id` (index, ondelete=cascade)
 - **主要欄位**：
   - `chunk_text` (text)
   - `chunk_index` (int)
@@ -133,7 +125,7 @@
   - `is_processed` (bool)
   - `created_at/updated_at`
 
-#### 5.2.8 `vlogs`
+#### 5.2.7 `vlogs`
 - **PK**：`id` (uuid)
 - **FK**：`user_id` → `users.id` (index)
 - **主要欄位**：
@@ -148,7 +140,7 @@
   - `settings` (jsonb, nullable)
   - `created_at/updated_at`
 
-#### 5.2.9 `vlog_segments`
+#### 5.2.8 `vlog_segments`
 - **PK**：`id` (uuid)
 - **FK**：
   - `vlog_id` → `vlogs.id` (index, ondelete=cascade)
@@ -160,7 +152,7 @@
   - `sequence_order` (int)
   - `created_at/updated_at`
 
-#### 5.2.10 `inference_jobs`
+#### 5.2.9 `inference_jobs`
 - **PK**：`id` (uuid)
 - **主要欄位**：
   - `type` (varchar(128))
@@ -176,7 +168,7 @@
   - `metrics` (jsonb, nullable)
   - `created_at/updated_at`
 
-#### 5.2.11 `music`
+#### 5.2.10 `music`
 - **PK**：`id` (uuid)
 - **FK**：`uploader_user_id` → `users.id` (index)
 - **唯一性**：`s3_key` unique
@@ -190,7 +182,7 @@
   - `s3_key` (text)
   - `created_at/updated_at`
 
-#### 5.2.12 `api_keys`
+#### 5.2.11 `api_keys`
 - **PK**：`id` (uuid)
 - **FK**：`owner_id` → `users.id`
 - **唯一性**：`token_hash` unique (index)
@@ -203,21 +195,21 @@
   - `last_used_at` (timestamptz, nullable)
   - `created_at/updated_at`
 
-#### 5.2.13 `api_key_blacklist`
-- **PK**：`user_id` (int)
+#### 5.2.12 `api_key_blacklist`
+- **PK**：`user_id` (int, unique, index)
 - **FK**：`user_id` → `users.id` (ondelete=cascade)
 - **主要欄位**：
   - `reason` (varchar(500), nullable)
   - `created_at/updated_at`
 
-#### 5.2.14 `settings`
-- **PK**：`key` (varchar(100))
+#### 5.2.13 `settings`
+- **PK**：`key` (varchar(100), unique, index)
 - **主要欄位**：
   - `value` (text；以 JSON 字串保存)
   - `description` (text, nullable)
   - `created_at/updated_at`
 
-#### 5.2.15 `llm_usage_logs`
+#### 5.2.14 `llm_usage_logs`
 - **PK**：`id` (uuid)
 - **FK**：`user_id` → `users.id` (index, ondelete=cascade)
 - **主要欄位**：
@@ -242,7 +234,6 @@ erDiagram
   users ||--o{ recordings : owns
   users ||--o{ events : owns
   users ||--o{ diary : writes
-  users ||--o{ daily_summaries : has
   users ||--o{ vlogs : owns
   users ||--o{ music : uploads
   users ||--o{ api_keys : owns
@@ -255,8 +246,7 @@ erDiagram
   vlogs ||--o{ vlog_segments : composed_of
   recordings ||--o{ vlog_segments : source
   events ||--o{ vlog_segments : references
-
-  daily_summaries ||--o{ diary_chunks : embeds
+  diary ||--o{ diary_chunks : embeds
 
   users {
     int id PK
@@ -267,6 +257,7 @@ erDiagram
     date birthday
     string phone UK
     string email UK
+    string headshot_url
     bool active
     jsonb settings
     datetime created_at
@@ -329,18 +320,9 @@ erDiagram
     datetime updated_at
   }
 
-  daily_summaries {
-    uuid id PK
-    int user_id FK
-    date date
-    text summary_text
-    datetime created_at
-    datetime updated_at
-  }
-
   diary_chunks {
     uuid id PK
-    uuid daily_summary_id FK
+    uuid diary_id FK
     text chunk_text
     int chunk_index
     vector embedding
@@ -458,10 +440,11 @@ erDiagram
 - `users` 為多數業務資料的擁有者（1 對多）：camera/recordings/events/diary/vlogs/music/api_keys/llm_usage_logs。
 - `camera` 與 `recordings`：一個 camera 可產生多段 recordings。
 - `recordings` 與 `events`：一段 recordings 可包含多個事件（事件可為 0..*）。
+- `diary` 與 `diary_chunks`：一篇日記可切分為多個 chunk；chunk 以 `diary_id` 連回日記主體（ondelete=cascade）。
 - `vlogs` 與 `vlog_segments`：一支回憶短片由多段 segments 組成；每段 segment 引用來源 recording 與（可選）event。
 - `api_key_blacklist`：以 user_id 作為 PK，表示一位使用者最多一筆黑名單狀態。
 
-> 註：目前 schema 中 `diary_chunks` FK 指向 `daily_summaries`，而日記主內容存於 `diary`。若日記 embedding 以 `diary` 為主體，需在資料庫層統一主體（例如改 FK 或導入同步寫入策略）。
+> 註：目前 ORM 狀態未包含 `daily_summaries` 資料表；日記向量化（RAG）以 `diary` / `diary_chunks` 作為主體（`diary_chunks.diary_id` → `diary.id`）。
 
 ---
 
