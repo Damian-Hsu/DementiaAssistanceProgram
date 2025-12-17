@@ -268,6 +268,94 @@
   font-weight: 600;
 }
 
+/* ===== 分頁（沿用 events/admin_tasks 風格）===== */
+.pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  flex-wrap: wrap;
+}
+
+.pagination #pageInput {
+  width: 56px;
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  border: 2px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-sm, 8px);
+  font-size: var(--font-size-base, 16px);
+  background-color: #fff;
+  color: var(--color-text, #2E2E2E);
+  text-align: center;
+  box-sizing: border-box;
+  min-height: 36px;
+}
+
+.pagination #pageInput:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+}
+
+.pagination span {
+  font-size: var(--font-size-base, 16px);
+  color: var(--color-text, #2E2E2E);
+  white-space: nowrap;
+}
+
+.pagination .page-btn {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--color-border, #D3C0A8);
+  background: var(--bg-button, #F3F0EB);
+  color: var(--color-text, #2E2E2E);
+  font-size: var(--font-size-base, 16px);
+  cursor: pointer;
+  transition: all var(--transition-normal, 0.2s ease);
+  min-height: 36px;
+  min-width: 36px;
+  box-shadow: none;
+}
+
+.pagination .page-btn:hover:not(:disabled) {
+  background: var(--color-accent, #6B4F4F);
+  color: #fff;
+  border-color: var(--color-accent, #6B4F4F);
+}
+
+.pagination .page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  margin-left: var(--spacing-md, 16px);
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text, #2E2E2E);
+}
+
+.pagination-info input {
+  width: 72px;
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  border: 2px solid var(--color-border, #D3C0A8);
+  border-radius: var(--radius-sm, 8px);
+  font-size: var(--font-size-base, 16px);
+  background-color: #fff;
+  color: var(--color-text, #2E2E2E);
+  text-align: center;
+  box-sizing: border-box;
+  min-height: 36px;
+}
+
+.pagination-info input:focus {
+  outline: none;
+  border-color: var(--color-accent, #6B4F4F);
+  box-shadow: 0 0 0 3px rgba(107, 79, 79, 0.15);
+}
+
 .list-header .search-bar .search-actions .btn-primary {
   background-color: var(--color-accent, #6B4F4F);
   color: #fff;

@@ -11,28 +11,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   const recordingsList = document.getElementById('recordingsList');
   const deleteVideoBtn = document.getElementById('deleteVideoBtn');
 
+  // 分頁元件（位於 list-section 底下）
+  const paginationEl = document.getElementById('recordingsPagination');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const pageInput = document.getElementById('pageInput');
+  const pageTotalEl = document.getElementById('pageTotal');
+  const pageSizeInput = document.getElementById('pageSize');
+  const totalCountEl = document.getElementById('totalCount');
+
   let currentRecordingId = null;
   let currentRecording = null;
   let validRecordings = []; // 保存當前載入的影片列表
+
+  // 分頁狀態
+  let pageNow = 1;
+  let pageSize = 20;
+  let pageTotal = 1;
   
   // 檢查 URL 參數中是否有 recording_id
   const urlParams = new URLSearchParams(window.location.search);
   const targetRecordingId = urlParams.get('recording_id');
+  // 若有指定 recording_id：先以「單筆定位」模式載入，避免分頁找不到該影片
+  let forcedRecordingId = targetRecordingId;
 
   // 格式化時間
   function formatDateTime(dateTimeStr) {
     if (!dateTimeStr) return '未知時間';
     try {
+      // 後端會回傳已換算使用者時區的時間字串（ISO），
+      // 這裡只做顯示用的「字串格式化」，不做時區計算。
+      if (typeof dateTimeStr === 'string') {
+        return dateTimeStr
+          .replace('T', ' ')
+          .replace('Z', '')
+          .replace(/\.\d+/, '')
+          .replace(/([+-]\d\d:\d\d)$/, '') // 移除時區 offset（顯示用）
+          .trim();
+      }
       const date = new Date(dateTimeStr);
-      return date.toLocaleString('zh-TW', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      });
+      return date.toLocaleString('zh-TW');
     } catch (e) {
       return dateTimeStr;
     }
@@ -87,15 +105,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 載入影片列表
-  async function loadRecordings(keyword = '', startDate = null, endDate = null, sortOrder = '-start_time') {
+  function updatePagination(resp, items) {
+    const total = resp?.item_total ?? resp?.total ?? (items ? items.length : 0);
+    const size = resp?.page_size ?? pageSize;
+    const page = resp?.page_now ?? pageNow;
+    const pt = resp?.page_total ?? (total > 0 ? Math.ceil(total / size) : 1);
+
+    pageNow = page;
+    pageSize = size;
+    pageTotal = pt;
+
+    if (pageInput) {
+      pageInput.value = pageNow;
+      pageInput.max = pageTotal;
+    }
+    if (pageTotalEl) {
+      pageTotalEl.textContent = `/ ${pageTotal}`;
+    }
+    if (pageSizeInput) {
+      pageSizeInput.value = pageSize;
+    }
+    if (totalCountEl) {
+      totalCountEl.textContent = total;
+    }
+    if (prevBtn) prevBtn.disabled = pageNow <= 1;
+    if (nextBtn) nextBtn.disabled = pageNow >= pageTotal;
+
+    // 有資料才顯示分頁（定位單筆也顯示總筆數，方便回到全部）
+    if (paginationEl) {
+      paginationEl.style.display = total > 0 ? 'flex' : 'none';
+    }
+  }
+
+  // 載入影片列表（支援分頁與單筆定位）
+  async function loadRecordings(keyword = '', startDate = null, endDate = null, sortOrder = '-start_time', page = 1, size = 20, recordingId = null) {
     recordingsList.innerHTML = '<p class="loading">載入中...</p>';
     try {
       const params = {
+        recording_id: recordingId || null,
         keywords: keyword || null,
         sort: sortOrder, 
-        page: 1, 
-        size: 50
+        page: page, 
+        size: size
       };
       
       // 添加日期範圍篩選
@@ -111,26 +162,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (!data.items || data.items.length === 0) {
         recordingsList.innerHTML = '<p class="loading">沒有找到錄影紀錄。</p>';
+        updatePagination(data, []);
         return;
       }
 
-      // 過濾掉沒有時間資訊的影片（不顯示未知時間的影片）
-      validRecordings = data.items.filter(rec => {
-        // 檢查是否有 start_time 且為有效值
-        if (!rec.start_time) return false;
-        try {
-          const date = new Date(rec.start_time);
-          // 檢查日期是否有效（不是 Invalid Date）
-          return !isNaN(date.getTime());
-        } catch (e) {
-          return false;
-        }
-      });
-
-      if (validRecordings.length === 0) {
-        recordingsList.innerHTML = '<p class="loading">沒有找到有時間資訊的錄影紀錄。</p>';
-        return;
-      }
+      // 後端已盡量補齊 start_time（若缺失會用第一個事件時間/created_at）
+      // 前端不再把「未知時間」整批濾掉，避免影片多時看起來像查不到
+      validRecordings = Array.isArray(data.items) ? data.items : [];
+      updatePagination(data, validRecordings);
 
       validRecordings.forEach(rec => {
         const item = document.createElement('div');
@@ -138,7 +177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         item.dataset.id = rec.id;
         
         // 使用時間作為名稱
-        const timeName = formatDateTime(rec.start_time);
+        const timeName = formatDateTime(rec.start_time || rec.created_at);
         const duration = formatDuration(rec.duration);
         
         // 所有項目都顯示縮圖區域，即使沒有縮圖也顯示黑色佔位符（3:4 比例）
@@ -170,6 +209,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return validRecordings;
     } catch (e) {
       recordingsList.innerHTML = `<p class="error">錯誤：${e.message}</p>`;
+      updatePagination(null, []);
     }
   }
 
@@ -261,9 +301,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       videoPlayer.addEventListener('error', handleVideoError, { once: true });
 
       // 更新詳細資訊
-      const timeName = formatDateTime(recording.start_time);
+      const timeName = formatDateTime(recording.start_time || recording.created_at);
       const duration = formatDuration(recording.duration);
-      const timeRange = recording.end_time 
+      const timeRange = recording.end_time
         ? `${formatDateTime(recording.start_time)} - ${formatDateTime(recording.end_time)}`
         : formatDateTime(recording.start_time);
 
@@ -329,8 +369,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // 保存當前關鍵字和要刪除的 ID
-    const keyword = keywordsInput?.value.trim() || '';
+    // 保存要刪除的 ID
     const deletedId = currentRecordingId;
 
     try {
@@ -355,6 +394,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       // 重新載入列表（使用當前的篩選條件）
       await loadRecordingsWithFilters();
+
+      // 若刪到當頁最後一筆，可能會變成空頁：退一頁再載一次（僅一般列表模式）
+      if (!forcedRecordingId && (!validRecordings || validRecordings.length === 0) && pageNow > 1) {
+        pageNow--;
+        await loadRecordingsWithFilters();
+      }
       
       // 如果列表中有其他影片，自動選擇第一個（但不是剛刪除的那個）
       const firstItem = document.querySelector('.recording-item');
@@ -391,9 +436,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     keywordsInput.addEventListener('input', (e) => {
       const keyword = e.target.value.trim();
       
+      // 一旦開始搜尋，就解除單筆定位模式
+      if (forcedRecordingId) {
+        forcedRecordingId = null;
+        const url = new URL(window.location.href);
+        url.searchParams.delete('recording_id');
+        window.history.replaceState({}, '', url);
+      }
+
       // 防抖處理
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
+        pageNow = 1;
         loadRecordingsWithFilters();
       }, 300);
     });
@@ -402,12 +456,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 日期範圍搜尋
   if (startDateInput) {
     startDateInput.addEventListener('change', () => {
+      if (forcedRecordingId) {
+        forcedRecordingId = null;
+        const url = new URL(window.location.href);
+        url.searchParams.delete('recording_id');
+        window.history.replaceState({}, '', url);
+      }
+      pageNow = 1;
       loadRecordingsWithFilters();
     });
   }
   
   if (endDateInput) {
     endDateInput.addEventListener('change', () => {
+      if (forcedRecordingId) {
+        forcedRecordingId = null;
+        const url = new URL(window.location.href);
+        url.searchParams.delete('recording_id');
+        window.history.replaceState({}, '', url);
+      }
+      pageNow = 1;
       loadRecordingsWithFilters();
     });
   }
@@ -415,6 +483,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 排序變更
   if (sortOrderSelect) {
     sortOrderSelect.addEventListener('change', () => {
+      if (forcedRecordingId) {
+        forcedRecordingId = null;
+        const url = new URL(window.location.href);
+        url.searchParams.delete('recording_id');
+        window.history.replaceState({}, '', url);
+      }
+      pageNow = 1;
       loadRecordingsWithFilters();
     });
   }
@@ -426,7 +501,69 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (startDateInput) startDateInput.value = '';
       if (endDateInput) endDateInput.value = '';
       if (sortOrderSelect) sortOrderSelect.value = '-start_time';
+      // 重設同時解除單筆定位，並把 URL 的 recording_id 拿掉
+      forcedRecordingId = null;
+      const url = new URL(window.location.href);
+      url.searchParams.delete('recording_id');
+      window.history.replaceState({}, '', url);
+      pageNow = 1;
       loadRecordingsWithFilters();
+    });
+  }
+
+  // 分頁：上一頁/下一頁
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      if (pageNow > 1) {
+        pageNow--;
+        loadRecordingsWithFilters();
+      }
+    });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      if (pageNow < pageTotal) {
+        pageNow++;
+        loadRecordingsWithFilters();
+      }
+    });
+  }
+  if (pageInput) {
+    pageInput.addEventListener('change', () => {
+      const inputValue = parseInt(pageInput.value, 10);
+      const maxPage = parseInt(pageInput.max || '1', 10);
+      if (inputValue && inputValue >= 1 && inputValue <= maxPage) {
+        pageNow = inputValue;
+        loadRecordingsWithFilters();
+      } else {
+        pageInput.value = pageNow;
+      }
+    });
+    pageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        const inputValue = parseInt(pageInput.value, 10);
+        const maxPage = parseInt(pageInput.max || '1', 10);
+        if (inputValue && inputValue >= 1 && inputValue <= maxPage) {
+          pageNow = inputValue;
+          loadRecordingsWithFilters();
+        } else {
+          pageInput.value = pageNow;
+        }
+      }
+    });
+  }
+  if (pageSizeInput) {
+    pageSizeInput.addEventListener('change', () => {
+      pageSize = parseInt(pageSizeInput.value, 10) || 20;
+      pageNow = 1;
+      loadRecordingsWithFilters();
+    });
+    pageSizeInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        pageSize = parseInt(pageSizeInput.value, 10) || 20;
+        pageNow = 1;
+        loadRecordingsWithFilters();
+      }
     });
   }
   
@@ -437,7 +574,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const endDate = endDateInput?.value || null;
     const sortOrder = sortOrderSelect?.value || '-start_time';
     
-    await loadRecordings(keyword, startDate, endDate, sortOrder);
+    await loadRecordings(keyword, startDate, endDate, sortOrder, pageNow, pageSize, forcedRecordingId);
   }
 
   // 刪除按鈕事件
@@ -447,11 +584,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadRecordingsWithFilters();
   
   // 第一次進入頁面：只自動選取一次，避免重複呼叫 selectRecording 造成競態
-  if (targetRecordingId) {
-    const targetRec = validRecordings.find(r => r.id === targetRecordingId);
-    if (targetRec) {
-      await selectRecording(targetRec, false); // 不更新 URL，因為已經在 URL 中
-    }
+  if (forcedRecordingId && validRecordings && validRecordings.length > 0) {
+    // 定位模式：列表預期只回傳該筆，直接選取
+    await selectRecording(validRecordings[0], false);
   } else if (validRecordings && validRecordings.length > 0) {
     // 沒有指定 recording_id：預載入最新的影片（不更新 URL）
     await selectRecording(validRecordings[0], false);

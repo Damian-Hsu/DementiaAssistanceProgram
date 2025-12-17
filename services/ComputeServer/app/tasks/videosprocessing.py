@@ -6,7 +6,6 @@ import gc
 from typing import List, Dict, Any, Optional, Tuple, Literal
 from PIL import Image
 import torch
-from transformers import BlipProcessor, BlipForConditionalGeneration
 import math
 import json
 from datetime import datetime, timedelta
@@ -22,6 +21,10 @@ from botocore.config import Config
 from urllib.parse import quote
 from urllib.parse import urlparse
 from pydantic import BaseModel, Field
+import torch
+from transformers import AutoModelForCausalLM
+
+
 dotenv.load_dotenv()
 
 # 以此檔案為錨點，而非 CWD
@@ -553,117 +556,198 @@ def filter_by_frame_difference(
     # B = [ ,0,1,2,3,....]
     # A - B 
 
-class BLIPImageCaptioner:
-    
-    def __init__(self, model_name="Salesforce/blip-image-captioning-base",
-                 cache_dir="/srv/app/adapters/.cache/transformers",
-                 device=None):
-        _dbg(f"Initializing BLIPImageCaptioner with model {model_name} on device {device if device else ('cuda' if torch.cuda.is_available() else 'cpu')}")
+
+# 你原本就有的 _dbg / timer / _frames_dicts_summary ... 這裡沿用
+
+class Moondream2ImageCaptioner:
+    """
+    Moondream2 captioner (Transformers).
+    Uses model.caption(image, length=..., settings=...)  (no BLIP processor needed).
+    Docs: https://docs.moondream.ai/transformers/  :contentReference[oaicite:2]{index=2}
+    """
+
+    def __init__(
+        self,
+        model_name: str = "vikhyatk/moondream2",
+        cache_dir: str = "/srv/app/adapters/.cache/transformers",
+        device: Optional[str] = None,
+        dtype: Optional[torch.dtype] = None,
+        device_map: Optional[str] = None,
+        use_4bit: bool = False,
+    ):
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         self.cache_dir = cache_dir
-        self.processor = BlipProcessor.from_pretrained(
+
+        # dtype：6GB VRAM 常見用 float16；若你是 A100/L4 之類也可 bfloat16
+        if dtype is None:
+            dtype = torch.float16 if self.device.startswith("cuda") else torch.float32
+
+        # device_map：Moondream docs 用 device_map="cuda"/"mps" 的寫法 :contentReference[oaicite:3]{index=3}
+        if device_map is None:
+            device_map = "cuda" if self.device.startswith("cuda") else "cpu"
+
+        _dbg(f"Initializing Moondream2ImageCaptioner model={model_name} device={self.device} "
+             f"dtype={dtype} device_map={device_map} use_4bit={use_4bit}")
+
+        os.makedirs(self.cache_dir, exist_ok=True)
+
+        # 4-bit（可選）：更容易塞進 6GB，但需要 bitsandbytes
+        quant_kwargs = {}
+        if use_4bit:
+            try:
+                from transformers import BitsAndBytesConfig
+                quant_kwargs["quantization_config"] = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=dtype,
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    "use_4bit=True 需要安裝 bitsandbytes，且你的環境要支援。"
+                ) from e
+
+        self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             cache_dir=self.cache_dir,
-            use_fast=True 
+            trust_remote_code=True,   # Moondream2 必須開 :contentReference[oaicite:4]{index=4}
+            dtype=dtype,
+            device_map=device_map,
+            **quant_kwargs,
         )
-        self.model = BlipForConditionalGeneration.from_pretrained(
-            model_name,
-            cache_dir=self.cache_dir
-        )
-        self.model.to(self.device)
         self.model.eval()
 
-        # print(f"✅ BLIP 模型已載入至 {self.device}。")
+        # 若你會反覆呼叫（很多幀），官方也提到可以 compile() 提升速度（可選） :contentReference[oaicite:5]{index=5}
+        # try:
+        #     self.model.compile()
+        # except Exception:
+        #     pass
 
-    def describe(self, image_input):
+    @torch.inference_mode()
+    def describe(self, image_input, length: str = "normal", max_tokens: int = 128) -> str:
         """
-        將圖像轉為自然語言敘述。
-
         Args:
-            image_input: 圖片路徑（str）或 PIL.Image 對象
-            prompt: 給模型的指令提示詞（BLIP-base 不需要，可為 None）
-
-        Returns:
-            caption: 圖像描述文字（str）
+            image_input: 圖片路徑（str）或 PIL.Image
+            length: "short" | "normal" | "long"  :contentReference[oaicite:6]{index=6}
+            max_tokens: 上限（Moondream 的 settings.max_tokens） :contentReference[oaicite:7]{index=7}
         """
-        _dbg(f"BLIPImageCaptioner.describe() called with image_input type {type(image_input)}")
+        _dbg(f"Moondream2ImageCaptioner.describe() called with image_input type {type(image_input)}")
+
         if isinstance(image_input, str):
             image = Image.open(image_input).convert("RGB")
         elif isinstance(image_input, Image.Image):
-            image = image_input
+            image = image_input.convert("RGB")
         else:
             raise TypeError("請提供圖片路徑或 PIL Image 物件")
 
-        inputs = self.processor(image, return_tensors="pt").to(self.device)
-        generated_ids = self.model.generate(**inputs, max_new_tokens=50)
-        caption = self.processor.decode(generated_ids[0], skip_special_tokens=True)
-        
-        # 清理模型推理產生的臨時變數
-        del inputs
-        del generated_ids
+        settings = {"max_tokens": int(max_tokens)}
+        result = self.model.caption(image, length=length, settings=settings)  # :contentReference[oaicite:8]{index=8}
+        caption = result["caption"] if isinstance(result, dict) else str(result)
+
+        # 你原本的清理習慣保留
+        del image
+        gc.collect()
         if torch.cuda.is_available():
-            torch.cuda.empty_cache()  # 清理 CUDA 快取
-        
+            torch.cuda.empty_cache()
+
         return caption
+
 
 _CAPTIONER = None
 _CAPTIONER_LOCK = threading.Lock()
 
-def get_captioner() -> BLIPImageCaptioner:
+def get_captioner() -> Moondream2ImageCaptioner:
     global _CAPTIONER
     _dbg("get_captioner() called")
     if _CAPTIONER is None:
         with _CAPTIONER_LOCK:
             if _CAPTIONER is None:
-                # 確保有資料夾
-                os.makedirs("/srv/app/adapters/.cache/transformers", exist_ok=True)                
-                _CAPTIONER = BLIPImageCaptioner(
-                    model_name="Salesforce/blip-image-captioning-base",
-                    device=None,
-                    # 用「絕對路徑」而非相對路徑
+                os.makedirs("/srv/app/adapters/.cache/transformers", exist_ok=True)
+                _CAPTIONER = Moondream2ImageCaptioner(
+                    model_name="vikhyatk/moondream2",
                     cache_dir="/srv/app/adapters/.cache/transformers",
+                    device=None,
+                    # < 6GB 先開：
+                    use_4bit=True,
+                    # dtype=torch.float16,  # 視你的 GPU 而定
                 )
     return _CAPTIONER
 
-# 初始化 BLIP Captioner 
-# CAPTIONER = BLIPImageCaptioner()
+
 
 @timer
 def img_captioning(frames_dicts: List[Dict[str, Any]]):
+    """
+    Generate image captions for selected video frames using a singleton VLM captioner.
+
+    Design considerations:
+    - Frames are processed sequentially to avoid GPU memory spikes.
+    - Only frames passing blur/significance filters are sent to the vision-language model.
+    - Aggressive memory cleanup is intentionally applied to support low-VRAM GPUs (≈6GB).
+    - The captioner instance is reused (singleton) to avoid repeated model initialization.
+    """
+
     _dbg(f"img_captioning() called with {_frames_dicts_summary(frames_dicts)}")
+
+    # Singleton captioner:
+    # The underlying model is heavy (VLM + vision encoder),
+    # so we ensure it is instantiated exactly once per process.
     captioner = get_captioner()
+
     processed_count = 0
+
     for idx, item in enumerate(frames_dicts):
+        # Skip frames that are either blurry or semantically insignificant.
+        # This acts as a cheap pre-filter to reduce expensive VLM invocations.
         if item["is_not_blurry"] and item["is_significant"]:
             frame = item["frame"]
 
-            # OpenCV (BGR) -> PIL (RGB)
+            # Convert OpenCV BGR frame to PIL RGB image.
+            # PIL.Image is required by most HuggingFace / VLM APIs.
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(image_rgb)
 
-            # 丟進 BLIP 產生描述
-            caption = captioner.describe(pil_image)
+            # Run vision-language inference.
+            # max_tokens is intentionally bounded to:
+            #   1) prevent excessive KV-cache growth
+            #   2) stabilize VRAM usage under repeated calls
+            caption = captioner.describe(
+                pil_image,
+                length="normal",
+                max_tokens=96
+            )
 
-            # 存回 dict
+            # Persist caption back into the frame metadata.
             item["caption"] = caption
             processed_count += 1
-            
-            # 每處理 5 個幀後進行一次垃圾回收（模型推理較耗記憶體）
+
+            # Explicitly release large Python-side objects after each iteration.
+            # This reduces CPU RAM pressure and prevents delayed reference cleanup.
+            del image_rgb
+            del pil_image
+
+            # Periodic deep cleanup:
+            # - gc.collect(): reclaim Python objects that are no longer referenced
+            # - torch.cuda.empty_cache(): release unused CUDA memory back to the allocator
+            #
+            # Running this every frame would cause performance jitter,
+            # so we batch it every N frames as a compromise between stability and throughput.
             if processed_count % 5 == 0:
-                del image_rgb
-                del pil_image
                 gc.collect()
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-        else: 
+        else:
+            # Mark skipped frames explicitly to keep downstream logic simple and explicit.
             item["caption"] = "<skipped due to blur or insignificance>"
-    
-    # 處理完成後進行最終垃圾回收
+
+    # Final cleanup to ensure no residual allocations remain
+    # before returning control to the caller.
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    
+
     return frames_dicts
+
 
 # ====== LLM Schema 定義 ======
 

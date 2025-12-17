@@ -232,22 +232,27 @@ async def list_events(
     rows = (await db.execute(stmt_items)).scalars().all()
     total = (await db.execute(stmt_total)).scalar_one()
 
-    # 轉換時間到使用者時區
+    # 後端負責把事件時間轉成使用者時區（前端只顯示、不做時區計算）
     import pytz
     user_tz = pytz.timezone(user_timezone)
     for row in rows:
-        if row.start_time:
-            if row.start_time.tzinfo is None:
-                row.start_time = row.start_time.replace(tzinfo=timezone.utc)
-            row.start_time = row.start_time.astimezone(user_tz)
-        if hasattr(row, 'created_at') and row.created_at:
-            if row.created_at.tzinfo is None:
-                row.created_at = row.created_at.replace(tzinfo=timezone.utc)
-            row.created_at = row.created_at.astimezone(user_tz)
-        if hasattr(row, 'updated_at') and row.updated_at:
-            if row.updated_at.tzinfo is None:
-                row.updated_at = row.updated_at.replace(tzinfo=timezone.utc)
-            row.updated_at = row.updated_at.astimezone(user_tz)
+        st = row.start_time
+        if st and st.tzinfo is None:
+            st = st.replace(tzinfo=timezone.utc)
+        if st:
+            row.start_time = st.astimezone(user_tz)
+
+        created = getattr(row, "created_at", None)
+        if created and created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if created:
+            row.created_at = created.astimezone(user_tz)
+
+        updated = getattr(row, "updated_at", None)
+        if updated and updated.tzinfo is None:
+            updated = updated.replace(tzinfo=timezone.utc)
+        if updated:
+            row.updated_at = updated.astimezone(user_tz)
 
     return EventListResp(
         items=rows,
@@ -272,22 +277,25 @@ async def get_event(
     
     ev = await _get_event_or_404(db, event_id)
     
-    # 轉換時間到使用者時區
+    # 後端負責把事件時間轉成使用者時區（前端只顯示、不做時區計算）
     import pytz
     user_tz = pytz.timezone(user_timezone)
+
     if ev.start_time:
         if ev.start_time.tzinfo is None:
             ev.start_time = ev.start_time.replace(tzinfo=timezone.utc)
         ev.start_time = ev.start_time.astimezone(user_tz)
-    if hasattr(ev, 'created_at') and ev.created_at:
+
+    if hasattr(ev, "created_at") and ev.created_at:
         if ev.created_at.tzinfo is None:
             ev.created_at = ev.created_at.replace(tzinfo=timezone.utc)
         ev.created_at = ev.created_at.astimezone(user_tz)
-    if hasattr(ev, 'updated_at') and ev.updated_at:
+
+    if hasattr(ev, "updated_at") and ev.updated_at:
         if ev.updated_at.tzinfo is None:
             ev.updated_at = ev.updated_at.replace(tzinfo=timezone.utc)
         ev.updated_at = ev.updated_at.astimezone(user_tz)
-    
+
     return ev
 
 

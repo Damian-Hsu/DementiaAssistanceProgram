@@ -387,9 +387,10 @@
     box-sizing: border-box;
   }
 
-  /* 為固定的 header 留出空間 */
-  .page-content {
-    padding-top: calc(var(--spacing-sm, 8px) * 2 + 24px + 2px) !important; /* header padding + 字體高度 + 邊框 */
+  /* 為固定的 header 留出空間（用 margin-top，避免播放器被遮住）
+     注意：home.html 的主內容不在 .page-content 裡，因此改對 home-content-section 生效 */
+  .home-content-section {
+    margin-top: 56px; /* 約略等於 header 高度（含 padding + 字體 + border） */
   }
 
   .date-selector-inline .date-display {

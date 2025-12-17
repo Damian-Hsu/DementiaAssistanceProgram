@@ -39,12 +39,18 @@ RUN mkdir -p /var/log/compute \
 # 切換到非 root
 USER appuser
 
-# （強烈建議）在 build 階段預先把 BLIP 模型拉進快取，避免執行時卡權限/鎖與網路
+# 在 build 階段預先把 Moondream2 模型拉進快取，避免執行時卡權限/鎖與網路
 RUN python - <<'PY'
-from transformers import BlipProcessor, BlipForConditionalGeneration
-m = "Salesforce/blip-image-captioning-base"
-BlipProcessor.from_pretrained(m, cache_dir="/srv/app/adapters/.cache/transformers", use_fast=True )
-BlipForConditionalGeneration.from_pretrained(m, cache_dir="/srv/app/adapters/.cache/transformers")
+from transformers import AutoModelForCausalLM
+m = "vikhyatk/moondream2"
+cache_dir = "/srv/app/adapters/.cache/transformers"
+# Moondream2 需要 trust_remote_code=True
+AutoModelForCausalLM.from_pretrained(
+    m,
+    cache_dir=cache_dir,
+    trust_remote_code=True,
+    device_map="cpu",  # build 階段僅下載/快取，不做推論
+)
 PY
 
 # 啟動 Celery Worker

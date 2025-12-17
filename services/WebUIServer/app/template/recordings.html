@@ -67,6 +67,19 @@
           <div class="recordings-list" id="recordingsList">
             <p class="loading">載入中...</p>
           </div>
+          <!-- 分頁（放在 list-section 最底下） -->
+          <div class="pagination" id="recordingsPagination" style="display:none;">
+            <button id="prevBtn" class="page-btn" type="button">‹</button>
+            <input id="pageInput" type="number" min="1" value="1" />
+            <span id="pageTotal">/ 1</span>
+            <button id="nextBtn" class="page-btn" type="button">›</button>
+
+            <div class="pagination-info">
+              <span>每頁</span>
+              <input id="pageSize" type="number" min="1" max="200" value="20" />
+              <span>筆，共 <span id="totalCount">0</span> 筆</span>
+            </div>
+          </div>
         </section>
       </main>
 

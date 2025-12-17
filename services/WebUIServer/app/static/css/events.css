@@ -235,6 +235,14 @@
   background-color: #faf6f3;
 }
 
+/* 事件列/卡片：可點擊（點一下即開啟編輯彈窗） */
+.table tbody tr.events-clickable-row {
+  cursor: pointer;
+}
+.table tbody tr.events-clickable-row:hover td {
+  background-color: #f8f9fa;
+}
+
 /* --- 可排序表頭：配合 th[data-sort] 的點擊行為 --- */
 .table th[data-sort] {
   cursor: pointer;
@@ -267,51 +275,6 @@ td.date {
   word-break: break-all;     /* 強制斷詞換行 */
   line-height: 1.5;          /* 增加閱讀性 */
 }
-/* --- 操作按鈕：維持一致配色（不覆蓋全域 .button） --- */
-.btn-detail,
-.btn-edit,
-.btn-delete {
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 0.92rem;
-  border: none;
-  transition: filter .15s ease-in-out, transform .02s;
-  margin: 0;
-  box-shadow: none;
-}
-
-.btn-detail { background: var(--color-accent); color: #fff; }
-.btn-edit   { background: #c8a785; color: #fff; }
-.btn-delete { background: #e07a5f; color: #fff; }
-
-.btn-detail:hover,
-.btn-edit:hover,
-.btn-delete:hover { filter: brightness(1.06); }
-.btn-detail:active,
-.btn-edit:active,
-.btn-delete:active { transform: translateY(1px); }
-
-/* 操作欄樣式 - 按鈕水平置中 */
-.table td:last-child {
-  white-space: nowrap;
-  text-align: center; /* 按鈕水平置中 */
-  /* 不再改動上/下邊框（由整列共用），避免重疊雙線 */
-  border-left: none; /* 避免與左側欄位重疊 */
-  border-right: 1px solid var(--color-border, #D3C0A8); /* 保留右邊框 */
-}
-
-/* 操作欄位按鈕樣式 - 確保按鈕本身沒有邊框和陰影 */
-.table td:last-child .btn-detail,
-.table td:last-child .btn-edit,
-.table td:last-child .btn-delete {
-  border: none;
-  margin: 0 3px; /* 按鈕之間的小間距 */
-  box-shadow: none;
-  outline: none;
-  display: inline-block; /* 讓按鈕可以水平排列 */
-  vertical-align: middle; /* 按鈕垂直置中 */
-}
-
 /* --- 分頁與結果摘要 --- */
 .pagination {
   margin-top: 16px;
@@ -461,6 +424,7 @@ td.date {
     padding: var(--spacing-md, 16px);
     box-shadow: var(--shadow-md, 0 2px 6px rgba(0, 0, 0, 0.1));
     transition: all var(--transition-normal, 0.2s ease);
+    cursor: pointer;
   }
 
   .event-card:hover {
@@ -515,24 +479,6 @@ td.date {
     margin-top: var(--spacing-sm, 8px);
     padding-top: var(--spacing-sm, 8px);
     border-top: 1px solid var(--color-border, #D3C0A8);
-  }
-
-  .event-card-actions {
-    display: flex;
-    gap: var(--spacing-sm, 8px);
-    margin-top: var(--spacing-md, 16px);
-    padding-top: var(--spacing-md, 16px);
-    border-top: 1px solid var(--color-border, #D3C0A8);
-    flex-wrap: wrap;
-  }
-
-  .event-card-actions .btn-detail,
-  .event-card-actions .btn-edit,
-  .event-card-actions .btn-delete {
-    flex: 1;
-    min-width: 80px;
-    text-align: center;
-    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
   }
 
   /* 手機版分頁改為水平排列 */
@@ -619,3 +565,227 @@ td.date {
 .table thead th {
   border-bottom: 2px solid var(--color-border, #D3C0A8) !important;
 }
+
+/* =========================
+   Modal（與 admin_users/vlog 相同風格）
+   ========================= */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.show { display: flex; }
+
+.modal-container {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 860px;
+  width: 92%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 2px solid #e5e7eb;
+  flex-shrink: 0;
+}
+.modal-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+.modal-close {
+  background: transparent !important;
+  font-size: 28px;
+  color: #6B4F4F;
+  cursor: pointer;
+  transition: color 0.2s;
+  user-select: none;
+}
+.modal-close:hover { color: #A47148; }
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 2px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+/* 表單（精簡 admin-form） */
+.admin-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.admin-form .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: #314268;
+}
+.admin-form .form-field > label {
+  font-weight: 600;
+  color: #2f3f66;
+}
+.admin-form .form-field input,
+.admin-form .form-field textarea {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #d7dce5;
+  background-color: #f9fbff;
+  font-size: 0.95rem;
+}
+.admin-form .form-field textarea { resize: vertical; }
+.admin-form .form-hint { font-size: 0.9rem; color: #4a5c84; margin-top: 4px; }
+
+/* footer buttons */
+.modal-footer .btn-primary,
+.modal-footer .btn-secondary,
+.modal-footer .btn-danger {
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  min-height: 44px;
+}
+.modal-footer .btn-primary { background-color: var(--color-accent, #6B4F4F); color: #fff; }
+.modal-footer .btn-secondary { background-color: var(--bg-button, #F3F0EB); color: var(--color-text, #2E2E2E); }
+.modal-footer .btn-danger { background-color: #C45B5B; color: #fff; margin-right: auto; }
+.modal-footer .btn-primary:hover { background-color: var(--color-secondary, #A47148); }
+.modal-footer .btn-secondary:hover { background-color: var(--bg-button-hover, #E2D7C5); }
+.modal-footer .btn-danger:hover { background-color: #B04A4A; }
+
+/* 物件 tags */
+.objects-tags-container {
+  border: 1px solid #d7dce5;
+  border-radius: 12px;
+  background: #f9fbff;
+  padding: 10px 12px;
+}
+.objects-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.object-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;              /* 增加左右 padding，避免看起來被擠扁 */
+  min-height: 28px;               /* 維持視覺高度一致 */
+  border-radius: 10px;            /* 改成自然倒角，不用膠囊 */
+  background: rgba(107, 79, 79, 0.12);
+  border: 1px solid rgba(107, 79, 79, 0.22);
+  color: #6B4F4F;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;            /* 物件名稱不要斷行 */
+}
+.object-tag-remove {
+  border: none;
+  background: transparent !important;
+  cursor: pointer;
+  color: #6B4F4F;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 2px;                 /* 增加一點點點擊範圍 */
+  box-shadow: none !important;
+}
+
+.object-tag-remove:hover,
+.object-tag-remove:focus {
+  background: transparent !important; /* 不要任何底色 */
+  color: #A47148;                      /* hover 稍微亮一點的棕色 */
+  outline: none;
+}
+.objects-tags-input-wrapper input {
+  width: 100%;
+  border: 1px dashed #cbd5e1;
+  background: #fff;
+}
+
+/* 前往事件影片（縮圖卡片） */
+.recording-jump-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e5e7eb;
+}
+.recording-jump-section h4 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+  color: #243654;
+  font-weight: 700;
+}
+.recording-preview-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 2px solid var(--color-border, #D3C0A8);
+  background: #fff;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.recording-preview-card:hover { background-color: #faf6f3; }
+.recording-preview-thumb {
+  width: 128px;
+  height: 96px; /* 修正：縮圖應為橫向（寬>高） */
+  border-radius: 10px;
+  background: #000;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.recording-preview-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.recording-preview-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.recording-preview-title {
+  font-weight: 700;
+  color: var(--color-accent, #6B4F4F);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recording-preview-meta { color: #6b7280; font-size: 14px; }

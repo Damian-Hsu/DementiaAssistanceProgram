@@ -981,11 +981,12 @@ stopStream: async (cameraId) => {
 // === Recordings API ===
 recordings: {
   // 取得錄影列表
-  list: async ({ keywords = null, sr = null, start_time = null, end_time = null, sort = null, page = 1, size = 20 } = {}) => {
+  list: async ({ recording_id = null, keywords = null, sr = null, start_time = null, end_time = null, sort = null, page = 1, size = 20 } = {}) => {
     const token = localStorage.getItem('jwt');
     if (!token) throw new Error('請先登入');
 
     const usp = new URLSearchParams();
+    if (recording_id) usp.set('recording_id', recording_id);
     if (keywords) usp.set('keywords', keywords);
     if (Array.isArray(sr)) sr.forEach(v => usp.append('sr', v));
     else if (typeof sr === 'string') usp.append('sr', sr);

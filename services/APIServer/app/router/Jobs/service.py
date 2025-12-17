@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Optional
 import uuid
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid_utils as uuidu
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.encoders import jsonable_encoder
@@ -41,7 +41,12 @@ def _parse_iso_dt(s: str | None):
         return None
     from datetime import datetime
     try:
-        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+        # 若沒有 tzinfo（naive datetime），一律視為 UTC，避免被 DB 以伺服器時區解讀後轉換造成偏移
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        # 統一轉成 UTC 儲存
+        return dt.astimezone(timezone.utc)
     except Exception:
         return None
 

@@ -432,6 +432,7 @@ async def delete_recording(
 @recordings_router.get("/", response_model=RecordingListResp)
 async def list_recordings(
     request: Request,  # 🔧 修復：添加 request 參數以獲取 current_user
+    recording_id: Optional[uuid.UUID] = Query(default=None, description="指定錄影 ID（用於直接定位單一影片）"),
     user_id: Optional[int] = Query(default=None, description="指定使用者 ID（僅管理員可用）"),
     keywords: Optional[str] = Query(None, description="在 *事件* 欄位內搜尋的關鍵字（預設比對 `summary`）"),
     sr: Optional[List[str]] = Query(None, description="查詢範圍，多值：`?sr=action&sr=scene&sr=objects`；預設只查 `summary`"),
@@ -476,71 +477,120 @@ async def list_recordings(
         # 一般使用者：只能查詢自己的影片，忽略手動輸入的 user_id
         conds.append(recordings_table.Table.user_id == current_user.id)
     
-    conds += _build_time_preds(start_time, end_time, recordings_table.Table.start_time, user_timezone)
+    # --------- 取「第一個事件」的摘要/時間（避免 N+1；也可補齊 recordings.start_time 缺失）---------
+    # 用 window function：row_number() over (partition by recording_id order by start_time asc)
+    ev = events_table.Table
+    first_ev_subq = (
+        select(
+            ev.recording_id.label("recording_id"),
+            ev.start_time.label("event_start_time"),
+            ev.summary.label("event_summary"),
+            func.row_number()
+            .over(
+                partition_by=ev.recording_id,
+                order_by=ev.start_time.asc().nulls_last(),
+            )
+            .label("rn"),
+        )
+        .where(ev.recording_id.is_not(None))
+        .subquery("ev_first")
+    )
+
+    created_at_col = getattr(recordings_table.Table, "created_at", recordings_table.Table.start_time)
+    updated_at_col = getattr(recordings_table.Table, "updated_at", recordings_table.Table.end_time)
+
+    # 影片「顯示/排序用」的時間：優先 recordings.start_time；缺失時用第一個事件時間；再不行用 created_at
+    start_time_expr = func.coalesce(recordings_table.Table.start_time, first_ev_subq.c.event_start_time, created_at_col)
+
+    # 時間條件（使用使用者時區），改用 start_time_expr，避免 start_time 為 NULL 時整批「看起來查不到」
+    conds += _build_time_preds(start_time, end_time, start_time_expr, user_timezone)
 
     exists_pred = _events_keyword_exists_condition(keywords, sr)
     if exists_pred is not None:
         conds.append(exists_pred)
 
+    # 直接定位單一錄影（支援 events → recordings 的 deep link）
+    if recording_id:
+        conds.append(recordings_table.Table.id == recording_id)
+
     allowed = {
-        "start_time": recordings_table.Table.start_time,
-        "created_at": getattr(recordings_table.Table, "created_at", recordings_table.Table.start_time),
+        "start_time": start_time_expr,
+        "created_at": created_at_col,
         "duration": recordings_table.Table.duration,
         "size_bytes": recordings_table.Table.size_bytes,
         "id": recordings_table.Table.id,
     }
     order_by = _parse_sort(sort, allowed, default_key="start_time")
 
-    base_sel = select(recordings_table.Table)
+    base_sel = (
+        select(
+            recordings_table.Table,
+            first_ev_subq.c.event_summary.label("first_event_summary"),
+            start_time_expr.label("computed_start_time"),
+        )
+        .select_from(recordings_table.Table)
+        .outerjoin(
+            first_ev_subq,
+            and_(
+                first_ev_subq.c.recording_id == recordings_table.Table.id,
+                first_ev_subq.c.rn == 1,
+            ),
+        )
+    )
     if conds:
         base_sel = base_sel.where(and_(*conds))
 
     stmt_items = base_sel.order_by(order_by).offset((page - 1) * size).limit(size)
-    stmt_total = select(func.count()).select_from(base_sel.subquery())
+    # total 用只選 id 的子查詢，避免把 recordings/video_metadata 整批放進子查詢造成負擔
+    base_sel_total = (
+        select(recordings_table.Table.id)
+        .select_from(recordings_table.Table)
+        .outerjoin(
+            first_ev_subq,
+            and_(
+                first_ev_subq.c.recording_id == recordings_table.Table.id,
+                first_ev_subq.c.rn == 1,
+            ),
+        )
+    )
+    if conds:
+        base_sel_total = base_sel_total.where(and_(*conds))
+    stmt_total = select(func.count()).select_from(base_sel_total.subquery())
 
-    rows = (await db.execute(stmt_items)).scalars().all()
+    rows = (await db.execute(stmt_items)).all()
     total = (await db.execute(stmt_total)).scalar_one()
     
-    # 🔧 修復：為每個 recording 填充 summary（從第一個 event）並轉換時間到使用者時區
+    # 🔧 修復：一次查詢就拿到 summary/時間，並轉換時間到使用者時區
     import pytz
     user_tz = pytz.timezone(user_timezone)
     items_with_summary = []
-    for rec in rows:
-        # 查詢該 recording 的第一個 event 的 summary
-        stmt_event = (
-            select(events_table.Table.summary)
-            .where(events_table.Table.recording_id == rec.id)
-            .order_by(events_table.Table.start_time.asc())
-            .limit(1)
-        )
-        first_summary = (await db.execute(stmt_event)).scalar_one_or_none()
-        
-        # 轉換時間到使用者時區
-        start_time_user = rec.start_time
+    for rec, first_summary, computed_start_time in rows:
+        # 轉換時間到使用者時區（start_time：用 computed_start_time）
+        start_time_user = computed_start_time
         if start_time_user:
             if start_time_user.tzinfo is None:
                 start_time_user = start_time_user.replace(tzinfo=timezone.utc)
             start_time_user = start_time_user.astimezone(user_tz)
-        
+
         end_time_user = rec.end_time
         if end_time_user:
             if end_time_user.tzinfo is None:
                 end_time_user = end_time_user.replace(tzinfo=timezone.utc)
             end_time_user = end_time_user.astimezone(user_tz)
-        
+
         created_at_user = getattr(rec, "created_at", None)
         if created_at_user:
             if created_at_user.tzinfo is None:
                 created_at_user = created_at_user.replace(tzinfo=timezone.utc)
             created_at_user = created_at_user.astimezone(user_tz)
-        
+
         updated_at_user = getattr(rec, "updated_at", None)
         if updated_at_user:
             if updated_at_user.tzinfo is None:
                 updated_at_user = updated_at_user.replace(tzinfo=timezone.utc)
             updated_at_user = updated_at_user.astimezone(user_tz)
         
-        # 將 ORM 對象轉為 dict，添加 summary 和轉換後的時間
+        # 將 ORM 對象轉為 dict，時間已轉換為使用者時區
         rec_dict = {
             "id": rec.id,
             "user_id": rec.user_id,
@@ -560,8 +610,16 @@ async def list_recordings(
             "updated_at": updated_at_user,
         }
         items_with_summary.append(rec_dict)
-    
-    return RecordingListResp(items=items_with_summary, total=total)
+
+    page_total = total // size + (1 if total % size > 0 else 0)
+    return RecordingListResp(
+        items=items_with_summary,
+        item_total=total,
+        page_size=size,
+        page_now=page,
+        page_total=page_total,
+        total=total,  # 向後相容
+    )
 
 
 @recordings_m2m_router.patch("/{recording_id}/thumbnail")
@@ -630,4 +688,22 @@ async def get_recording_events(
         .order_by(order_by)
     )
     rows = (await db.execute(stmt)).scalars().all()
+
+    # 後端負責把事件時間轉成使用者時區（前端只顯示、不做時區計算）
+    user_timezone = user_service.get_user_timezone(current_user)
+    import pytz
+    user_tz = pytz.timezone(user_timezone)
+    for r in rows:
+        if r.start_time:
+            if r.start_time.tzinfo is None:
+                r.start_time = r.start_time.replace(tzinfo=timezone.utc)
+            r.start_time = r.start_time.astimezone(user_tz)
+        if hasattr(r, "created_at") and getattr(r, "created_at", None):
+            if r.created_at.tzinfo is None:
+                r.created_at = r.created_at.replace(tzinfo=timezone.utc)
+            r.created_at = r.created_at.astimezone(user_tz)
+        if hasattr(r, "updated_at") and getattr(r, "updated_at", None):
+            if r.updated_at.tzinfo is None:
+                r.updated_at = r.updated_at.replace(tzinfo=timezone.utc)
+            r.updated_at = r.updated_at.astimezone(user_tz)
     return rows

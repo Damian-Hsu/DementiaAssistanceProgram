@@ -187,8 +187,11 @@ async def ai_select_vlog_clips(
     
     target_date = body.date
     
-    # 構建日期範圍
-    user_tz = pytz.timezone("Asia/Taipei")
+    # 構建日期範圍（使用使用者時區）
+    from ...router.User.service import UserService
+    user_service = UserService()
+    user_timezone = user_service.get_user_timezone(current_user)
+    user_tz = pytz.timezone(user_timezone)
     day_start = user_tz.localize(datetime.combine(target_date, time.min))
     day_end = user_tz.localize(datetime.combine(target_date, time.max))
     day_start_utc = day_start.astimezone(timezone.utc)

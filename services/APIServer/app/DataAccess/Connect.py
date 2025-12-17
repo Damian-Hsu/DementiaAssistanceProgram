@@ -32,6 +32,8 @@ engine = create_async_engine(
     DATABASE_URL,
     echo=False, # 需要時改True可以觀察SQL
     pool_pre_ping=True,
+    # 強制 DB session 時區為 UTC，避免 naive timestamp 被伺服器時區解讀後轉換造成偏移
+    connect_args={"server_settings": {"timezone": "UTC"}},
 )
 
 

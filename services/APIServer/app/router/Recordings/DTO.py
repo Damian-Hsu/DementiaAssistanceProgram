@@ -33,7 +33,14 @@ class RecordingRead(BaseModel):
 
 class RecordingListResp(BaseModel):
     items: List[RecordingRead]
-    total: int
+    # 與 events/jobs/admin_tasks 的回應格式對齊，方便前端共用分頁元件
+    item_total: int
+    page_size: int
+    page_now: int
+    page_total: int
+
+    # 向後相容：舊前端曾使用 total（等同 item_total）
+    total: Optional[int] = None
 
 class RecordingUrlResp(BaseModel):
     url: str

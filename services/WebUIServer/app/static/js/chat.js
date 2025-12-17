@@ -355,15 +355,8 @@ function showEventsModal(events) {
   // 渲染事件列表
   const eventsList = modal.querySelector('.chat-events-list');
   eventsList.innerHTML = events.map(e => {
-    const time = e.start_time 
-      ? new Date(e.start_time).toLocaleString('zh-TW', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      : '未知時間';
+    // 後端會把事件時間轉成使用者時區；前端只顯示，不做時區計算
+    const time = e.start_time || '未知時間';
     const duration = e.duration 
       ? `(${Math.round(e.duration)}秒)` 
       : '';

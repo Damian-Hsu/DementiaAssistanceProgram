@@ -34,7 +34,6 @@
               <th>進行行為</th>
               <th>發生地點</th>
               <th>事件摘要</th>
-              <th>操作</th>
             </tr>
           </thead>
           <tbody id="eventsList">
@@ -62,15 +61,70 @@
           </span>
         </div>
       </section>
-      <dialog id="eventDialog">
-  <div class="dlg__header">
-    <h3 id="dialogTitle"></h3>
-    <button id="closeDialogBtn" class="dlg__close">✕</button>
+
+  <!-- 事件詳情/編輯彈出視窗（沿用 admin_users 的直覺化 modal 風格） -->
+  <div class="modal-overlay" id="eventDetailModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 id="eventModalTitle">事件編輯</h3>
+        <span class="modal-close" id="closeEventDetailModal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <form id="eventDetailForm" class="admin-form">
+          <input type="hidden" id="detailEventId">
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="detailEventTime">事件時間</label>
+              <input type="text" id="detailEventTime" readonly style="background-color:#f5f5f5;">
+            </div>
+            <div class="form-field">
+              <label for="detailEventDuration">持續時間（秒）</label>
+              <input type="text" id="detailEventDuration" readonly style="background-color:#f5f5f5;">
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="detailAction">行為</label>
+              <input type="text" id="detailAction" placeholder="例如：吃飯 / 看電視">
+            </div>
+            <div class="form-field">
+              <label for="detailScene">地點</label>
+              <input type="text" id="detailScene" placeholder="例如：客廳 / 廚房">
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="detailObjectsInput">物件（按 Enter 新增）</label>
+            <div class="objects-tags-container">
+              <div class="objects-tags-list" id="detailObjectsTags"></div>
+              <div class="objects-tags-input-wrapper">
+                <input type="text" id="detailObjectsInput" placeholder="輸入物件後按 Enter 新增" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="detailSummary">摘要</label>
+            <textarea id="detailSummary" rows="4" placeholder="補充事件摘要（可選）"></textarea>
+          </div>
+
+          <div class="form-hint" id="eventDetailMessage" aria-live="polite"></div>
+
+          <div class="recording-jump-section" id="recordingJumpSection">
+            <h4>前往事件影片</h4>
+            <div id="recordingPreviewContainer"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-danger" id="deleteEventBtn">刪除事件</button>
+        <button type="button" class="btn-secondary" id="cancelEventDetail">取消</button>
+        <button type="button" class="btn-primary" id="saveEventDetail">儲存</button>
+      </div>
+    </div>
   </div>
-  <div class="dlg__body">
-    <div id="dialogContent"></div>
-  </div>
-</dialog>
 
 <script type="module" src="{{ url_for('static', filename='js/events.js') }}"></script>
 

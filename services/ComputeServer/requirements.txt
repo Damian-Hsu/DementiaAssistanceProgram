@@ -1,6 +1,6 @@
 celery
 python-dotenv
-transformers
+transformers>=4.51.1
 numpy
 boto3
 minio
@@ -8,7 +8,7 @@ sqlalchemy
 psycopg2-binary
 # opencv-python
 opencv-python-headless
-pillow
+pillow>=11.0.0
 pathlib
 scikit-image
 requests
@@ -17,10 +17,11 @@ pydantic
 openai
 google-generativeai
 google-genai
-torch
+torch>=2.7.0
 torchvision
 --extra-index-url https://download.pytorch.org/whl/cu126
 sentence-transformers
 jieba
 rank_bm25
 pgvector
+accelerate>=1.10.0
